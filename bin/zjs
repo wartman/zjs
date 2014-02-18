@@ -1,0 +1,65 @@
+#!/usr/bin/env node
+
+var program = require('commander');
+var build = require('../lib/build');
+var fs = require('fs');
+
+program
+  .version('0.0.1')
+  .usage('[options] [commands]');
+
+program
+  .command('build [src] [dest]')
+  .description('z modules build into a single file')
+  .option('-o --optimize', 'uglify the compiled script')
+  .option('-p --project <projectName>', 'set the project name')
+  .option('-m --main <mainModule>', "set the name of your main module (if using an anonymous module)")
+  .action(function(src, dest, options){
+
+    if(typeof src === "undefined"){
+      // Look for a build.js file
+      src = "build.js";
+      options.buildfile = true;
+    }
+
+    build.setup(options);
+    build.start(src, dest);
+
+  }).on('--help', function(){
+    console.log('   Examples:\n');
+    console.log('   $ z build -o foo/scripts/main.js foo/scripts/app-min.js\n');
+  });
+
+program
+  .command('init [dest]')
+  .description('sets up a new z project')
+  .option('-p --project <name>', 'set the project name')
+  .option('-a --about <about>', 'set the project description')
+  .action(function(dest, options){
+    dest = (dest || process.cwd());
+    var z = fs.readFileSync(__dirname + '/../dist/z.js', 'utf-8')
+      , fitMin = fs.readFileSync(__dirname + '/../dist/z-min.js', 'utf-8')
+      , build = 'module.exports = {\n';
+
+    build += '  project: "' + (options.project || 'unnamed') + '",\n';
+    build += '  about: "' + (options.about || 'none') + '",\n';
+    build += '  src: "scripts/main.js",\n  dest: "scripts/build/app.js"\n};'; 
+
+    fs.mkdir(dest + '/libs');
+    fs.writeFileSync(dest + '/libs/z.js', z);
+    fs.writeFileSync(dest + '/libs/z-min.js', fitMin);
+    fs.writeFileSync(dest + '/build.js', build);
+
+    console.log('Project started in '+ dest);
+  });
+
+program
+  .command('test')
+  .description('run tests')
+  .action(function(options){
+    var promiseTest = require('../test/promise/adapter');
+    promiseTest();
+  });
+
+program.parse(process.argv);
+if (!program.args.length) program.help();
