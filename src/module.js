@@ -2,15 +2,9 @@
    * ----------------------------------------------------------------------
    * z.module
    *
-   * Fit's module loading system, capiable of async script loading.
-   * Note that z is compatable with AMD, simply write the module as usual and z will do the rest.
+   * z's module loading system.
+   * Compatable with AMD.
    */
-
-  // Note:
-  // Promises swollow errors, on purpose.
-  // Usually this is fine, but you can throw them using z.Promise#done,
-  // which uses an async-error handler to throw the error anyway.
-  // Just be sure the error is passed all the way down.
 
   /**
    * Constants

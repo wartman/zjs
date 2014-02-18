@@ -6,15 +6,6 @@
    * Based heavily on backbone.
    */
 
-  /**
-   * Events API
-   *
-   * @return {Object} events.Manager
-   */
-  z.events = function(context){
-    return new Events(context);
-  }
-
   var eventsSeparator = /\s+/;
 
   /**
@@ -225,3 +216,12 @@
     }
 
   });
+
+  /**
+   * Events API
+   *
+   * @return {Events}
+   */
+  z.events = function(context){
+    return new Events(context);
+  }

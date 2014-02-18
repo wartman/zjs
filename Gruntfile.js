@@ -39,26 +39,25 @@ module.exports = function(grunt){
         dest: 'dist/z-min.js'
       }
     },
-    qunit: { // Doesn't like z.module :(
-      options: {
-        timeout: 10000
-      },
-      all:[
-        'test/**/*-grunt.html'
-      ]
-    },
-    connect: {
-      server: {
-        options: {
-          port: 8080
-        }
-      }
+    // qunit: {
+    //   options: {
+    //     timeout: 10000
+    //   },
+    //   all:[
+    //     'test/**/*-grunt.html'
+    //   ]
+    // },
+    // connect: {
+    //   server: {
+    //     options: {
+    //       port: 8080
+    //     }
+    //   }
     }
   });
 
   grunt.loadNpmTasks('grunt-contrib-uglify');
   grunt.loadNpmTasks('grunt-contrib-concat');
-  grunt.loadNpmTasks('grunt-contrib-qunit');
   grunt.loadNpmTasks('grunt-contrib-copy');
   grunt.loadNpmTasks('grunt-contrib-connect');
 

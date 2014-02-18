@@ -1,6 +1,7 @@
 {
   "name": "zjs",
-  "version": "0.0.6",
+  "version": "0.0.7",
+  "description": "Modules, classes, promises.",
   "repository": "https://wartman@bitbucket.org/wartman/zjs.git",
   "author": {
     "name": "Peter Wartman",
@@ -11,7 +12,6 @@
     "grunt": "~0.4.2",
     "grunt-contrib-uglify": "~0.3.1",
     "grunt-contrib-concat": "~0.3.0",
-    "grunt-contrib-qunit": "~0.4.0",
     "jquery": "~2.1.0",
     "grunt-contrib-copy": "~0.5.0",
     "grunt-contrib-connect": "~0.6.0",
