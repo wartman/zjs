@@ -256,4 +256,21 @@
 
   });
 
+  // test('error', function(){
+
+  //   stop();
+
+  //   z.module('tests.error').
+  //   imports('not.a.module').
+  //   exports(function(__){
+  //     // zip
+  //   });
+
+  //   z.App.start().catches(function(){
+  //     start();
+  //     ok();
+  //   });
+    
+  // });
+
 })(window.z || {});

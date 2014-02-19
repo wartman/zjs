@@ -52,8 +52,9 @@
      * @return {z.Promise}
      */
     start: function(next){
-      
-      var self = this;
+
+      var self = this
+        , pending = false;
 
       var promise = new z.Promise(function(res, rej){
 
@@ -61,16 +62,17 @@
           rej('Cannot continue from rejected state');
         }
 
-        if(self.isPending()){
+        z.u(self._modules).each(function(mod){
+          if( mod instanceof Module && mod.isPending() ){
+            res(mod.enable()); // bind promise to enable.
+            pending = true;
+            return true; // break loop
+          }
+        });
 
-          z.u(self._modules).each(function(mod){
-            if( mod instanceof Module && mod.isPending() ){
-              res(mod.enable()); // bind promise to enable.
-              return true; // break loop
-            }
-          });
+        if(pending) return;
 
-        }
+        res();
 
       });
 
@@ -81,7 +83,7 @@
       // Default callback.
       // Calling done will throw caught errors
       promise.done(function(val){
-        self.start();
+        if(pending) self.start();
       });
 
       return promise;      
@@ -566,6 +568,11 @@
 
       var promise = new z.Promise(function(res, rej){
 
+        if(self.isRejected()){
+          rej('Cannot enable a rejected module');
+          return;
+        }
+
         if(self.isDone()){ // can only change from a pending state.
           res();
           return;
@@ -582,17 +589,14 @@
 
       });
 
-      if(!z.util.isFunction(next)){
-        next = function(val){ return val; }
+      if(z.u(next).isFunction()){
+        promise.then(next);
       }
 
-      // Will throw errors
-      promise
-        .then(next)
-        .catches(function(e){
-          self._state = MODULE_STATUS.REJECTED;
-          return e;
-        });
+      promise.catches(function(e){
+        self._state = MODULE_STATUS.REJECTED;
+        return e;
+      });
 
       return promise;
 
