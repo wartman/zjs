@@ -27,7 +27,7 @@ program
 
   }).on('--help', function(){
     console.log('   Examples:\n');
-    console.log('   $ z build -o foo/scripts/main.js foo/scripts/app-min.js\n');
+    console.log('   $ zjs build -o foo/scripts/main.js foo/scripts/app-min.js\n');
   });
 
 program

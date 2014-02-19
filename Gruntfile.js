@@ -53,7 +53,7 @@ module.exports = function(grunt){
     //       port: 8080
     //     }
     //   }
-    }
+    // }
   });
 
   grunt.loadNpmTasks('grunt-contrib-uglify');

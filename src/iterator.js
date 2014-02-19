@@ -91,3 +91,10 @@
     }
 
   });
+
+  /**
+   * OOP factory version.
+   */
+  z.util.prototype.iterator = function(){
+    return new z.util.Iterator(this._obj);
+  }

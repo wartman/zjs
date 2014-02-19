@@ -4,10 +4,6 @@
 
   var util = z.util;
 
-  test('z.util.replace', function(){
-    equal(util.replace('my.string.many', '.', '='), 'my=string=many', 'Are several items replaced?');
-  });
-
   test('z.util.each', function(){
 
     var test = ['1', '2', '3', '4'];
@@ -39,11 +35,53 @@
 
   });
 
+  test('z.util.each oop', function(){
+
+    var test = ['1', '2', '3', '4'];
+
+    var expected = "1, 2, 3, 4, ";
+    var actual = ""
+
+    z.util(test).each(function(item){
+      actual += item + ", "
+    });
+
+    equal(actual, expected, 'Iterated over an array');
+
+    test = {
+      one: '1',
+      two: '2',
+      three: '3',
+      four: '4'
+    };
+
+    expected = "one:1, two:2, three:3, four:4, ";
+    actual = ""
+
+    z.util(test).each(function(value, key){
+      actual += key+":"+value+", ";
+    });
+
+    equal(actual, expected, 'Iterated over an object');
+
+  });
+
   test('z.util.once', function(){
     var inc = 0;
     var once = z.util.once(function(){
       return inc += 1;
     });
+
+    equal(once(), 1, 'Ran once.');
+    equal(once(), 1, 'And only once.');
+
+  });
+
+  test('z.util.once oop', function(){
+    var inc = 0;
+    var once = z.util(function(){
+      return inc += 1;
+    }).once().value();
 
     equal(once(), 1, 'Ran once.');
     equal(once(), 1, 'And only once.');
@@ -61,6 +99,17 @@
 
   });
 
+  test('z.util.empty oop', function(){
+
+    ok(z.util([]).empty().value());
+    ok(z.util({}).empty().value());
+    ok(z.util("").empty().value());
+    equal(z.util([1,2]).empty().value(), false);
+    equal(z.util({a:1,b:2}).empty().value(), false);
+    equal(z.util('one').empty().value(), false);
+
+  });
+
   test('z.util.clone', function(){
 
     var expected = {
@@ -73,6 +122,27 @@
     };
 
     var actual = util.clone(expected);
+
+    deepEqual(actual, expected, 'Does the clone create a clone of the object?');
+
+    actual['one'] = '2';
+
+    notDeepEqual(actual, expected, 'Does the cloned object not modify the original?');
+
+  });
+
+  test('z.util.clone oop', function(){
+
+    var expected = {
+      'one' : '1',
+      'two' : '2',
+      'three': {
+        'four': '4',
+        'five': '5'
+      }
+    };
+
+    var actual = z.util(expected).clone().value();
 
     deepEqual(actual, expected, 'Does the clone create a clone of the object?');
 
@@ -110,10 +180,53 @@
 
   });
 
+  test('z.util.defaults oop', function(){
+
+    var defaults = {
+      'option': 'value',
+      'optionTwo': 'value'
+    };
+
+    var expected = {
+      'option' : 'not',
+      'optionTwo': 'value'
+    };
+
+    var actual = z.util(defaults).defaults({'option': 'not'}).value();
+
+    deepEqual(actual, expected, 'Are default options preserved?');
+    notDeepEqual(actual, defaults, 'Is the default object not changed?');
+
+    actual = z.util({}).defaults(expected).value();
+    deepEqual(actual, expected, 'Does extending a blank object work?');
+
+    actual = z.util(expected).defaults(undefined).value();
+    deepEqual(actual, expected, 'Does an undefined second arg work?');
+
+    actual = z.util(expected).defaults({}).value();
+    deepEqual(actual, expected, 'Does an empty second arg work?');
+
+  });
+
   test('z.util.uniqueId', function(){
 
+    // Reset the id index as it may have been called.
+    var retain = util._idIndex;
+    util._idIndex = 0;
     equal(util.uniqueId('test'), 'test1', 'Is the id generated?');
     equal(util.uniqueId('test'), 'test2', 'Deos the id iterate upwards?');
+    util._idIndex = retain;
+
+  });
+
+  test('z.util.uniqueId oop', function(){
+
+    // Reset the id index as it may have been called.
+    var retain = util._idIndex;
+    util._idIndex = 0;
+    equal(util('test').uniqueId().value(), 'test1', 'Is the id generated?');
+    equal(util('test').uniqueId().value(), 'test2', 'Deos the id iterate upwards?');
+    util._idIndex = retain;
 
   });
 
@@ -211,6 +324,13 @@
 
     z.util.extract(['one', 'two'], test, actual);
     deepEqual(actual, {one:"one", two:{one:"one", two:"two"}}, "Applied args to provided object, retained existing props.");
+
+  });
+
+  test('util oop chaining', function(){
+
+    var actual = z.u(['one', 'two']).isArray();
+    ok(actual.value());
 
   });
 
