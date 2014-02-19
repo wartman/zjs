@@ -6,7 +6,7 @@
  * Copyright 2014
  * Released under the MIT license
  *
- * Date: 2014-02-19T17:55Z
+ * Date: 2014-02-19T21:49Z
  */
 
 (function(global, factory){
@@ -1785,17 +1785,15 @@
 
       var promise = new z.Promise(function(res, rej){
 
-        self._checkState();
-
         if(self.isRejected()){
           rej('Cannot continue from rejected state');
         }
 
         if(self.isPending()){
 
-          z.util.each(self._modules, function(mod){
+          z.u(self._modules).each(function(mod){
             if( mod instanceof Module && mod.isPending() ){
-              mod.enable().then(res, rej);
+              res(mod.enable()); // bind promise to enable.
               return true; // break loop
             }
           });
@@ -1812,7 +1810,7 @@
       // Calling done will throw caught errors
       promise.done(function(val){
         self.start();
-      })
+      });
 
       return promise;      
     },
@@ -2312,15 +2310,17 @@
 
       });
 
-      if(z.util.isFunction(next)){
-        promise.then(next);
+      if(!z.util.isFunction(next)){
+        next = function(val){ return val; }
       }
 
-      // Handle failures.
-      promise.catches(function(reason){
-        self._state = MODULE_STATUS.REJECTED;
-        return reason;
-      });
+      // Will throw errors
+      promise
+        .then(next)
+        .catches(function(e){
+          self._state = MODULE_STATUS.REJECTED;
+          return e;
+        });
 
       return promise;
 
@@ -2437,13 +2437,14 @@
 
           } catch(e) {
             // If a plugin is not found, an error will be thrown.
+            self._state = MODULE_STATUS.REJECTED;
             rej(e);
           }
 
         });
       } else {
         self._state = MODULE_STATUS.DEFINED;
-        this.enable().then(res);
+        this.enable().then(res, rej);
       }
 
     },
@@ -2487,17 +2488,23 @@
         return;
       }
 
-      if(z.config.env !== 'server'){
-        if(typeof this.factory === 'function'){
-          this.definition = this.factory(context);
+      try {
+        if(z.config.env !== 'server'){
+          if(typeof this.factory === 'function'){
+            this.definition = this.factory(context);
+          } else {
+            this.definition = this.factory;
+          }
         } else {
-          this.definition = this.factory;
+          // If we're in a node.js env we don't want to execute the factory.
+          // However, if the defintion is null z.module.start() will stall,
+          // so we need to set it to 'true'
+          this.definition = true;
         }
-      } else {
-        // If we're in a node.js env we don't want to execute the factory.
-        // However, if the defintion is null z.module.start() will stall,
-        // so we need to set it to 'true'
-        this.definition = true;
+      } catch(e) {
+        self._state = MODULE_STATUS.REJECTED;
+        rej(e);
+        return;
       }
 
       this._state = MODULE_STATUS.ENABLED;
