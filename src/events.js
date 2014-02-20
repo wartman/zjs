@@ -180,7 +180,7 @@
       for(var id in listeningTo){
         obj = listeningTo[id];
         obj.off(name, callback, this);
-        if(remove || z.util.empty(obj._events)){
+        if(remove || z.util.isEmpty(obj._events)){
           delete this._listeningTo[id];
         }
       }

@@ -88,25 +88,25 @@
 
   });
 
-  test('z.util.empty', function(){
+  test('z.util.isEmpty', function(){
 
-    ok(z.util.empty([]));
-    ok(z.util.empty({}));
-    ok(z.util.empty(""));
-    equal(z.util.empty([1,2]), false);
-    equal(z.util.empty({a:1,b:2}), false);
-    equal(z.util.empty('one'), false);
+    ok(z.util.isEmpty([]));
+    ok(z.util.isEmpty({}));
+    ok(z.util.isEmpty(""));
+    equal(z.util.isEmpty([1,2]), false);
+    equal(z.util.isEmpty({a:1,b:2}), false);
+    equal(z.util.isEmpty('one'), false);
 
   });
 
-  test('z.util.empty oop', function(){
+  test('z.util.isEmpty oop', function(){
 
-    ok(z.util([]).empty().value());
-    ok(z.util({}).empty().value());
-    ok(z.util("").empty().value());
-    equal(z.util([1,2]).empty().value(), false);
-    equal(z.util({a:1,b:2}).empty().value(), false);
-    equal(z.util('one').empty().value(), false);
+    ok(z.util([]).isEmpty().value());
+    ok(z.util({}).isEmpty().value());
+    ok(z.util("").isEmpty().value());
+    equal(z.util([1,2]).isEmpty().value(), false);
+    equal(z.util({a:1,b:2}).isEmpty().value(), false);
+    equal(z.util('one').isEmpty().value(), false);
 
   });
 

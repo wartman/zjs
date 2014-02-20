@@ -6,7 +6,7 @@
  * Copyright 2014
  * Released under the MIT license
  *
- * Date: 2014-02-19T22:18Z
+ * Date: 2014-02-20T22:19Z
  */
 
 (function(global, factory){
@@ -419,7 +419,7 @@
    * @param {Object} Obj
    * @return {Boolean}
    */
-  util.empty = function(obj){
+  util.isEmpty = function(obj){
     if (obj == null){
       return true;
     } 
@@ -1353,7 +1353,7 @@
       for(var id in listeningTo){
         obj = listeningTo[id];
         obj.off(name, callback, this);
-        if(remove || z.util.empty(obj._events)){
+        if(remove || z.util.isEmpty(obj._events)){
           delete this._listeningTo[id];
         }
       }
@@ -1735,6 +1735,12 @@
    */
 
   /**
+   * To do:
+   * Circular dependencies will run forever.
+   * At the very least, throw an error if this happens.
+   */
+
+  /**
    * Constants
    */
   var MODULE_GLOBAL_STATUS = {
@@ -1776,8 +1782,6 @@
      * Checks all modules and loads any that need it.
      * This is run internally: Other then some testing instances,
      * you shoulding need to use it.
-     *
-     * @return {z.Promise}
      */
     start: function(next){
 
@@ -1786,35 +1790,25 @@
 
       var promise = new z.Promise(function(res, rej){
 
-        if(self.isRejected()){
-          rej('Cannot continue from rejected state');
-        }
-
         z.u(self._modules).each(function(mod){
           if( mod instanceof Module && mod.isPending() ){
-            res(mod.enable()); // bind promise to enable.
+            mod.enable(function(){
+              self.start(res);
+            }, rej);
             pending = true;
             return true; // break loop
           }
         });
 
-        if(pending) return;
-
-        res();
+        if(!pending){
+          res();
+        }
 
       });
 
-      if(z.util.isFunction(next)){
-        promise.then(next);
-      }
+      promise.done(next);
 
-      // Default callback.
-      // Calling done will throw caught errors
-      promise.done(function(val){
-        if(pending) self.start();
-      });
-
-      return promise;      
+      return promise;
     },
 
     /**
@@ -2104,7 +2098,7 @@
         root.module = {}; // Allows the use of module.exports
         result = factory.apply(this, args);
 
-        if(false === z.util.empty(root.exports)){
+        if(false === z.util.isEmpty(root.exports)){
           result = root.exports;
         }
 
@@ -2285,48 +2279,43 @@
 
     /**
      * Enable the module.
+     * Module#enable can be used to resolve a promise, if so desired.
      *
      * @param {Function} next
      * @return {this}
      */
-    enable: function(next){
+    enable: function(res, rej){
 
       var self = this
         , stop = false;
 
-      var promise = new z.Promise(function(res, rej){
-
-        if(self.isRejected()){
-          rej('Cannot enable a rejected module');
-          return;
-        }
-
-        if(self.isDone()){ // can only change from a pending state.
-          res();
-          return;
-        }
-
-        self._checkState();
-
-        if(self.isPending()){
-          self._import(res, rej);
-          return;
-        }
-
-        self._define(res, rej);
-
-      });
-
-      if(z.u(next).isFunction()){
-        promise.then(next);
+      if(!res){
+        res = function(){}
+      }
+      if(!rej){
+        rej = function(e){ throw new Error(e); }
       }
 
-      promise.catches(function(e){
-        self._state = MODULE_STATUS.REJECTED;
-        return e;
-      });
+      if(self.isRejected()){
+        rej('Cannot enable a rejected module');
+        return;
+      }
 
-      return promise;
+      if(self.isDone()){ // can only change from a pending state.
+        res();
+        return;
+      }
+
+      self._checkState();
+
+      if(self.isPending()){
+        self._import(res, rej);
+        return;
+      }
+
+      self._define(res, rej);
+
+      return this;
 
     },
 
@@ -2375,9 +2364,7 @@
     },
 
     isDone: function(){
-      return 
-        this._state === MODULE_STATUS.ENABLED ||
-        this._state === MODULE_STATUS.REJECTED;
+      return (this._state === MODULE_STATUS.ENABLED || this._state === MODULE_STATUS.REJECTED);
     },
 
     /**
@@ -2434,7 +2421,7 @@
               remaining -= 1;
               if(remaining <=0 ){
                 self._state = MODULE_STATUS.DEFINED;
-                self.enable().then(res);
+                self.enable(res, rej)
               }
             })
             .catches(rej);
@@ -2448,7 +2435,7 @@
         });
       } else {
         self._state = MODULE_STATUS.DEFINED;
-        this.enable().then(res, rej);
+        this.enable(res, rej);
       }
 
     },
@@ -2473,9 +2460,8 @@
 
         if(false === current){
 
-          z.App._modules[dep.from].enable()
-          .then(function(){
-            self.enable().then(res, rej);
+          z.App._modules[dep.from].enable(function(){
+            self.enable(res, rej);
           }, rej);
 
           stop = true;

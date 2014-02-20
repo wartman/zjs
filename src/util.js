@@ -273,7 +273,7 @@
    * @param {Object} Obj
    * @return {Boolean}
    */
-  util.empty = function(obj){
+  util.isEmpty = function(obj){
     if (obj == null){
       return true;
     } 

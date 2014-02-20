@@ -25,7 +25,7 @@
         one: 1,
         two: 2
       }
-    }).enable().then(function(){
+    }).enable(function(){
 
       start();
 
@@ -266,11 +266,11 @@
   //     // zip
   //   });
 
-  //   z.App.start().catches(function(){
+  //   z.App.start().catches(function(e){
   //     start();
-  //     ok();
+  //     ok('Loaded');
   //   });
-    
+
   // });
 
 })(window.z || {});
