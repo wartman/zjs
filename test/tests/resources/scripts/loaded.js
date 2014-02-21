@@ -1,5 +1,0 @@
-(function(){
-
-  window.loaded = true;
-
-})();
