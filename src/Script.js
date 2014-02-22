@@ -13,10 +13,6 @@ var Script = Loader.extend({
     async: true
   },
 
-  __init__: function(){
-    Script.scripts.push(this);
-  },
-
   /**
    * Create a script node.
    *
@@ -64,8 +60,6 @@ var Script = Loader.extend({
 
 });
 
-Script.pending = [];
-
 /**
  * The following methods and properties are for older browsers, which
  * may start defining a script before it is fully loaded.
@@ -78,19 +72,16 @@ Script.getInteractiveScript = function(){
   }
 
   u.eachReverse(Script.getScripts(), function (script) {
-    // Each script saves its node in '_value'.
-    if (script._value.readyState === 'interactive') {
+    if (script.readyState === 'interactive') {
       return (Script.interactiveScript = script.node);
     }
   });
   return Script.interactiveScript;
 }
 
-Script.scripts = [];
-
-Script.getScripts = function() {
-  return Script.scripts;
-}
+Script.scripts = function(){
+  return getElementsByTagName('script');
+} 
 
 /**
  * Configure the event listener.
