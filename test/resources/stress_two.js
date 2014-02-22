@@ -1,6 +1,8 @@
 /**
  * Stress test imports.
  */
+
+z().
 imports('resources.target_four','*').
 imports('resources.target_five', '*').
 imports('resources.target_six', '*').

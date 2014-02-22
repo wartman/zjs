@@ -79,12 +79,20 @@ z.ensureModule = function(name){
   return;
 }
 
+_loadQueue = 0;
+z.isLoading = function(state){
+  return _loadQueue.length >= 0;
+}
+z.addLoading = function(){
+  _loadQueue += 1;
+}
+z.doneLoading = function(){
+  _loadQueue -= 1;
+}
+
 z.script = function(req, next, error){
   var scr = new Script(req, z.config.script).ready(next, error);
   return scr;
-}
-z.script.isPending = function(url){
-  return Script.isPending(url);
 }
 
 z.ajax = function(req, next, error){
@@ -93,8 +101,8 @@ z.ajax = function(req, next, error){
   return ajx;
 }
 
-z.plugin = function(name, plugin){
-  if(!plugin){
+z.plugin = function(name, loader, loadEvent, options){
+  if(arguments.length <= 1){
     if(z.plugins.hasOwnProperty(name)){
       return z.plugins[name];
     }
@@ -102,12 +110,7 @@ z.plugin = function(name, plugin){
     return false;
   }
 
-  if(!u.isFunction(plugin)){
-    throw new TypeError('[plugin] must be a function or undefined: '+typeof plugin);
-    return false;
-  }
-
-  z.plugins[name] = plugin;
+  z.plugins[name] = new Plugable(loader, loadEvent, options);
   return z.plugins[name];
 }
 

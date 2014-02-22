@@ -22,6 +22,7 @@ var Module = function(deps){
   this._onFailed = [];
 }
 
+var _alias = /\s?([\S]+?)\s?\@\s?([\S]+?)\s?$/;
 Module.prototype.use = function(items){
   if(!this.isEnabled()){
     return false;
@@ -44,16 +45,18 @@ Module.prototype.use = function(items){
     var alias = item
       , name = item;
     if(_alias.test(item)){
-      item.replace(_alias, function(match, actual, replace){
-        name = actual.trim();
-        alias = replace.trim();
+      item.replace(_alias, function(match, actual, replace, index){
+        name = actual;
+        alias = replace;
         return match;
       });
     }
     if(self._definition.hasOwnProperty(name)){
-      (single)?
-      ctx = self._definition[name] :
-      ctx[alias] = self._definition[name];
+      if(single){
+        ctx = self._definition[name];
+      } else {
+        ctx[alias] = self._definition[name];
+      }
     }
   });
 
@@ -84,8 +87,6 @@ Module.prototype.imports = function(from, uses, options){
     options:options
   };
 
-  dep.url = _findUrl(dep);
-
   this._deps.push(dep);
 
   return this;
@@ -114,12 +115,12 @@ Module.prototype.exports = function(name, factory){
 }
 
 Module.prototype.enable = function(next, error){
-  this.ready(next, error);
+  this.done(next, error);
   _resolve(this);
   return this;
 }
 
-Module.prototype.ready = function(onReady, onFailed){
+Module.prototype.done = function(onReady, onFailed){
   if(onReady && u.isFunction(onReady)){
     (this.isEnabled())?
       onReady.call(this) :
@@ -134,7 +135,7 @@ Module.prototype.ready = function(onReady, onFailed){
 }
 
 Module.prototype.fail = function(onFailed){
-  return this.ready(undef, onFailed);
+  return this.done(undef, onFailed);
 }
 
 u.each(['Enabled', 'Loaded', 'Pending', 'Failed'], function(state){
@@ -142,8 +143,6 @@ u.each(['Enabled', 'Loaded', 'Pending', 'Failed'], function(state){
     return this._state === MODULE_STATE[state.toUpperCase()];
   } 
 });
-
-var _alias = /([\s\S]+?)\@([\s\S]+?)$/g;
 
 /**
  * Helper to dispatch a function queue.
@@ -190,7 +189,7 @@ var _resolve = function(mod, state){
   }
 
   if(mod.isEnabled()){
-    // Dispatch the ready queue.
+    // Dispatch the done queue.
     _dispatch(mod._onReady, mod);
     mod._onReady = [];
   }
@@ -218,7 +217,7 @@ var _import = function(mod){
         var type = (item.options.type || 'script')
           , loader = z.plugin(type);
 
-        loader(item, function(){
+        loader.load(item, function(){
           remaining -= 1;
           if(remaining <=0 ){
             _resolve(mod, MODULE_STATE.LOADED);
@@ -266,7 +265,7 @@ var _define = function(mod){
     }
 
     if(!current.isEnabled()){
-      current.enable().ready(function(){
+      current.enable().done(function(){
         mod.enable();
       });
       stop = true;
@@ -320,28 +319,28 @@ var _define = function(mod){
   _resolve(mod, MODULE_STATE.ENABLED);
 }
 
-_findUrl = function(req){
-  var shim = z.config.shim
-    , alias = z.config.alias
-    , name = req.from
-    , ext = (req.options.ext || 'js')
-    , nameParts = name.split('.')
-    , changed = false
-    , src = '';
+// _findUrl = function(req){
+//   var shim = z.config.shim
+//     , alias = z.config.alias
+//     , name = req.from
+//     , ext = (req.options.ext || 'js')
+//     , nameParts = name.split('.')
+//     , changed = false
+//     , src = '';
 
-  u.each(nameParts, function(part, index){
-    if(alias.hasOwnProperty(part)){
-      nameParts[index] = alias[part];
-    }
-  });
+//   u.each(nameParts, function(part, index){
+//     if(alias.hasOwnProperty(part)){
+//       nameParts[index] = alias[part];
+//     }
+//   });
 
-  name = nameParts.join('.');
-  if(shim.hasOwnProperty(name)){
-    src = shim[name].src;
-  } else {
-    src = name.replace(/\./g, '/');
-    src = z.config.root + src + '.' + ext;
-  }
+//   name = nameParts.join('.');
+//   if(shim.hasOwnProperty(name)){
+//     src = shim[name].src;
+//   } else {
+//     src = name.replace(/\./g, '/');
+//     src = z.config.root + src + '.' + ext;
+//   }
 
-  return src;
-}
+//   return src;
+// }

@@ -39,13 +39,14 @@
 
     z('test.stress').
     imports('resources.stress_one').
+    imports('resources.stress_two').
     exports(function(__){
       start();
       equal(__.stress_one.stress, 'one|two|three', 'stress test one passed');
       equal(__.stress_one.stressTxt, 'stress one', 'txt file imported.');
-      //equal(__.stress_two.stress, 'four|five|six', 'stress test two passed');
-      //equal(__.stress_two.stressTxt, 'stress two|stress three', 'txt file imported.');
-    })
+      equal(__.stress_two.stress, 'four|five|six', 'stress test two passed');
+      equal(__.stress_two.stressTxt, 'stress two|stress three', 'txt file imported.');
+    });
 
   });
 

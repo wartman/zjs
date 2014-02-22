@@ -12,22 +12,16 @@ LOADER_STATE = {
   FAILED: -1
 };
 
-var Loader = z.Class({
+var Loader = z.Loader = z.Class({
   
   __new__: function(req, options){
     this.options = u.defaults(this.options, options);
-
     this.node = false;
-
     this._state = LOADER_STATE.PENDING;
-
     this._onReady = [];
     this._onFailed = [];
-
     this._value = false;
-
     this.__init__.apply(this, arguments);
-
     this.load(req);
   },
 
@@ -36,16 +30,16 @@ var Loader = z.Class({
   },
 
   load: function(req){
-    // no-op
+    // No op
   },
 
   /**
-   * Callbacks to run on ready.
+   * Callbacks to run on done.
    *
    * @param {Function} onReady
    * @param {Function} onFailed
    */
-  ready: function(onReady, onFailed){
+  done: function(onReady, onFailed){
     if(onReady && u.isFunction(onReady)){
       (this.isDone())?
         onReady(this._value) :

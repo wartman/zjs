@@ -47,8 +47,6 @@ var Script = Loader.extend({
 
     node.setAttribute('data-from', (req.from || req.url));
 
-    Script.pending.push(req.url);
-
     _scriptLoadEvent(node, function(node){
       self._resolve(node, LOADER_STATE.DONE);
     }, function(e){
@@ -57,20 +55,16 @@ var Script = Loader.extend({
 
     // For ie8, code may start running as soon as the node
     // is placed in the DOM, so we need to be ready:  
-    this.currentlyAddingScript = node;
+    Script.currentlyAddingScript = node;
     node.src = req.url;
     head.appendChild(node);
     // Clear out the current script after DOM insertion.
-    this.currentlyAddingScript = null;
+    Script.currentlyAddingScript = null;
   }
 
 });
 
 Script.pending = [];
-
-Script.isPending = function(url){
-  return Script.pending.indexOf(url) >= 0;
-}
 
 /**
  * The following methods and properties are for older browsers, which
@@ -80,15 +74,16 @@ Script.currentlyAddingScript = null;
 Script.interactiveScript = null;
 Script.getInteractiveScript = function(){
   if (Script.interactiveScript && Script.interactiveScript.readyState === 'interactive') {
-    return interactiveScript;
+    return Script.interactiveScript;
   }
 
-  u.eachReverse(Script.scripts(), function (script) {
-    if (script.readyState === 'interactive') {
-      return (self.interactiveScript = script);
+  u.eachReverse(Script.getScripts(), function (script) {
+    // Each script saves its node in '_value'.
+    if (script._value.readyState === 'interactive') {
+      return (Script.interactiveScript = script.node);
     }
   });
-  return interactiveScript;
+  return Script.interactiveScript;
 }
 
 Script.scripts = [];

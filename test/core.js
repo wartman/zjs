@@ -25,7 +25,7 @@
         foo: 'foo',
         bar: 'bar'
       } 
-    }).ready(function(){
+    }).done(function(){
 
       start();
 
@@ -136,7 +136,7 @@
 
   });
 
-  test('ready', function(){
+  test('done', function(){
 
     // Reset the modules.
     z.modules = {};
@@ -160,7 +160,7 @@
       }
     });
 
-    z('test.ready').
+    z('test.done').
     imports('test.foo', ['foo', 'bin']).
     imports('test.bar', 'bar').
     imports('test.baz').
@@ -174,10 +174,10 @@
 
     stop();
 
-    z('test.ready').ready(function(){
+    z('test.done').done(function(){
       start();
       ok('Ran when module ready');
-      deepEqual(z('test.ready'), this, '"this" bound correctly');
+      deepEqual(z('test.done'), this, '"this" bound correctly');
       deepEqual(this.use(['foo', 'bar', 'baz']), {foo:'foo',bar:'bar',baz:'bin'}, 'Exports accessable and ready');
     });
 
@@ -225,7 +225,7 @@
 
     stop();
 
-    Exports.ready(function(){
+    Exports.done(function(){
 
       start();
 
@@ -256,7 +256,13 @@
 
     stop();
 
-    z.plugin('test', function(req, next, err){
+    var TestLoader = z.Loader.extend({
+      load: function(req){
+        this._resolve(true, 1); // Make constants available too?
+      }
+    }); 
+
+    z.plugin('test', TestLoader, function(req, res, next, err){
       start();
       // Define the request so the loader doesn't throw an error.
       z('fake.request', function(){/*no-op*/});
@@ -278,7 +284,13 @@
     // This test DOES NOT test for ensured names via a network-load action.
     // Always run test.core.actual
 
-    z.plugin('ensure', function(req, next, err){
+    var TestLoader = z.Loader.extend({
+      load: function(req){
+        this._resolve(true, 1); // Make constants available too?
+      }
+    }); 
+
+    z.plugin('ensure', TestLoader, function(req, res, next, err){
       // Mock an anonymous module being retrieved
       z().exports(function(){
         return{

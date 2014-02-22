@@ -32,6 +32,8 @@ var Ajax = Loader.extend({
   },
 
   load: function(req){
+    this.__super__(req);
+
     var request
       , self = this
       , method = 'GET';
@@ -54,11 +56,8 @@ var Ajax = Loader.extend({
     request.onreadystatechange = function(){
       if(AJAX_STATE.DONE === this.readyState){
         if(200 === this.status){
-          if(this.response){
-            self._value = this.response;
-          } else {
-            self._value = this.responseText
-          }
+          console.log(this.responseText);
+          self._value = this.responseText;
           self._resolve(self._value, AJAX_STATE.DONE);
         } else {
           self._value = this.status;

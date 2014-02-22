@@ -1,29 +1,23 @@
 /**
  * The default plugin, used for loading js files.
  */
-z.plugin('script', function(req, next, error){
-  var name = req.from
-    , self = this;
-  if(z.script.isPending(req.url)){
-    return;
-  }
-  z.script(req, function(node){
-    z.ensureModule(name);
-    next();
-  }, error);
+z.plugin('script', Script, function(req, res, next, error){
+  var name = req.from;
+  z.ensureModule(name);
+  next();
+}, {
+  ext: 'js'
 });
 
 /**
  * Load other files.
  */
-z.plugin('ajax', function(req, next, error){
-  var name = req.from
-    , self = this
-    , mod = z(name); // The module that will wrap the file.
-
-  req.method = 'GET';
-  z.ajax(req, function(data){
-    mod.exports(function(){ return data; });
-    next();
-  }, error);
+z.plugin('ajax', Ajax, function(req, res, next, error){
+  var name = req.from;
+  z(name, function(){ return res; }).done(next, error);
+}, {
+  req: {
+    method: 'GET',
+  },
+  ext: 'txt'
 });

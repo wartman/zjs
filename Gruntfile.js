@@ -21,6 +21,7 @@ module.exports = function(grunt){
           "src/core.js",
           "src/Class.js",
           "src/Module.js",
+          "src/Plugable.js",
           "src/Loader.js",
           "src/Script.js",
           "src/Ajax.js",

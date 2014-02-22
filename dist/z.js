@@ -6,7 +6,7 @@
  * Copyright 2014
  * Released under the MIT license
  *
- * Date: 2014-02-21T23:10Z
+ * Date: 2014-02-22T21:41Z
  */
 
 (function(global, factory){
@@ -23,9 +23,9 @@
 
 /**
  * ----------------------------------------------------------------------
- * u
+ * z.u
  *
- * z's uity classes and functions.
+ * z's utility functions.
  */
 
 /**
@@ -468,12 +468,20 @@ z.ensureModule = function(name){
   return;
 }
 
+_loadQueue = 0;
+z.isLoading = function(state){
+  return _loadQueue.length >= 0;
+}
+z.addLoading = function(){
+  _loadQueue += 1;
+}
+z.doneLoading = function(){
+  _loadQueue -= 1;
+}
+
 z.script = function(req, next, error){
   var scr = new Script(req, z.config.script).ready(next, error);
   return scr;
-}
-z.script.isPending = function(url){
-  return Script.isPending(url);
 }
 
 z.ajax = function(req, next, error){
@@ -482,8 +490,8 @@ z.ajax = function(req, next, error){
   return ajx;
 }
 
-z.plugin = function(name, plugin){
-  if(!plugin){
+z.plugin = function(name, loader, loadEvent, options){
+  if(arguments.length <= 1){
     if(z.plugins.hasOwnProperty(name)){
       return z.plugins[name];
     }
@@ -491,12 +499,7 @@ z.plugin = function(name, plugin){
     return false;
   }
 
-  if(!u.isFunction(plugin)){
-    throw new TypeError('[plugin] must be a function or undefined: '+typeof plugin);
-    return false;
-  }
-
-  z.plugins[name] = plugin;
+  z.plugins[name] = new Plugable(loader, loadEvent, options);
   return z.plugins[name];
 }
 
@@ -658,6 +661,7 @@ var Module = function(deps){
   this._onFailed = [];
 }
 
+var _alias = /\s?([\S]+?)\s?\@\s?([\S]+?)\s?$/;
 Module.prototype.use = function(items){
   if(!this.isEnabled()){
     return false;
@@ -680,16 +684,18 @@ Module.prototype.use = function(items){
     var alias = item
       , name = item;
     if(_alias.test(item)){
-      item.replace(_alias, function(match, actual, replace){
-        name = actual.trim();
-        alias = replace.trim();
+      item.replace(_alias, function(match, actual, replace, index){
+        name = actual;
+        alias = replace;
         return match;
       });
     }
     if(self._definition.hasOwnProperty(name)){
-      (single)?
-      ctx = self._definition[name] :
-      ctx[alias] = self._definition[name];
+      if(single){
+        ctx = self._definition[name];
+      } else {
+        ctx[alias] = self._definition[name];
+      }
     }
   });
 
@@ -720,8 +726,6 @@ Module.prototype.imports = function(from, uses, options){
     options:options
   };
 
-  dep.url = _findUrl(dep);
-
   this._deps.push(dep);
 
   return this;
@@ -750,12 +754,12 @@ Module.prototype.exports = function(name, factory){
 }
 
 Module.prototype.enable = function(next, error){
-  this.ready(next, error);
+  this.done(next, error);
   _resolve(this);
   return this;
 }
 
-Module.prototype.ready = function(onReady, onFailed){
+Module.prototype.done = function(onReady, onFailed){
   if(onReady && u.isFunction(onReady)){
     (this.isEnabled())?
       onReady.call(this) :
@@ -770,7 +774,7 @@ Module.prototype.ready = function(onReady, onFailed){
 }
 
 Module.prototype.fail = function(onFailed){
-  return this.ready(undef, onFailed);
+  return this.done(undef, onFailed);
 }
 
 u.each(['Enabled', 'Loaded', 'Pending', 'Failed'], function(state){
@@ -778,8 +782,6 @@ u.each(['Enabled', 'Loaded', 'Pending', 'Failed'], function(state){
     return this._state === MODULE_STATE[state.toUpperCase()];
   } 
 });
-
-var _alias = /([\s\S]+?)\@([\s\S]+?)$/g;
 
 /**
  * Helper to dispatch a function queue.
@@ -826,7 +828,7 @@ var _resolve = function(mod, state){
   }
 
   if(mod.isEnabled()){
-    // Dispatch the ready queue.
+    // Dispatch the done queue.
     _dispatch(mod._onReady, mod);
     mod._onReady = [];
   }
@@ -854,7 +856,7 @@ var _import = function(mod){
         var type = (item.options.type || 'script')
           , loader = z.plugin(type);
 
-        loader(item, function(){
+        loader.load(item, function(){
           remaining -= 1;
           if(remaining <=0 ){
             _resolve(mod, MODULE_STATE.LOADED);
@@ -902,7 +904,7 @@ var _define = function(mod){
     }
 
     if(!current.isEnabled()){
-      current.enable().ready(function(){
+      current.enable().done(function(){
         mod.enable();
       });
       stop = true;
@@ -956,11 +958,79 @@ var _define = function(mod){
   _resolve(mod, MODULE_STATE.ENABLED);
 }
 
-_findUrl = function(req){
+// _findUrl = function(req){
+//   var shim = z.config.shim
+//     , alias = z.config.alias
+//     , name = req.from
+//     , ext = (req.options.ext || 'js')
+//     , nameParts = name.split('.')
+//     , changed = false
+//     , src = '';
+
+//   u.each(nameParts, function(part, index){
+//     if(alias.hasOwnProperty(part)){
+//       nameParts[index] = alias[part];
+//     }
+//   });
+
+//   name = nameParts.join('.');
+//   if(shim.hasOwnProperty(name)){
+//     src = shim[name].src;
+//   } else {
+//     src = name.replace(/\./g, '/');
+//     src = z.config.root + src + '.' + ext;
+//   }
+
+//   return src;
+// }
+
+
+/**
+ * ----------------------------------------------------------------------
+ * Plugable
+ */
+
+/**
+ * The Plugable is used by z.plugin to handle loading events.
+ *
+ * @param {Loader} loader A loader class. Requires a 'load' method
+ *   and a 'done' method. See z.Loader for an example of how to
+ *   create a compatable class.
+ * @param {Function} loadEvent The callback that will be triggered
+ *   when the module is loaded.
+ * @param {Object} options Default options for requests.
+ */
+var Plugable = function(loader, loadEvent, options){
+  this._queue = {};
+  this._loader = loader;
+  this.options = u.defaults(this.options, options);
+  this._loadEvent = loadEvent;
+}
+
+/**
+ * The default options for a request.
+ * Currently, you can set 'ext' to change the default extension,
+ * and 'req' to modifiy all request objects.
+ *
+ * This is subject to change!
+ *
+ * @var {Object}
+ */
+Plugable.prototype.options = {
+  ext: 'js'
+};
+
+/**
+ * Create an URL using this plugables options.
+ *
+ * @param {Object} request
+ * @api private
+ */
+Plugable.prototype._makeUrl = function(req){
   var shim = z.config.shim
     , alias = z.config.alias
     , name = req.from
-    , ext = (req.options.ext || 'js')
+    , ext = (req.options.ext || this.options.ext)
     , nameParts = name.split('.')
     , changed = false
     , src = '';
@@ -982,6 +1052,60 @@ _findUrl = function(req){
   return src;
 }
 
+/**
+ * Add a request to the queue.
+ * 
+ * @param {String} url
+ * @param {Loader} obj
+ */ 
+Plugable.prototype.enqueue = function(url, obj){
+  this._queue[url] = obj;
+}
+
+/**
+ * Check the queue to see if an url is loading.
+ *
+ * @param {String} url
+ */
+Plugable.prototype.has = function(url){
+  return this._queue.hasOwnProperty(url)
+}
+
+/**
+ * Load a request.
+ *
+ * @param {Object} req
+ * @param {Function} next
+ * @param {Function} error
+ */
+Plugable.prototype.load = function(req, next, error){
+  var self = this;
+  if(!req.url){
+    req.url = this._makeUrl(req);
+  }
+  if(this.options.req){
+    req = u.defaults(this.options.req, req);
+  }
+
+  // Ensure that we only load an item once.
+  // If a module requests the same URL again, have it subscribe to the 
+  // request alreay in progress.
+  if(!this.has(req.url)){
+    this.enqueue(req.url, new this._loader(req));
+  }
+  this._queue[req.url].done(function(res){
+    self._loadEvent(req, res, next, error);
+  }, error);
+}
+
+
+/**
+ * ----------------------------------------------------------------------
+ * Loader
+ *
+ * A class that contains some common functionality for z's script loader
+ * and its ajax loader.
+ */
 
 LOADER_STATE = {
   PENDING: 0,
@@ -989,22 +1113,16 @@ LOADER_STATE = {
   FAILED: -1
 };
 
-var Loader = z.Class({
+var Loader = z.Loader = z.Class({
   
   __new__: function(req, options){
     this.options = u.defaults(this.options, options);
-
     this.node = false;
-
     this._state = LOADER_STATE.PENDING;
-
     this._onReady = [];
     this._onFailed = [];
-
     this._value = false;
-
     this.__init__.apply(this, arguments);
-
     this.load(req);
   },
 
@@ -1013,10 +1131,16 @@ var Loader = z.Class({
   },
 
   load: function(req){
-    // no-op
+    // No op
   },
 
-  ready: function(onReady, onFailed){
+  /**
+   * Callbacks to run on done.
+   *
+   * @param {Function} onReady
+   * @param {Function} onFailed
+   */
+  done: function(onReady, onFailed){
     if(onReady && u.isFunction(onReady)){
       (this.isDone())?
         onReady(this._value) :
@@ -1029,6 +1153,12 @@ var Loader = z.Class({
     }
   },
 
+  /**
+   * Resolve the loader based on the passed state.
+   *
+   * @param {Mixed} arg
+   * @param {Integer} state
+   */
   _resolve: function(arg, state){
     if(state){
       this._state = state;
@@ -1066,11 +1196,9 @@ u.each(['Done', 'Pending', 'Failed'], function(state){
  * ----------------------------------------------------------------------
  * z.Scripts
  *
- * Fit's Script loader, which uses the DOM to get js files.
+ * z's scripts loader.
  */
-/**
- * Script class.
- */
+
 var Script = Loader.extend({
 
   options: {
@@ -1083,6 +1211,11 @@ var Script = Loader.extend({
     Script.scripts.push(this);
   },
 
+  /**
+   * Create a script node.
+   *
+   * @return {Element}
+   */
   create: function(){
     var node = this._value = document.createElement('script');
     node.type = this.options.nodeType || 'text/javascript';
@@ -1091,6 +1224,9 @@ var Script = Loader.extend({
     return node;
   },
 
+  /**
+   * Load a request
+   */
   load: function(req){
 
     var node = this.create()
@@ -1105,8 +1241,6 @@ var Script = Loader.extend({
 
     node.setAttribute('data-from', (req.from || req.url));
 
-    Script.pending.push(req.url);
-
     _scriptLoadEvent(node, function(node){
       self._resolve(node, LOADER_STATE.DONE);
     }, function(e){
@@ -1115,34 +1249,35 @@ var Script = Loader.extend({
 
     // For ie8, code may start running as soon as the node
     // is placed in the DOM, so we need to be ready:  
-    this.currentlyAddingScript = node;
+    Script.currentlyAddingScript = node;
     node.src = req.url;
     head.appendChild(node);
     // Clear out the current script after DOM insertion.
-    this.currentlyAddingScript = null;
+    Script.currentlyAddingScript = null;
   }
 
 });
 
 Script.pending = [];
 
-Script.isPending = function(url){
-  return Script.pending.indexOf(url) >= 0;
-}
-
+/**
+ * The following methods and properties are for older browsers, which
+ * may start defining a script before it is fully loaded.
+ */
 Script.currentlyAddingScript = null;
 Script.interactiveScript = null;
 Script.getInteractiveScript = function(){
   if (Script.interactiveScript && Script.interactiveScript.readyState === 'interactive') {
-    return interactiveScript;
+    return Script.interactiveScript;
   }
 
-  u.eachReverse(Script.scripts(), function (script) {
-    if (script.readyState === 'interactive') {
-      return (self.interactiveScript = script);
+  u.eachReverse(Script.getScripts(), function (script) {
+    // Each script saves its node in '_value'.
+    if (script._value.readyState === 'interactive') {
+      return (Script.interactiveScript = script.node);
     }
   });
-  return interactiveScript;
+  return Script.interactiveScript;
 }
 
 Script.scripts = [];
@@ -1239,6 +1374,8 @@ var Ajax = Loader.extend({
   },
 
   load: function(req){
+    this.__super__(req);
+
     var request
       , self = this
       , method = 'GET';
@@ -1261,11 +1398,8 @@ var Ajax = Loader.extend({
     request.onreadystatechange = function(){
       if(AJAX_STATE.DONE === this.readyState){
         if(200 === this.status){
-          if(this.response){
-            self._value = this.response;
-          } else {
-            self._value = this.responseText
-          }
+          console.log(this.responseText);
+          self._value = this.responseText;
           self._resolve(self._value, AJAX_STATE.DONE);
         } else {
           self._value = this.status;
@@ -1365,31 +1499,25 @@ root.define.amd = {
 /**
  * The default plugin, used for loading js files.
  */
-z.plugin('script', function(req, next, error){
-  var name = req.from
-    , self = this;
-  if(z.script.isPending(req.url)){
-    return;
-  }
-  z.script(req, function(node){
-    z.ensureModule(name);
-    next();
-  }, error);
+z.plugin('script', Script, function(req, res, next, error){
+  var name = req.from;
+  z.ensureModule(name);
+  next();
+}, {
+  ext: 'js'
 });
 
 /**
  * Load other files.
  */
-z.plugin('ajax', function(req, next, error){
-  var name = req.from
-    , self = this
-    , mod = z(name); // The module that will wrap the file.
-
-  req.method = 'GET';
-  z.ajax(req, function(data){
-    mod.exports(function(){ return data; });
-    next();
-  }, error);
+z.plugin('ajax', Ajax, function(req, res, next, error){
+  var name = req.from;
+  z(name, function(){ return res; }).done(next, error);
+}, {
+  req: {
+    method: 'GET',
+  },
+  ext: 'txt'
 });
 
 
