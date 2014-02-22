@@ -64,23 +64,26 @@ var Script = Loader.extend({
  * The following methods and properties are for older browsers, which
  * may start defining a script before it is fully loaded.
  */
+Script.useInteractive = false;
 Script.currentlyAddingScript = null;
 Script.interactiveScript = null;
 Script.getInteractiveScript = function(){
+  console.log('getting interactive');
   if (Script.interactiveScript && Script.interactiveScript.readyState === 'interactive') {
     return Script.interactiveScript;
   }
 
-  u.eachReverse(Script.getScripts(), function (script) {
+  u.eachReverse(Script.scripts(), function (script) {
     if (script.readyState === 'interactive') {
-      return (Script.interactiveScript = script.node);
+      Script.interactiveScript = script;
+      return true;
     }
   });
   return Script.interactiveScript;
 }
 
 Script.scripts = function(){
-  return getElementsByTagName('script');
+  return document.getElementsByTagName('script');
 } 
 
 /**
@@ -103,13 +106,16 @@ var _scriptLoadEvent = (function(){
   // (based on requireJs)
   if (testNode.attachEvent){
 
+    console.log('setup interactive');
+
     // Because onload is not fired right away, we can't add a define call to
     // anonymous modules. However, IE reports the script as being in 'interactive'
     // ready state at the time of the define call.
     loader = function(node, next, err){
       Script.useInteractive = true;
       node.attachEvent('onreadystatechange', function(){
-        if(node.readyState === 'loaded'){
+        // if(node.readyState === 'loaded'){  // I could swear this was correct.
+        if(node.readyState === 'complete'){
           next(node);
           Script.interactiveScript = null;
         }
@@ -122,11 +128,9 @@ var _scriptLoadEvent = (function(){
     loader = function(node, next, err){
       node.addEventListener('load', function(e){
         next(node);
-        Script.interactiveScript = null;
       }, false);
       node.addEventListener('error', function(e){
         err(e);
-        Script.interactiveScript = null;
       }, false);
     }
 
