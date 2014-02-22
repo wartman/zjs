@@ -1,6 +1,9 @@
 /**
  * Stress test imports.
+ *
+ * The following is one way -- probably the more correct one -- to write a module.
  */
+
 var Stress = z()
   .imports('resources.target_one', '*')
   .imports('resources.target_two', '*')

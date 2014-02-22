@@ -1,5 +1,7 @@
 /**
  * Stress test imports.
+ *
+ * The following is one way -- less correct, but prettier -- to write a module.
  */
 
 z().

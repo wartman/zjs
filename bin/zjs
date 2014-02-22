@@ -17,8 +17,8 @@ program
   .action(function(src, dest, options){
 
     if(typeof src === "undefined"){
-      // Look for a build.js file
-      src = "build.js";
+      // Look for a buildz.js file
+      src = "buildz.js";
       options.buildfile = true;
     }
 

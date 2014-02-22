@@ -1,9 +1,10 @@
 define([
-  'resources/imports'
-], function(imports){
+  'resources/named',
+  'resources/anon'
+], function(named, anon){
 
   return {
-    loaded: imports.named + "|"+imports.anon
+    loaded: named + "|"+ anon
   };
 
 });

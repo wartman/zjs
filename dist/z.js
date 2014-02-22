@@ -6,7 +6,7 @@
  * Copyright 2014
  * Released under the MIT license
  *
- * Date: 2014-02-22T22:07Z
+ * Date: 2014-02-22T23:05Z
  */
 
 (function(global, factory){
@@ -388,7 +388,18 @@ u.prototype.value = function(){
 
 
 /**
+ * ----------------------------------------------------------------------
+ * z API
+ */
+
+/**
  * The top-level API for z
+ *
+ * @param {String | Function} name The module name. If this is the only arg given,
+ *   and the name exists in the registry, this will return an existing module.
+ *   If you pass a function here, you will define a ananymous module with no deps.
+ * @param {Function} factory Pass a function here to quickly define a module
+ *   with no deps.
  */
 var z = root.z = function(name, factory){
   if(z.has(name) && !factory){
@@ -398,7 +409,7 @@ var z = root.z = function(name, factory){
     factory = name;
     name = undef;
   }
-  var mod = _add(name);
+  var mod = _addModule(name);
   if(factory){
     mod.exports(factory);
   }
@@ -407,8 +418,12 @@ var z = root.z = function(name, factory){
 
 /**
  * Helper for adding modules.
+ *
+ * @param {String} name
+ * @return {Module}
+ * @api private
  */
-var _add = function(name){
+var _addModule = function(name){
   if(typeof name === "undefined"){
     var node;
     if(Script.useInteractive){
@@ -429,32 +444,35 @@ var _add = function(name){
 }
 
 /**
- * Expose util funcs.
+ * All modules are registered here.
+ *
+ * @var {Object}
  */
-z.u = z.util = u;
-
 z.modules = {};
-z.plugins = {};
+
+/**
+ * Anonymous modules are stored here until they can be named.
+ *
+ * @var {Module | null}
+ */
 z.tmp = null;
 
 /**
- * Static methods
+ * Check to see if a module exists in the registry.
+ *
+ * @param {String} name
  */
-
 z.has = function(name){
   return z.modules.hasOwnProperty(name);
 }
 
-z.config = {
-  root: '',
-  shim: {},
-  alias: {},
-  env: 'browser'
-};
-z.setup = function(options){
-  z.config = u.defaults(z.config, options);
-}
-
+/**
+ * This method checks z.tmp and assigns the name provided
+ * if it finds a module there. Should be called by plugins in
+ * their onLoad callbacks.
+ *
+ * @param {String} name
+ */
 z.ensureModule = function(name){
   var tmp = z.tmp;
   if(null === tmp){
@@ -468,28 +486,50 @@ z.ensureModule = function(name){
   return;
 }
 
-_loadQueue = 0;
-z.isLoading = function(state){
-  return _loadQueue.length >= 0;
-}
-z.addLoading = function(){
-  _loadQueue += 1;
-}
-z.doneLoading = function(){
-  _loadQueue -= 1;
+/**
+ * The app configuration.
+ *
+ * @var {Object}
+ */
+z.config = {
+  root: '',
+  shim: {},
+  alias: {},
+  env: 'browser'
+};
+
+/**
+ * Configure z
+ *
+ * @param {Object} options
+ */
+z.setup = function(options){
+  z.config = u.defaults(z.config, options);
 }
 
-z.script = function(req, next, error){
-  var scr = new Script(req, z.config.script).ready(next, error);
-  return scr;
-}
+/**
+ * Expose util funcs.
+ */
+z.u = z.util = u;
 
-z.ajax = function(req, next, error){
-  var ajx = new Ajax(req, z.config.ajax)
-  ajx.ready(next, error);
-  return ajx;
-}
+/**
+ * The plugin registry.
+ *
+ * @var {Object}
+ */
+z.plugins = {};
 
+/**
+ * Plugable factory. If the only arg provided is [name], and
+ * a plugin of that name exists, this will return a plugin.
+ *
+ * @param {String} name Set or get a plugin of this name.
+ * @param {Loader} loader The loader class to use.
+ * @param {Function} loadEvent The event to trigger on load
+ * @param {Object} options
+ * @throws {Error} If no plugin of the requested name is found.
+ * @return {Plugable}
+ */
 z.plugin = function(name, loader, loadEvent, options){
   if(arguments.length <= 1){
     if(z.plugins.hasOwnProperty(name)){
@@ -504,10 +544,31 @@ z.plugin = function(name, loader, loadEvent, options){
 }
 
 /**
- * Shortcuts
+ * Load a script.
+ *
+ * @param {Object} req
+ * @param {Function} next
+ * @param {Function} err
+ * @return {Script}
  */
-root.imports = function(from, uses, options){
-  return z().imports(from, uses, options);
+z.script = function(req, next, error){
+  var scr = new Script(req, z.config.script);
+  scr.ready(next, error);
+  return scr;
+}
+
+/**
+ * Send an AJAX request.
+ *
+ * @param {Object} req
+ * @param {Function} next
+ * @param {Function} err
+ * @retrun {Ajax}
+ */
+z.ajax = function(req, next, err){
+  var ajx = new Ajax(req, z.config.ajax);
+  ajx.ready(next, err);
+  return ajx;
 }
 
 
@@ -641,8 +702,19 @@ z.Class = function(parent, props){
  * ----------------------------------------------------------------------
  * z.Module
  *
- * z's module loading system.
- * Compatable with AMD.
+ * The core of z.
+ * 
+ * This class will never be called directly -- instead, use z's constructor to
+ * add and retrieve modules.
+ *
+ * @example:
+ *
+ *  z('foo.bar').
+ *  imports('foo.bin', ['Bar @ Foo', 'Bin']).
+ *  imports('foo.baz', 'Bar').
+ *  exports(function(__){
+ *    // code
+ *  });
  */
 
 var MODULE_STATE = {
@@ -652,6 +724,11 @@ var MODULE_STATE = {
   FAILED: -1
 };
 
+/**
+ * The module constructor.
+ *
+ * @param {Array} deps This arg is only used by the zjs optimizer.
+ */
 var Module = function(deps){
   this._deps = (deps && u.isArray(deps))? deps : [];
   this._state = MODULE_STATE.PENDING;
@@ -661,7 +738,25 @@ var Module = function(deps){
   this._onFailed = [];
 }
 
+/**
+ * Regexp to parse aliases.
+ *
+ * @var {RegExp}
+ * @api private
+ */
 var _alias = /\s?([\S]+?)\s?\@\s?([\S]+?)\s?$/;
+
+/**
+ * Check the module's definition and return requested item(s)
+ *
+ * @param {String | Array} items An item or items that you want from this module.
+ *   Passing a string will always return a single item, an array returns an object.
+ *   You can alias items with '@'. For example:
+ *     z('myModule').get(['foo @ bar', 'baz']);
+ *   This will return an object where 'bar' will alias 'foo'. Note that if you
+ *   pass a string the alias will be ignored.
+ * @return {Object | Mixed}
+ */
 Module.prototype.use = function(items){
   if(!this.isEnabled()){
     return false;
@@ -702,6 +797,31 @@ Module.prototype.use = function(items){
   return ctx;
 }
 
+/**
+ * Import modules.
+ *
+ * @param {String} from The name of a module, using period-delimited
+ *   syntax. A loader will map this name to an url later. If this is the
+ *   only arg provided (or [uses] indicates you want the entire module:
+ *   see below) this module will be available, by default, using the last
+ *   segment of the name.
+ *      imports('foo.bar') ... -> imports as 'bar'
+ *   Alternately, you can alias the name with '@'.
+ *      imports('foo.bar @foo') ... -> imports as 'foo'
+ *   If [uses] is defined, then the alias will be ignored.
+ * @param {String | Array | Boolean} uses Specific item or items you want
+ *   from the module. 
+ *      imports('foo.bar', 'Bin') ... -> imports Bin from foo.bar
+ *      imports('foo.bar', ['Bin', 'Ban']) ... -> imports Bin and Ban from foo.bar.
+ *   Passing '*', 'false' or leaving this arg undefined will return the entire module.
+ *      imports('foo.bar', '*') ... -> imports as 'bar' 
+ *   Items requested here can be also be aliased using '@'.
+ *      imports('foo.bar', ['Bin @ foo', 'Ban']) ... -> imports Bin (as 'foo') and Ban from foo.bar.
+ * @param {Object} options Allows you to further modify the import request. A common
+ *    example will be to use a plugin.
+ *      imports('foo.bar', '*', {type:'ajax', ext:'txt'}) ... -> Import a txt file
+ * @return {this}
+ */
 Module.prototype.imports = function(from, uses, options){
   if(!from){
     throw new TypeError('{from} must be defined');
@@ -731,6 +851,17 @@ Module.prototype.imports = function(from, uses, options){
   return this;
 }
 
+/**
+ * Define module exports.
+ *
+ * @param {String} name (optional) If a name is passed, then [factory]
+ *   will define [name] in the module definition.
+ * @param {Function} factory A callback to define the module (or
+ *   module component, if [name] is passed).
+ * @example:
+ *   TODO
+ * @return {this}
+ */
 Module.prototype.exports = function(name, factory){
   if(arguments.length <= 1){
     factory = name;
@@ -753,12 +884,25 @@ Module.prototype.exports = function(name, factory){
   return this;
 }
 
+/**
+ * Enable the module.
+ *
+ * @param {Function} next (optional)
+ * @parma {Function} error (optional)
+ */
 Module.prototype.enable = function(next, error){
   this.done(next, error);
   _resolve(this);
   return this;
 }
 
+/**
+ * Callbacks to fire once the module has loaded all dependencies. 
+ * If called on a enabled module, the callback will be fired immediately.
+ *
+ * @param {Function} onReady
+ * @param {Function} onFailed
+ */
 Module.prototype.done = function(onReady, onFailed){
   if(onReady && u.isFunction(onReady)){
     (this.isEnabled())?
@@ -773,6 +917,11 @@ Module.prototype.done = function(onReady, onFailed){
   return this;
 }
 
+/**
+ * Shortcut for Module#done(undefined, onFailed)
+ *
+ * @param {Function} onFailed
+ */
 Module.prototype.fail = function(onFailed){
   return this.done(undef, onFailed);
 }
@@ -802,10 +951,6 @@ var _dispatch = function(fns, ctx){
  * @param {MODULE_STATE} state (optional)
  */
 var _resolve = function(mod, state){
-
-  // TODO:
-  // Check z's global state before continuing.
-
   if(state){
     mod._state = state
   }
@@ -958,40 +1103,16 @@ var _define = function(mod){
   _resolve(mod, MODULE_STATE.ENABLED);
 }
 
-// _findUrl = function(req){
-//   var shim = z.config.shim
-//     , alias = z.config.alias
-//     , name = req.from
-//     , ext = (req.options.ext || 'js')
-//     , nameParts = name.split('.')
-//     , changed = false
-//     , src = '';
-
-//   u.each(nameParts, function(part, index){
-//     if(alias.hasOwnProperty(part)){
-//       nameParts[index] = alias[part];
-//     }
-//   });
-
-//   name = nameParts.join('.');
-//   if(shim.hasOwnProperty(name)){
-//     src = shim[name].src;
-//   } else {
-//     src = name.replace(/\./g, '/');
-//     src = z.config.root + src + '.' + ext;
-//   }
-
-//   return src;
-// }
-
 
 /**
  * ----------------------------------------------------------------------
  * Plugable
+ *
+ * A wrapper for z plugins. Primarily ensures items are not loaded more then once.
  */
 
 /**
- * The Plugable is used by z.plugin to handle loading events.
+ * Plugable is used by z.plugin to handle loading events.
  *
  * @param {Loader} loader A loader class. Requires a 'load' method
  *   and a 'done' method. See z.Loader for an example of how to
@@ -1436,6 +1557,14 @@ u.each(['Done', 'Pending', 'Failed'], function(state){
 });
 
 
+/**
+ * Provides AMD compatability. Use exactly as you would with any other 
+ * AMD system. This also allows z to import AMD modules natively.
+ *
+ * @param {String} name (optional)
+ * @param {Array} reqs
+ * @param {Fnction} factory
+ */
 root.define= function(name, reqs, factory){
 
   if(2 === arguments.length){
