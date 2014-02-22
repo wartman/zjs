@@ -1,10 +1,12 @@
 /**
  * ----------------------------------------------------------------------
  * Plugable
+ *
+ * A wrapper for z plugins. Primarily ensures items are not loaded more then once.
  */
 
 /**
- * The Plugable is used by z.plugin to handle loading events.
+ * Plugable is used by z.plugin to handle loading events.
  *
  * @param {Loader} loader A loader class. Requires a 'load' method
  *   and a 'done' method. See z.Loader for an example of how to

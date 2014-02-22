@@ -1,5 +1,16 @@
 /**
+ * ----------------------------------------------------------------------
+ * z API
+ */
+
+/**
  * The top-level API for z
+ *
+ * @param {String | Function} name The module name. If this is the only arg given,
+ *   and the name exists in the registry, this will return an existing module.
+ *   If you pass a function here, you will define a ananymous module with no deps.
+ * @param {Function} factory Pass a function here to quickly define a module
+ *   with no deps.
  */
 var z = root.z = function(name, factory){
   if(z.has(name) && !factory){
@@ -9,7 +20,7 @@ var z = root.z = function(name, factory){
     factory = name;
     name = undef;
   }
-  var mod = _add(name);
+  var mod = _addModule(name);
   if(factory){
     mod.exports(factory);
   }
@@ -18,8 +29,12 @@ var z = root.z = function(name, factory){
 
 /**
  * Helper for adding modules.
+ *
+ * @param {String} name
+ * @return {Module}
+ * @api private
  */
-var _add = function(name){
+var _addModule = function(name){
   if(typeof name === "undefined"){
     var node;
     if(Script.useInteractive){
@@ -40,32 +55,35 @@ var _add = function(name){
 }
 
 /**
- * Expose util funcs.
+ * All modules are registered here.
+ *
+ * @var {Object}
  */
-z.u = z.util = u;
-
 z.modules = {};
-z.plugins = {};
+
+/**
+ * Anonymous modules are stored here until they can be named.
+ *
+ * @var {Module | null}
+ */
 z.tmp = null;
 
 /**
- * Static methods
+ * Check to see if a module exists in the registry.
+ *
+ * @param {String} name
  */
-
 z.has = function(name){
   return z.modules.hasOwnProperty(name);
 }
 
-z.config = {
-  root: '',
-  shim: {},
-  alias: {},
-  env: 'browser'
-};
-z.setup = function(options){
-  z.config = u.defaults(z.config, options);
-}
-
+/**
+ * This method checks z.tmp and assigns the name provided
+ * if it finds a module there. Should be called by plugins in
+ * their onLoad callbacks.
+ *
+ * @param {String} name
+ */
 z.ensureModule = function(name){
   var tmp = z.tmp;
   if(null === tmp){
@@ -79,28 +97,50 @@ z.ensureModule = function(name){
   return;
 }
 
-_loadQueue = 0;
-z.isLoading = function(state){
-  return _loadQueue.length >= 0;
-}
-z.addLoading = function(){
-  _loadQueue += 1;
-}
-z.doneLoading = function(){
-  _loadQueue -= 1;
+/**
+ * The app configuration.
+ *
+ * @var {Object}
+ */
+z.config = {
+  root: '',
+  shim: {},
+  alias: {},
+  env: 'browser'
+};
+
+/**
+ * Configure z
+ *
+ * @param {Object} options
+ */
+z.setup = function(options){
+  z.config = u.defaults(z.config, options);
 }
 
-z.script = function(req, next, error){
-  var scr = new Script(req, z.config.script).ready(next, error);
-  return scr;
-}
+/**
+ * Expose util funcs.
+ */
+z.u = z.util = u;
 
-z.ajax = function(req, next, error){
-  var ajx = new Ajax(req, z.config.ajax)
-  ajx.ready(next, error);
-  return ajx;
-}
+/**
+ * The plugin registry.
+ *
+ * @var {Object}
+ */
+z.plugins = {};
 
+/**
+ * Plugable factory. If the only arg provided is [name], and
+ * a plugin of that name exists, this will return a plugin.
+ *
+ * @param {String} name Set or get a plugin of this name.
+ * @param {Loader} loader The loader class to use.
+ * @param {Function} loadEvent The event to trigger on load
+ * @param {Object} options
+ * @throws {Error} If no plugin of the requested name is found.
+ * @return {Plugable}
+ */
 z.plugin = function(name, loader, loadEvent, options){
   if(arguments.length <= 1){
     if(z.plugins.hasOwnProperty(name)){
@@ -115,8 +155,29 @@ z.plugin = function(name, loader, loadEvent, options){
 }
 
 /**
- * Shortcuts
+ * Load a script.
+ *
+ * @param {Object} req
+ * @param {Function} next
+ * @param {Function} err
+ * @return {Script}
  */
-root.imports = function(from, uses, options){
-  return z().imports(from, uses, options);
+z.script = function(req, next, error){
+  var scr = new Script(req, z.config.script);
+  scr.ready(next, error);
+  return scr;
+}
+
+/**
+ * Send an AJAX request.
+ *
+ * @param {Object} req
+ * @param {Function} next
+ * @param {Function} err
+ * @retrun {Ajax}
+ */
+z.ajax = function(req, next, err){
+  var ajx = new Ajax(req, z.config.ajax);
+  ajx.ready(next, err);
+  return ajx;
 }

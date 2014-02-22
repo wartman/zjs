@@ -1,3 +1,11 @@
+/**
+ * Provides AMD compatability. Use exactly as you would with any other 
+ * AMD system. This also allows z to import AMD modules natively.
+ *
+ * @param {String} name (optional)
+ * @param {Array} reqs
+ * @param {Fnction} factory
+ */
 root.define= function(name, reqs, factory){
 
   if(2 === arguments.length){

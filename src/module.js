@@ -2,8 +2,19 @@
  * ----------------------------------------------------------------------
  * z.Module
  *
- * z's module loading system.
- * Compatable with AMD.
+ * The core of z.
+ * 
+ * This class will never be called directly -- instead, use z's constructor to
+ * add and retrieve modules.
+ *
+ * @example:
+ *
+ *  z('foo.bar').
+ *  imports('foo.bin', ['Bar @ Foo', 'Bin']).
+ *  imports('foo.baz', 'Bar').
+ *  exports(function(__){
+ *    // code
+ *  });
  */
 
 var MODULE_STATE = {
@@ -13,6 +24,11 @@ var MODULE_STATE = {
   FAILED: -1
 };
 
+/**
+ * The module constructor.
+ *
+ * @param {Array} deps This arg is only used by the zjs optimizer.
+ */
 var Module = function(deps){
   this._deps = (deps && u.isArray(deps))? deps : [];
   this._state = MODULE_STATE.PENDING;
@@ -22,7 +38,25 @@ var Module = function(deps){
   this._onFailed = [];
 }
 
+/**
+ * Regexp to parse aliases.
+ *
+ * @var {RegExp}
+ * @api private
+ */
 var _alias = /\s?([\S]+?)\s?\@\s?([\S]+?)\s?$/;
+
+/**
+ * Check the module's definition and return requested item(s)
+ *
+ * @param {String | Array} items An item or items that you want from this module.
+ *   Passing a string will always return a single item, an array returns an object.
+ *   You can alias items with '@'. For example:
+ *     z('myModule').get(['foo @ bar', 'baz']);
+ *   This will return an object where 'bar' will alias 'foo'. Note that if you
+ *   pass a string the alias will be ignored.
+ * @return {Object | Mixed}
+ */
 Module.prototype.use = function(items){
   if(!this.isEnabled()){
     return false;
@@ -63,6 +97,31 @@ Module.prototype.use = function(items){
   return ctx;
 }
 
+/**
+ * Import modules.
+ *
+ * @param {String} from The name of a module, using period-delimited
+ *   syntax. A loader will map this name to an url later. If this is the
+ *   only arg provided (or [uses] indicates you want the entire module:
+ *   see below) this module will be available, by default, using the last
+ *   segment of the name.
+ *      imports('foo.bar') ... -> imports as 'bar'
+ *   Alternately, you can alias the name with '@'.
+ *      imports('foo.bar @foo') ... -> imports as 'foo'
+ *   If [uses] is defined, then the alias will be ignored.
+ * @param {String | Array | Boolean} uses Specific item or items you want
+ *   from the module. 
+ *      imports('foo.bar', 'Bin') ... -> imports Bin from foo.bar
+ *      imports('foo.bar', ['Bin', 'Ban']) ... -> imports Bin and Ban from foo.bar.
+ *   Passing '*', 'false' or leaving this arg undefined will return the entire module.
+ *      imports('foo.bar', '*') ... -> imports as 'bar' 
+ *   Items requested here can be also be aliased using '@'.
+ *      imports('foo.bar', ['Bin @ foo', 'Ban']) ... -> imports Bin (as 'foo') and Ban from foo.bar.
+ * @param {Object} options Allows you to further modify the import request. A common
+ *    example will be to use a plugin.
+ *      imports('foo.bar', '*', {type:'ajax', ext:'txt'}) ... -> Import a txt file
+ * @return {this}
+ */
 Module.prototype.imports = function(from, uses, options){
   if(!from){
     throw new TypeError('{from} must be defined');
@@ -92,6 +151,17 @@ Module.prototype.imports = function(from, uses, options){
   return this;
 }
 
+/**
+ * Define module exports.
+ *
+ * @param {String} name (optional) If a name is passed, then [factory]
+ *   will define [name] in the module definition.
+ * @param {Function} factory A callback to define the module (or
+ *   module component, if [name] is passed).
+ * @example:
+ *   TODO
+ * @return {this}
+ */
 Module.prototype.exports = function(name, factory){
   if(arguments.length <= 1){
     factory = name;
@@ -114,12 +184,25 @@ Module.prototype.exports = function(name, factory){
   return this;
 }
 
+/**
+ * Enable the module.
+ *
+ * @param {Function} next (optional)
+ * @parma {Function} error (optional)
+ */
 Module.prototype.enable = function(next, error){
   this.done(next, error);
   _resolve(this);
   return this;
 }
 
+/**
+ * Callbacks to fire once the module has loaded all dependencies. 
+ * If called on a enabled module, the callback will be fired immediately.
+ *
+ * @param {Function} onReady
+ * @param {Function} onFailed
+ */
 Module.prototype.done = function(onReady, onFailed){
   if(onReady && u.isFunction(onReady)){
     (this.isEnabled())?
@@ -134,6 +217,11 @@ Module.prototype.done = function(onReady, onFailed){
   return this;
 }
 
+/**
+ * Shortcut for Module#done(undefined, onFailed)
+ *
+ * @param {Function} onFailed
+ */
 Module.prototype.fail = function(onFailed){
   return this.done(undef, onFailed);
 }
@@ -163,10 +251,6 @@ var _dispatch = function(fns, ctx){
  * @param {MODULE_STATE} state (optional)
  */
 var _resolve = function(mod, state){
-
-  // TODO:
-  // Check z's global state before continuing.
-
   if(state){
     mod._state = state
   }
@@ -318,29 +402,3 @@ var _define = function(mod){
   }
   _resolve(mod, MODULE_STATE.ENABLED);
 }
-
-// _findUrl = function(req){
-//   var shim = z.config.shim
-//     , alias = z.config.alias
-//     , name = req.from
-//     , ext = (req.options.ext || 'js')
-//     , nameParts = name.split('.')
-//     , changed = false
-//     , src = '';
-
-//   u.each(nameParts, function(part, index){
-//     if(alias.hasOwnProperty(part)){
-//       nameParts[index] = alias[part];
-//     }
-//   });
-
-//   name = nameParts.join('.');
-//   if(shim.hasOwnProperty(name)){
-//     src = shim[name].src;
-//   } else {
-//     src = name.replace(/\./g, '/');
-//     src = z.config.root + src + '.' + ext;
-//   }
-
-//   return src;
-// }
