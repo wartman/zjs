@@ -296,25 +296,29 @@ var _import = function(mod){
   var remaining = queue.length;
 
   if(remaining > 0){
+    
     u.each(queue, function(item, index){
-      try{
-        var type = (item.options.type || 'script')
-          , loader = z.plugin(type);
+      var type = (item.options.type || 'script')
+        , loader;
 
-        loader.load(item, function(){
-          remaining -= 1;
-          if(remaining <=0 ){
-            _resolve(mod, MODULE_STATE.LOADED);
-          }
-        }, function(e){
-          _resolve(mod, MODULE_STATE.FAILED);
-          throw e;
-        });
+      try {
+        loader = z.plugin(type);
       } catch(e) {
         // If a plugin is not found, an error will be thrown.
         _resolve(mod, MODULE_STATE.FAILED);
         throw e;
       }
+
+      loader.load(item, function(){
+        remaining -= 1;
+        if(remaining <=0 ){
+          _resolve(mod, MODULE_STATE.LOADED);
+        }
+      }, function(e){
+        _resolve(mod, MODULE_STATE.FAILED);
+        throw e;
+      });
+
     });
   } else {
     _resolve(mod, MODULE_STATE.LOADED);

@@ -56,7 +56,6 @@ var Ajax = Loader.extend({
     request.onreadystatechange = function(){
       if(AJAX_STATE.DONE === this.readyState){
         if(200 === this.status){
-          console.log(this.responseText);
           self._value = this.responseText;
           self._resolve(self._value, AJAX_STATE.DONE);
         } else {

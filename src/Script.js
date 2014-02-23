@@ -68,7 +68,6 @@ Script.useInteractive = false;
 Script.currentlyAddingScript = null;
 Script.interactiveScript = null;
 Script.getInteractiveScript = function(){
-  console.log('getting interactive');
   if (Script.interactiveScript && Script.interactiveScript.readyState === 'interactive') {
     return Script.interactiveScript;
   }
@@ -105,8 +104,6 @@ var _scriptLoadEvent = (function(){
   // like most other browsers.
   // (based on requireJs)
   if (testNode.attachEvent){
-
-    console.log('setup interactive');
 
     // Because onload is not fired right away, we can't add a define call to
     // anonymous modules. However, IE reports the script as being in 'interactive'

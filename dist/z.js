@@ -6,7 +6,7 @@
  * Copyright 2014
  * Released under the MIT license
  *
- * Date: 2014-02-22T23:05Z
+ * Date: 2014-02-23T17:39Z
  */
 
 (function(global, factory){
@@ -996,25 +996,29 @@ var _import = function(mod){
   var remaining = queue.length;
 
   if(remaining > 0){
+    
     u.each(queue, function(item, index){
-      try{
-        var type = (item.options.type || 'script')
-          , loader = z.plugin(type);
+      var type = (item.options.type || 'script')
+        , loader;
 
-        loader.load(item, function(){
-          remaining -= 1;
-          if(remaining <=0 ){
-            _resolve(mod, MODULE_STATE.LOADED);
-          }
-        }, function(e){
-          _resolve(mod, MODULE_STATE.FAILED);
-          throw e;
-        });
+      try {
+        loader = z.plugin(type);
       } catch(e) {
         // If a plugin is not found, an error will be thrown.
         _resolve(mod, MODULE_STATE.FAILED);
         throw e;
       }
+
+      loader.load(item, function(){
+        remaining -= 1;
+        if(remaining <=0 ){
+          _resolve(mod, MODULE_STATE.LOADED);
+        }
+      }, function(e){
+        _resolve(mod, MODULE_STATE.FAILED);
+        throw e;
+      });
+
     });
   } else {
     _resolve(mod, MODULE_STATE.LOADED);
@@ -1383,7 +1387,6 @@ Script.useInteractive = false;
 Script.currentlyAddingScript = null;
 Script.interactiveScript = null;
 Script.getInteractiveScript = function(){
-  console.log('getting interactive');
   if (Script.interactiveScript && Script.interactiveScript.readyState === 'interactive') {
     return Script.interactiveScript;
   }
@@ -1420,8 +1423,6 @@ var _scriptLoadEvent = (function(){
   // like most other browsers.
   // (based on requireJs)
   if (testNode.attachEvent){
-
-    console.log('setup interactive');
 
     // Because onload is not fired right away, we can't add a define call to
     // anonymous modules. However, IE reports the script as being in 'interactive'
@@ -1514,7 +1515,6 @@ var Ajax = Loader.extend({
     request.onreadystatechange = function(){
       if(AJAX_STATE.DONE === this.readyState){
         if(200 === this.status){
-          console.log(this.responseText);
           self._value = this.responseText;
           self._resolve(self._value, AJAX_STATE.DONE);
         } else {

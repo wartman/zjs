@@ -4,7 +4,7 @@ define([
 ], function(named, anon){
 
   return {
-    loaded: named + "|"+ anon
+    loaded: named.named + "|"+ anon.anon
   };
 
 });
