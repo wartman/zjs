@@ -123,9 +123,8 @@ Module.prototype.use = function(items){
  * @return {this}
  */
 Module.prototype.imports = function(from, uses, options){
-  if(!from){
-    throw new TypeError('{from} must be defined');
-  }
+
+  this._state = MODULE_STATE.PENDING;
 
   var alias = false;
   if(_alias.test(from)){

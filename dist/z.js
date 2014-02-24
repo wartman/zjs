@@ -6,7 +6,7 @@
  * Copyright 2014
  * Released under the MIT license
  *
- * Date: 2014-02-24T17:12Z
+ * Date: 2014-02-24T17:52Z
  */
 
 (function(global, factory){
@@ -836,9 +836,8 @@ Module.prototype.use = function(items){
  * @return {this}
  */
 Module.prototype.imports = function(from, uses, options){
-  if(!from){
-    throw new TypeError('{from} must be defined');
-  }
+
+  this._state = MODULE_STATE.PENDING;
 
   var alias = false;
   if(_alias.test(from)){
