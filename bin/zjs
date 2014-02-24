@@ -10,7 +10,7 @@ program
 
 program
   .command('build [src] [dest]')
-  .description('z modules build into a single file')
+  .description('build a z app into a single file')
   .option('-o --optimize', 'uglify the compiled script')
   .option('-p --project <projectName>', 'set the project name')
   .option('-m --main <mainModule>', "set the name of your main module (if using an anonymous module)")
@@ -48,17 +48,9 @@ program
     fs.mkdir(dest + '/libs');
     fs.writeFileSync(dest + '/libs/z.js', z);
     fs.writeFileSync(dest + '/libs/z-min.js', fitMin);
-    fs.writeFileSync(dest + '/build.js', build);
+    fs.writeFileSync(dest + '/buildz.js', build);
 
     console.log('Project started in '+ dest);
-  });
-
-program
-  .command('test')
-  .description('run tests')
-  .action(function(options){
-    var promiseTest = require('../test/promise/adapter');
-    promiseTest();
   });
 
 program.parse(process.argv);

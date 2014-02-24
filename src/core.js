@@ -45,8 +45,8 @@ var _addModule = function(name){
       name = node.getAttribute('data-from');
     } else {
       // Assign to a temp cache, to be named by the onload callback.
-      z.tmp = new Module();
-      return z.tmp;
+      _tmpModule = new Module();
+      return _tmpModule;
     }
   }
 
@@ -55,18 +55,19 @@ var _addModule = function(name){
 }
 
 /**
+ * Anonymous modules are stored here until they can be named.
+ *
+ * @var {Module | null}
+ * @api private
+ */
+var _tmpModule = null;
+
+/**
  * All modules are registered here.
  *
  * @var {Object}
  */
 z.modules = {};
-
-/**
- * Anonymous modules are stored here until they can be named.
- *
- * @var {Module | null}
- */
-z.tmp = null;
 
 /**
  * Check to see if a module exists in the registry.
@@ -78,18 +79,18 @@ z.has = function(name){
 }
 
 /**
- * This method checks z.tmp and assigns the name provided
+ * This method checks _tmpModule and assigns the name provided
  * if it finds a module there. Should be called by plugins in
  * their onLoad callbacks.
  *
  * @param {String} name
  */
 z.ensureModule = function(name){
-  var tmp = z.tmp;
+  var tmp = _tmpModule;
   if(null === tmp){
     return;
   }
-  z.tmp = null;
+  _tmpModule = null;
   if(!tmp instanceof Module){
     return;
   }
@@ -163,9 +164,9 @@ z.plugin = function(name, loader, loadEvent, options){
  * @return {Script}
  */
 z.script = function(req, next, error){
-  var scr = new Script(req, z.config.script);
-  scr.ready(next, error);
-  return scr;
+  var s = new Script(req, z.config.script);
+  s.done(next, error);
+  return s;
 }
 
 /**
@@ -177,7 +178,19 @@ z.script = function(req, next, error){
  * @retrun {Ajax}
  */
 z.ajax = function(req, next, err){
-  var ajx = new Ajax(req, z.config.ajax);
-  ajx.ready(next, err);
-  return ajx;
+  var a = new Ajax(req, z.config.ajax);
+  a.done(next, err);
+  return a;
+}
+
+/**
+ * Shortcut for anon modules. Same as calling z().imports.
+ *
+ * @param {String} from
+ * @param {String | Array} uses (optional)
+ * @param {Object} options (optional)
+ * @return {Module}
+ */
+root.imports = function(from, uses, options){
+  return z().imports(from, uses, options);
 }

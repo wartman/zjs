@@ -1,12 +1,12 @@
 
 
 /**
- * zjs 0.1.0
+ * zjs 0.1.1
  *
  * Copyright 2014
  * Released under the MIT license
  *
- * Date: 2014-02-23T17:39Z
+ * Date: 2014-02-24T17:12Z
  */
 
 (function(global, factory){
@@ -434,8 +434,8 @@ var _addModule = function(name){
       name = node.getAttribute('data-from');
     } else {
       // Assign to a temp cache, to be named by the onload callback.
-      z.tmp = new Module();
-      return z.tmp;
+      _tmpModule = new Module();
+      return _tmpModule;
     }
   }
 
@@ -444,18 +444,19 @@ var _addModule = function(name){
 }
 
 /**
+ * Anonymous modules are stored here until they can be named.
+ *
+ * @var {Module | null}
+ * @api private
+ */
+var _tmpModule = null;
+
+/**
  * All modules are registered here.
  *
  * @var {Object}
  */
 z.modules = {};
-
-/**
- * Anonymous modules are stored here until they can be named.
- *
- * @var {Module | null}
- */
-z.tmp = null;
 
 /**
  * Check to see if a module exists in the registry.
@@ -467,18 +468,18 @@ z.has = function(name){
 }
 
 /**
- * This method checks z.tmp and assigns the name provided
+ * This method checks _tmpModule and assigns the name provided
  * if it finds a module there. Should be called by plugins in
  * their onLoad callbacks.
  *
  * @param {String} name
  */
 z.ensureModule = function(name){
-  var tmp = z.tmp;
+  var tmp = _tmpModule;
   if(null === tmp){
     return;
   }
-  z.tmp = null;
+  _tmpModule = null;
   if(!tmp instanceof Module){
     return;
   }
@@ -552,9 +553,9 @@ z.plugin = function(name, loader, loadEvent, options){
  * @return {Script}
  */
 z.script = function(req, next, error){
-  var scr = new Script(req, z.config.script);
-  scr.ready(next, error);
-  return scr;
+  var s = new Script(req, z.config.script);
+  s.done(next, error);
+  return s;
 }
 
 /**
@@ -566,9 +567,21 @@ z.script = function(req, next, error){
  * @retrun {Ajax}
  */
 z.ajax = function(req, next, err){
-  var ajx = new Ajax(req, z.config.ajax);
-  ajx.ready(next, err);
-  return ajx;
+  var a = new Ajax(req, z.config.ajax);
+  a.done(next, err);
+  return a;
+}
+
+/**
+ * Shortcut for anon modules. Same as calling z().imports.
+ *
+ * @param {String} from
+ * @param {String | Array} uses (optional)
+ * @param {Object} options (optional)
+ * @return {Module}
+ */
+root.imports = function(from, uses, options){
+  return z().imports(from, uses, options);
 }
 
 
@@ -1113,6 +1126,9 @@ var _define = function(mod){
  * Plugable
  *
  * A wrapper for z plugins. Primarily ensures items are not loaded more then once.
+ * This particular system is highly unstable -- I think there are much better
+ * ways of making this user friendly, so it will likely change a lot.
+ * For now, just use the provided 'script' and 'ajax' plugins.
  */
 
 /**
@@ -1324,7 +1340,7 @@ u.each(['Done', 'Pending', 'Failed'], function(state){
  * z's scripts loader.
  */
 
-var Script = Loader.extend({
+var Script = z.Script = Loader.extend({
 
   options: {
     nodeType: 'text/javascript',
@@ -1480,7 +1496,7 @@ var HTTP_METHODS = [
   'DELETE'
 ];
 
-var Ajax = Loader.extend({
+var Ajax = z.Ajax = Loader.extend({
 
   options: {
     defaults: {

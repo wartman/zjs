@@ -4,7 +4,6 @@
  * The following is one way -- less correct, but prettier -- to write a module.
  */
 
-z().
 imports('resources.target_four','*').
 imports('resources.target_five', '*').
 imports('resources.target_six', '*').

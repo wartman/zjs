@@ -5,7 +5,7 @@
  * z's scripts loader.
  */
 
-var Script = Loader.extend({
+var Script = z.Script = Loader.extend({
 
   options: {
     nodeType: 'text/javascript',

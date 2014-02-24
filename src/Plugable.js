@@ -3,6 +3,9 @@
  * Plugable
  *
  * A wrapper for z plugins. Primarily ensures items are not loaded more then once.
+ * This particular system is highly unstable -- I think there are much better
+ * ways of making this user friendly, so it will likely change a lot.
+ * For now, just use the provided 'script' and 'ajax' plugins.
  */
 
 /**

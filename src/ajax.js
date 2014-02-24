@@ -21,7 +21,7 @@ var HTTP_METHODS = [
   'DELETE'
 ];
 
-var Ajax = Loader.extend({
+var Ajax = z.Ajax = Loader.extend({
 
   options: {
     defaults: {
