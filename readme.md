@@ -61,8 +61,10 @@ You can also name each export individually, if you want:
 
 
 Naming modules is optional, z is smart enough to name them when requested
-(indeed, naming modules is not recomended). Here is another style of writing a
-z module (note the periods!):
+(indeed, naming modules is not recomended). Here's an example of an anonymous 
+z module (the coding style here may not be strictly 'correct', but I
+find it more readable):
+
   
     imports('app.bar', ['Bar', 'Bin']).        // Calling 'imports(...)' is the same as calling 'z().imports(...)'
     imports('app.fiz', ['Bin @ Bin2', 'Fod']). // Names can be aliased with '@' to avoid naming conflicts.
@@ -83,6 +85,29 @@ z module (note the periods!):
         };
 
     });
+
+
+Modules are loaded using configurable plugins. Plugins can be written, or modified,
+with z.loader:
+    
+
+    z.filter('app.filter', function(req){ // Filters are used to modify request objects
+        req.foo = 'foo'
+        return req; // Always return req
+    });
+
+    z.loader('myLoader')
+        .method(z.Script)  // The class to load things with. The only requirement is that it have a 'done' method.
+        .filters(['default.src', 'app.filter']) // Register filters
+        .handler(function(req, res, next, error){ // The handler is run when the request is done.
+            // code
+        });
+
+    z('app.foo')
+        .imports('app.bar', '*', {type: 'myLoader'}) // Use your new loader by setting 'type'
+        .exports(function(__){
+            // use __.bar
+        });
 
 
 z also comes with a simple class system. 'Bar' in the above examples could be defined
