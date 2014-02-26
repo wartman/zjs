@@ -1,16 +1,22 @@
 /**
  * ----------------------------------------------------------------------
- * z.Scripts
+ * z.Script
  *
- * z's scripts loader.
+ * z's script loader. Extends z.Resolver.
  */
 
-var Script = z.Script = Loader.extend({
+var Script = z.Script = Resolver.extend({
 
   options: {
     nodeType: 'text/javascript',
     charset: 'utf-8',
     async: true
+  },
+
+  __init__: function(req, options){
+    this.options = u.defaults(this.options, options);
+    this.node = false;
+    this.load(req);
   },
 
   /**
@@ -19,7 +25,7 @@ var Script = z.Script = Loader.extend({
    * @return {Element}
    */
   create: function(){
-    var node = this._value = document.createElement('script');
+    var node = document.createElement('script');
     node.type = this.options.nodeType || 'text/javascript';
     node.charset = this.options.charset;
     node.async = this.options.async;
@@ -28,6 +34,8 @@ var Script = z.Script = Loader.extend({
 
   /**
    * Load a request
+   *
+   * @param {Object | String} req
    */
   load: function(req){
 
@@ -36,23 +44,30 @@ var Script = z.Script = Loader.extend({
       , self = this
       , settings = this.scriptSettings
       , defaults = {
-          url: ''
+          src: ''
         };
+
+    // Allow the user to just pass an src.
+    if(z.u.isString(req)){
+      req = {
+        src: req
+      };
+    }
 
     req = u.defaults(defaults, req);
 
-    node.setAttribute('data-from', (req.from || req.url));
+    node.setAttribute('data-from', (req.from || req.src));
 
     _scriptLoadEvent(node, function(node){
-      self._resolve(node, LOADER_STATE.DONE);
+      self.resolve(node);
     }, function(e){
-      self._resolve(e, LOADER_STATE.FAILED);
+      self.reject(e);
     });
 
     // For ie8, code may start running as soon as the node
     // is placed in the DOM, so we need to be ready:  
     Script.currentlyAddingScript = node;
-    node.src = req.url;
+    node.src = req.src;
     head.appendChild(node);
     // Clear out the current script after DOM insertion.
     Script.currentlyAddingScript = null;
@@ -136,3 +151,18 @@ var _scriptLoadEvent = (function(){
   return loader;
 
 })();
+
+/**
+ * ----------------------------------------------------------------------
+ * Script API
+ *
+ * @param {Object} req
+ * @param {Function} next
+ * @param {Function} err
+ * @return {Script}
+ */
+z.script = function(req, next, error){
+  var s = new Script(req, z.config.script);
+  s.done(next, error);
+  return s;
+}

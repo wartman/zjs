@@ -125,65 +125,6 @@ z.setup = function(options){
 z.u = z.util = u;
 
 /**
- * The plugin registry.
- *
- * @var {Object}
- */
-z.plugins = {};
-
-/**
- * Plugable factory. If the only arg provided is [name], and
- * a plugin of that name exists, this will return a plugin.
- *
- * @param {String} name Set or get a plugin of this name.
- * @param {Loader} loader The loader class to use.
- * @param {Function} loadEvent The event to trigger on load
- * @param {Object} options
- * @throws {Error} If no plugin of the requested name is found.
- * @return {Plugable}
- */
-z.plugin = function(name, loader, loadEvent, options){
-  if(arguments.length <= 1){
-    if(z.plugins.hasOwnProperty(name)){
-      return z.plugins[name];
-    }
-    throw new Error('Plugin was not found: '+name);
-    return false;
-  }
-
-  z.plugins[name] = new Plugable(loader, loadEvent, options);
-  return z.plugins[name];
-}
-
-/**
- * Load a script.
- *
- * @param {Object} req
- * @param {Function} next
- * @param {Function} err
- * @return {Script}
- */
-z.script = function(req, next, error){
-  var s = new Script(req, z.config.script);
-  s.done(next, error);
-  return s;
-}
-
-/**
- * Send an AJAX request.
- *
- * @param {Object} req
- * @param {Function} next
- * @param {Function} err
- * @retrun {Ajax}
- */
-z.ajax = function(req, next, err){
-  var a = new Ajax(req, z.config.ajax);
-  a.done(next, err);
-  return a;
-}
-
-/**
  * Shortcut for anon modules. Same as calling z().imports.
  *
  * @param {String} from

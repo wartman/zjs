@@ -2,90 +2,251 @@
  * ----------------------------------------------------------------------
  * Loader
  *
- * A class that contains some common functionality for z's script loader
- * and its ajax loader.
+ * The Loader is ultimately responsable for loading scripts, files, etc.
+ * Use the API to register new loaders and filters.
  */
 
-LOADER_STATE = {
-  PENDING: 0,
-  DONE: 1,
-  FAILED: -1
-};
+/**
+ * Create a new Loader.
+ * The setup object is where you define how the loader should function:
+ * see the API under the class for more on how to set up Loaders.
+ *
+ * @param {Object} setup
+ */
+var Loader = function(setup){
+  this._queue = {};
+  setup = (setup || {});
 
-var Loader = z.Loader = z.Class({
-  
-  __new__: function(req, options){
-    this.options = u.defaults(this.options, options);
-    this.node = false;
-    this._state = LOADER_STATE.PENDING;
-    this._onReady = [];
-    this._onFailed = [];
-    this._value = false;
-    this.__init__.apply(this, arguments);
-    this.load(req);
-  },
+  this._filters = (setup.filters || ['default.src']);
+  this.options = z.u.defaults(this.options, setup.options);
+  this._method = (setup.method || z.Script);
+  this._handler = (setup.handler || function(req, res, next, error){
+    next(res);
+  });
+}
 
-  __init__: function(){
-    // no-op
-  },
+/**
+ * Default options.
+ *
+ * @var {Object}
+ */
+Loader.prototype.options = {
+  ext: 'js'
+}
 
-  load: function(req){
-    // No op
-  },
+/**
+ * Run the request through all registered filters.
+ *
+ * @param {Object} req
+ */
+Loader.prototype.prefilter = function(req){
+  var self = this;
+  z.u(this._filters).each(function(name, index){
+    var filter = z.filter(name);
+    if(filter)
+      req = filter.call(self, req);
+  });
+  return req;
+}
 
-  /**
-   * Callbacks to run on done.
-   *
-   * @param {Function} onReady
-   * @param {Function} onFailed
-   */
-  done: function(onReady, onFailed){
-    if(onReady && u.isFunction(onReady)){
-      (this.isDone())?
-        onReady(this._value) :
-        this._onReady.push(onReady);
-    }
-    if(onFailed && u.isFunction(onFailed)){
-      (this.isFailed())?
-        onFailed(this._value):
-        this._onFailed.push(onFailed);
-    }
-  },
+/**
+ * Register a method
+ *
+ * @param {Class} method
+ */
+Loader.prototype.method = function(method){
+  this._method = method;
+  return this;
+}
 
-  /**
-   * Resolve the loader based on the passed state.
-   *
-   * @param {Mixed} arg
-   * @param {Integer} state
-   */
-  _resolve: function(arg, state){
-    if(state){
-      this._state = state;
-    }
+/**
+ * Register a filter or filters.
+ *
+ * @param {String | Array} name
+ */
+Loader.prototype.filters = function(name){
+  if(!name){
+    return;
+  }
+  if(z.u.isArray(name)){
+    this._filters.concat(name);
+    return;
+  }
+  this._filters.push(name);
+  return this;
+}
 
-    var self = this;
+/**
+ * Register handler.
+ * Callbacks should have the args 'req', 'res', 'next' and 'error'
+ *
+ * @param {Function | Array} cb
+ */
+Loader.prototype.handler = function(cb){
+  if(!cb){
+    return;
+  }
+  this._handler = cb;
+  return this;
+}
 
-    if(this.isDone()){
-      u.each(self._onReady, function(fn){
-        fn(arg);
-      });
-      this._onReady = [];
-      return;
-    }
+/**
+ * Check the queue to see if an url is loading.
+ *
+ * @param {String} url
+ */
+Loader.prototype.has = function(src){
+  return this._queue.hasOwnProperty(src);
+}
 
-    if(this.isFailed()){
-      u.each(self._onFailed, function(fn){
-        fn(arg);
-      });
-      this._onFailed = [];
-      return;
+/**
+ * Load a request.
+ *
+ * @param {Object} req
+ * @param {Function} next
+ * @param {Function} error
+ */
+Loader.prototype.load = function(req, onDone, onRejected){
+  var self = this;
+  req = this.prefilter(req);
+  if(!this.has(req.src)){
+    this._queue[req.src] = new this._method(req);
+  }
+  this._queue[req.src].done(function(res){
+    self._handler(req, res, onDone, onRejected);
+  }, onRejected);
+  return this;
+}
+
+/**
+ * ----------------------------------------------------------------------
+ * Loader API
+ */
+
+/**
+ * Holds all registered loaders.
+ *
+ * @var {Object}
+ * @api private
+ */
+var _loaders = {};
+
+/**
+ * z Loader API
+ * // info on how it works
+ * 
+ * @param {String} name If this is the only arg passed, 
+ *   the method will try to return a loader or will create
+ *   a new one.
+ * @param {Object} setup (optional) If you pass an arg here,
+ *   a new loader will be created EVEN if one already exists
+ *   for the provided name.
+ * @return {Loader}
+ */
+z.loader = function(name, setup){
+  if(arguments.length <= 1){
+    if(_loaders.hasOwnProperty(name)){
+      return _loaders[name];
     }
   }
 
+  _loaders[name] = new Loader(setup);
+  return _loaders[name];
+}
+
+/**
+ * filter API
+ */
+_filters = {};
+z.filter = function(name, cb){
+  if(arguments.length <= 1){
+    if(_filters.hasOwnProperty(name)){
+      return _filters[name];
+    }
+    return false;
+  }
+
+  _filters[name] = cb 
+  return _filters[name];
+}
+
+/**
+ * ----------------------------------------------------------------------
+ * Default loaders and filters
+ */
+
+/**
+ * Script loader
+ */
+z.loader('script', {
+  method: z.Script,
+  filters: ['default.src'],
+  handler: function(req, res, next, error){
+    z.ensureModule(req.from);
+    next();
+  },
+  options: {
+    ext: 'js'
+  }
 });
 
-u.each(['Done', 'Pending', 'Failed'], function(state){
-  Loader.prototype['is' + state] = function(){
-    return this._state === LOADER_STATE[state.toUpperCase()];
-  } 
+/**
+ * Ajax loader
+ */
+z.loader('ajax', {
+  method: z.Ajax,
+  filters: ['default.src', 'ajax.method'],
+  handler: function(req, res, next, error){
+    z(req.from, function(){ return res; }).done(next, error);
+  },
+  options: {
+    ext: 'js',
+    method: 'GET'
+  }
+});
+
+/**
+ * Get a src from a request.
+ *
+ * @param {Object} req
+ */
+z.filter('default.src', function(req){
+  if(req.src){
+    return req;
+  }
+
+  var shim = z.config.shim
+    , alias = z.config.alias
+    , name = req.from
+    , ext = (req.options.ext || this.options.ext)
+    , nameParts = name.split('.')
+    , src = '';
+
+  u.each(nameParts, function(part, index){
+    if(alias.hasOwnProperty(part)){
+      nameParts[index] = alias[part];
+    }
+  });
+
+  name = nameParts.join('.');
+  if(shim.hasOwnProperty(name)){
+    src = shim[name].src;
+  } else {
+    src = name.replace(/\./g, '/');
+    src = z.config.root + src + '.' + ext;
+  }
+
+  req.src = src;
+
+  return req;
+});
+
+/**
+ * Method filter
+ *
+ * @param {Object} req
+ */
+z.filter('ajax.method', function(req){
+  req.method = (req.method || this.options.method);
+  return req;
 });

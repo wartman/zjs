@@ -21,18 +21,22 @@ var HTTP_METHODS = [
   'DELETE'
 ];
 
-var Ajax = z.Ajax = Loader.extend({
+var Ajax = z.Ajax = Resolver.extend({
 
   options: {
     defaults: {
-      url: '',
+      src: '',
       method: 'GET',
       data: false
     }
   },
 
+  __init__: function(req, options){
+    this.options = z.u.defaults(this.options, options);
+    this.load(req);
+  },
+
   load: function(req){
-    this.__super__(req);
 
     var request
       , self = this
@@ -56,20 +60,18 @@ var Ajax = z.Ajax = Loader.extend({
     request.onreadystatechange = function(){
       if(AJAX_STATE.DONE === this.readyState){
         if(200 === this.status){
-          self._value = this.responseText;
-          self._resolve(self._value, AJAX_STATE.DONE);
+          self.resolve(this.responseText);
         } else {
-          self._value = this.status;
-          self._resolve(this.status, AJAX_STATE.FAILED);
+          self.reject(this.status);
         }
       }
     }
 
     if(method === "GET" && req.data){
-      req.url += '?' + this._buildQueryStr(req.data);
+      req.src += '?' + this._buildQueryStr(req.data);
     }
 
-    request.open(method, req.url, true);
+    request.open(method, req.src, true);
 
     if(method === "POST" && req.data){
       var params = this._buildQueryStr(req.data)
@@ -96,3 +98,18 @@ u.each(['Done', 'Pending', 'Failed'], function(state){
     return this._state === AJAX_STATE[state.toUpperCase()];
   } 
 });
+
+/**
+ * ----------------------------------------------------------------------
+ * Ajax API
+ *
+ * @param {Object} req
+ * @param {Function} next
+ * @param {Function} err
+ * @retrun {Ajax}
+ */
+z.ajax = function(req, next, err){
+  var a = new Ajax(req, z.config.ajax);
+  a.done(next, err);
+  return a;
+}

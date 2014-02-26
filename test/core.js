@@ -252,22 +252,35 @@
 
   });
 
-  test('plugin', function(){
+  test('loader and filter API', function(){
 
     stop();
 
-    var TestLoader = z.Loader.extend({
-      load: function(req){
-        this._resolve(true, 1); // Make constants available too?
-      }
-    }); 
+    z.filter('test.filter', function(req){
+      req.tested = 'tested';
+      return req;
+    });
 
-    z.plugin('test', TestLoader, function(req, res, next, err){
-      start();
-      // Define the request so the loader doesn't throw an error.
-      z('fake.request', function(){/*no-op*/});
-      ok('plugin was called.');
-      next();
+    z.filter('test.filter2', function(req){
+      req.tested = (req.tested || '') + '2';
+      return req;
+    })
+
+    z.loader('test', {
+      method: z.Resolver.extend({
+        __init__: function(){
+          this.resolve(true);
+        }
+      }),
+      filters: ['test.filter', 'test.filter2'],
+      handler: function(req, res, next, err){
+        start();
+        // Define the request so the loader doesn't throw an error.
+        z('fake.request', function(){/*no-op*/});
+        ok('plugin was called.');
+        equal(req.tested, 'tested2', 'Filters ran and in order expected');
+        next();
+      }
     });
 
     z('test.plugin').
@@ -284,23 +297,24 @@
     // This test DOES NOT test for ensured names via a network-load action.
     // Always run test.core.actual
 
-    var TestLoader = z.Loader.extend({
-      load: function(req){
-        this._resolve(true, 1); // Make constants available too?
+    z.loader('ensure',{
+      method: z.Resolver.extend({
+        __init__: function(){
+          this.resolve(true);
+        }
+      }),
+      handler: function(req, res, next, err){
+        // Mock an anonymous module being retrieved
+        z(function(){
+          return{
+            foo: 'foo'
+          };
+        });
+
+        // Ensure the module is nammed.
+        z.ensureModule(req.from);
+        next();
       }
-    }); 
-
-    z.plugin('ensure', TestLoader, function(req, res, next, err){
-      // Mock an anonymous module being retrieved
-      z().exports(function(){
-        return{
-          foo: 'foo'
-        };
-      });
-
-      // Ensure the module is nammed.
-      z.ensureModule(req.from);
-      next();
     });
 
     stop();

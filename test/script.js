@@ -14,7 +14,7 @@
     stop();
 
     new z.Script({
-      url: 'resources/script/load.js'
+      src: 'resources/script/load.js'
     }).done(function(){
       start();
       ok(window.loaded, 'Script was loaded.');
@@ -28,7 +28,7 @@
   test('Load a script with API', function(){
     stop();
 
-    z.script({url: 'resources/script/loadAPI.js'}, function(){
+    z.script({src: 'resources/script/loadAPI.js'}, function(){
       start();
       ok(window.apiLoaded, 'Script was loaded');
     }, function(){

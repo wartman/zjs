@@ -1,12 +1,12 @@
 
 
 /**
- * zjs 0.1.1
+ * zjs 0.1.3
  *
  * Copyright 2014
  * Released under the MIT license
  *
- * Date: 2014-02-24T17:52Z
+ * Date: 2014-02-26T18:49Z
  */
 
 (function(global, factory){
@@ -514,65 +514,6 @@ z.setup = function(options){
 z.u = z.util = u;
 
 /**
- * The plugin registry.
- *
- * @var {Object}
- */
-z.plugins = {};
-
-/**
- * Plugable factory. If the only arg provided is [name], and
- * a plugin of that name exists, this will return a plugin.
- *
- * @param {String} name Set or get a plugin of this name.
- * @param {Loader} loader The loader class to use.
- * @param {Function} loadEvent The event to trigger on load
- * @param {Object} options
- * @throws {Error} If no plugin of the requested name is found.
- * @return {Plugable}
- */
-z.plugin = function(name, loader, loadEvent, options){
-  if(arguments.length <= 1){
-    if(z.plugins.hasOwnProperty(name)){
-      return z.plugins[name];
-    }
-    throw new Error('Plugin was not found: '+name);
-    return false;
-  }
-
-  z.plugins[name] = new Plugable(loader, loadEvent, options);
-  return z.plugins[name];
-}
-
-/**
- * Load a script.
- *
- * @param {Object} req
- * @param {Function} next
- * @param {Function} err
- * @return {Script}
- */
-z.script = function(req, next, error){
-  var s = new Script(req, z.config.script);
-  s.done(next, error);
-  return s;
-}
-
-/**
- * Send an AJAX request.
- *
- * @param {Object} req
- * @param {Function} next
- * @param {Function} err
- * @retrun {Ajax}
- */
-z.ajax = function(req, next, err){
-  var a = new Ajax(req, z.config.ajax);
-  a.done(next, err);
-  return a;
-}
-
-/**
  * Shortcut for anon modules. Same as calling z().imports.
  *
  * @param {String} from
@@ -709,6 +650,682 @@ z.Class = function(parent, props){
     throw new TypeError('{parent} must be a function, object or undefined.');
   }
 }
+
+
+/**
+ * ----------------------------------------------------------------------
+ * z.Resolver
+ *
+ * The resolver is basically a very stripped down promise. Having a full-on
+ * promise implementation is a bit overkill for the module loader, so this
+ * is the smallest implementation we can get away with.
+ *
+ * Resolvers can, however, be bound to Promise/A+ implementations in the
+ * following ways:
+ *   var resolver = new z.Resolver;
+ *   var promise = new Promise(resolver.ready); // Binds the resolver to the promise.
+ *   // or
+ *   promise.then(resolver); // Binds the promise to the resolver.
+ *   resolver.resolve(onFulfilled, onRejected); // Will resolve the promise.
+ */
+
+var RESOLVER_STATE = {
+  PENDING: 0,
+  READY: 1,
+  REJECTED: -1
+};
+
+var Resolver = z.Resolver = z.Class({
+
+  /**
+   * Initilize the resolver.
+   *
+   * @param {Object} options (optional)
+   */
+  __new__: function(){
+    this._onReady = [];
+    this._onRejected = [];
+    this._value = null;
+    this._state = RESOLVER_STATE.PENDING;
+
+    if(this.__init__)
+      this.__init__.apply(this, arguments);
+  },
+
+  /**
+   * Add a ready callback. 
+   *
+   * @param {Function} onReady
+   * @param {Function} onRejected
+   * @return {Resolver}
+   */
+  done: function(onReady, onRejected){
+    if(onReady){
+      (this.isReady())?
+        onReady(this._value) :
+        this._onReady.push(onReady);
+    }
+    if(onRejected){
+      (this.isRejected())?
+        onRejected(this._value) :
+        this._onRejected.push(onRejected);
+    }
+    return this;
+  },
+
+  /**
+   * Add a failure callback. 
+   *
+   * @param {Function} onRejected
+   * @return {Resolver}
+   */
+  failed: function(onRejected){
+    return this.ready(undefined, onRejected);
+  },
+
+  /**
+   * An alias for Resolver#ready.
+   * This method is here only to ensure that it can be complient
+   * with /A+ promises -- please do not try to use the resolver 
+   * as a promise.
+   *
+   * @param {Function} onReady
+   * @param {Function} onRejected
+   * @return {Resolver}
+   */
+  then: function(onReady, onRejected){
+    return this.ready(onReady, onFailed);
+  },
+
+  /**
+   * Resolve the resolver with the provided value.
+   *
+   * @param {Mixed} value
+   */
+  resolve: function(value){
+    this._value = value;
+    this._state = RESOLVER_STATE.READY;
+    this._dispatch(this._onReady);
+  },
+  
+  /**
+   * Reject the resolver with the provided value.
+   *
+   * @param {Mixed} reason
+   */
+  reject: function(reason){
+    this._value = reason;
+    this._state = RESOLVER_STATE.REJECTED;
+    this._dispatch(this._onRejected);
+  },
+
+  /**
+   * A helper function to run callbacks.
+   *
+   * @param {Array} fns
+   */
+  _dispatch: function(fns){
+    var value = this._value
+      , self = this;
+    // Execute fns from first added to last.
+    while(fns.length){
+      var fn = fns.shift();
+      fn.call(self, value);
+    }
+  }
+
+});
+
+/** 
+ * Add state helpers to the Resolver prototype.
+ */
+z.u(['Ready', 'Rejected', 'Pending']).each(function(state){
+  var STATE = state.toUpperCase();
+  Resolver.prototype['is'+state] = function(){
+    return this._state === RESOLVER_STATE[STATE];
+  }
+});
+
+
+/**
+ * ----------------------------------------------------------------------
+ * z.Script
+ *
+ * z's script loader. Extends z.Resolver.
+ */
+
+var Script = z.Script = Resolver.extend({
+
+  options: {
+    nodeType: 'text/javascript',
+    charset: 'utf-8',
+    async: true
+  },
+
+  __init__: function(req, options){
+    this.options = u.defaults(this.options, options);
+    this.node = false;
+    this.load(req);
+  },
+
+  /**
+   * Create a script node.
+   *
+   * @return {Element}
+   */
+  create: function(){
+    var node = document.createElement('script');
+    node.type = this.options.nodeType || 'text/javascript';
+    node.charset = this.options.charset;
+    node.async = this.options.async;
+    return node;
+  },
+
+  /**
+   * Load a request
+   *
+   * @param {Object | String} req
+   */
+  load: function(req){
+
+    var node = this.create()
+      , head = document.getElementsByTagName('head')[0]
+      , self = this
+      , settings = this.scriptSettings
+      , defaults = {
+          src: ''
+        };
+
+    // Allow the user to just pass an src.
+    if(z.u.isString(req)){
+      req = {
+        src: req
+      };
+    }
+
+    req = u.defaults(defaults, req);
+
+    node.setAttribute('data-from', (req.from || req.src));
+
+    _scriptLoadEvent(node, function(node){
+      self.resolve(node);
+    }, function(e){
+      self.reject(e);
+    });
+
+    // For ie8, code may start running as soon as the node
+    // is placed in the DOM, so we need to be ready:  
+    Script.currentlyAddingScript = node;
+    node.src = req.src;
+    head.appendChild(node);
+    // Clear out the current script after DOM insertion.
+    Script.currentlyAddingScript = null;
+  }
+
+});
+
+/**
+ * The following methods and properties are for older browsers, which
+ * may start defining a script before it is fully loaded.
+ */
+Script.useInteractive = false;
+Script.currentlyAddingScript = null;
+Script.interactiveScript = null;
+Script.getInteractiveScript = function(){
+  if (Script.interactiveScript && Script.interactiveScript.readyState === 'interactive') {
+    return Script.interactiveScript;
+  }
+
+  u.eachReverse(Script.scripts(), function (script) {
+    if (script.readyState === 'interactive') {
+      Script.interactiveScript = script;
+      return true;
+    }
+  });
+  return Script.interactiveScript;
+}
+
+Script.scripts = function(){
+  return document.getElementsByTagName('script');
+} 
+
+/**
+ * Configure the event listener.
+ */
+var _scriptLoadEvent = (function(){
+
+  if(typeof document === "undefined"){
+    // Return an empty function if this is a server context
+    return function(node, next, err){ /* noop */ };
+  }
+
+  var testNode = document.createElement('script')
+    , loader = null;
+
+  // Test for support.
+  // Test for attach event as IE9 has a subtle error where it does not 
+  // fire its onload event right after script-load with addEventListener,
+  // like most other browsers.
+  // (based on requireJs)
+  if (testNode.attachEvent){
+
+    // Because onload is not fired right away, we can't add a define call to
+    // anonymous modules. However, IE reports the script as being in 'interactive'
+    // ready state at the time of the define call.
+    loader = function(node, next, err){
+      Script.useInteractive = true;
+      node.attachEvent('onreadystatechange', function(){
+        // if(node.readyState === 'loaded'){  // I could swear this was correct.
+        if(node.readyState === 'complete'){
+          next(node);
+          Script.interactiveScript = null;
+        }
+      });
+      // Error handler not possible I beleive.
+    }
+
+  } else {
+    
+    loader = function(node, next, err){
+      node.addEventListener('load', function(e){
+        next(node);
+      }, false);
+      node.addEventListener('error', function(e){
+        err(e);
+      }, false);
+    }
+
+  }
+
+  return loader;
+
+})();
+
+/**
+ * ----------------------------------------------------------------------
+ * Script API
+ *
+ * @param {Object} req
+ * @param {Function} next
+ * @param {Function} err
+ * @return {Script}
+ */
+z.script = function(req, next, error){
+  var s = new Script(req, z.config.script);
+  s.done(next, error);
+  return s;
+}
+
+
+/**
+ * ----------------------------------------------------------------------
+ * z.Ajax
+ *
+ * Fit's ajax wrapper
+ */
+
+var AJAX_STATE = {
+  PENDING: 0,
+  OPENED: 1,
+  HEADERS_RECEIVED: 2,
+  LOADING: 3,
+  DONE: 4,
+  FAILED: -1
+};
+
+var HTTP_METHODS = [
+  'GET',
+  'PUT',
+  'POST',
+  'DELETE'
+];
+
+var Ajax = z.Ajax = Resolver.extend({
+
+  options: {
+    defaults: {
+      src: '',
+      method: 'GET',
+      data: false
+    }
+  },
+
+  __init__: function(req, options){
+    this.options = z.u.defaults(this.options, options);
+    this.load(req);
+  },
+
+  load: function(req){
+
+    var request
+      , self = this
+      , method = 'GET';
+
+    req = u.defaults(this.options.defaults, req);
+    
+    method = req.method.toUpperCase() === 'GET';
+
+    if(HTTP_METHODS.indexOf(method) <= 0){
+      // Ensure we have an allowed method.
+      method = 'GET';
+    }
+
+    if(window.XMLHttpRequest){
+      request = new XMLHttpRequest();
+    } else { // code for IE6, IE5
+      request = new ActiveXObject("Microsoft.XMLHTTP");
+    }
+
+    request.onreadystatechange = function(){
+      if(AJAX_STATE.DONE === this.readyState){
+        if(200 === this.status){
+          self.resolve(this.responseText);
+        } else {
+          self.reject(this.status);
+        }
+      }
+    }
+
+    if(method === "GET" && req.data){
+      req.src += '?' + this._buildQueryStr(req.data);
+    }
+
+    request.open(method, req.src, true);
+
+    if(method === "POST" && req.data){
+      var params = this._buildQueryStr(req.data)
+      request.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+      request.send(params);
+    } else {
+      request.send();
+    }
+  },
+
+  _buildQueryStr: function(data){
+    var query = []
+      ;
+    for(var key in data){
+      query.push(key + '=' + data[key]);
+    }
+    return query.join('&');
+  }
+
+});
+
+u.each(['Done', 'Pending', 'Failed'], function(state){
+  Ajax.prototype['is' + state] = function(){
+    return this._state === AJAX_STATE[state.toUpperCase()];
+  } 
+});
+
+/**
+ * ----------------------------------------------------------------------
+ * Ajax API
+ *
+ * @param {Object} req
+ * @param {Function} next
+ * @param {Function} err
+ * @retrun {Ajax}
+ */
+z.ajax = function(req, next, err){
+  var a = new Ajax(req, z.config.ajax);
+  a.done(next, err);
+  return a;
+}
+
+
+/**
+ * ----------------------------------------------------------------------
+ * Loader
+ *
+ * The Loader is ultimately responsable for loading scripts, files, etc.
+ * Use the API to register new loaders and filters.
+ */
+
+/**
+ * Create a new Loader.
+ * The setup object is where you define how the loader should function:
+ * see the API under the class for more on how to set up Loaders.
+ *
+ * @param {Object} setup
+ */
+var Loader = function(setup){
+  this._queue = {};
+  setup = (setup || {});
+
+  this._filters = (setup.filters || ['default.src']);
+  this.options = z.u.defaults(this.options, setup.options);
+  this._method = (setup.method || z.Script);
+  this._handler = (setup.handler || function(req, res, next, error){
+    next(res);
+  });
+}
+
+/**
+ * Default options.
+ *
+ * @var {Object}
+ */
+Loader.prototype.options = {
+  ext: 'js'
+}
+
+/**
+ * Run the request through all registered filters.
+ *
+ * @param {Object} req
+ */
+Loader.prototype.prefilter = function(req){
+  var self = this;
+  z.u(this._filters).each(function(name, index){
+    var filter = z.filter(name);
+    if(filter)
+      req = filter.call(self, req);
+  });
+  return req;
+}
+
+/**
+ * Register a method
+ *
+ * @param {Class} method
+ */
+Loader.prototype.method = function(method){
+  this._method = method;
+  return this;
+}
+
+/**
+ * Register a filter or filters.
+ *
+ * @param {String | Array} name
+ */
+Loader.prototype.filters = function(name){
+  if(!name){
+    return;
+  }
+  if(z.u.isArray(name)){
+    this._filters.concat(name);
+    return;
+  }
+  this._filters.push(name);
+  return this;
+}
+
+/**
+ * Register handler.
+ * Callbacks should have the args 'req', 'res', 'next' and 'error'
+ *
+ * @param {Function | Array} cb
+ */
+Loader.prototype.handler = function(cb){
+  if(!cb){
+    return;
+  }
+  this._handler = cb;
+  return this;
+}
+
+/**
+ * Check the queue to see if an url is loading.
+ *
+ * @param {String} url
+ */
+Loader.prototype.has = function(src){
+  return this._queue.hasOwnProperty(src);
+}
+
+/**
+ * Load a request.
+ *
+ * @param {Object} req
+ * @param {Function} next
+ * @param {Function} error
+ */
+Loader.prototype.load = function(req, onDone, onRejected){
+  var self = this;
+  req = this.prefilter(req);
+  if(!this.has(req.src)){
+    this._queue[req.src] = new this._method(req);
+  }
+  this._queue[req.src].done(function(res){
+    self._handler(req, res, onDone, onRejected);
+  }, onRejected);
+  return this;
+}
+
+/**
+ * ----------------------------------------------------------------------
+ * Loader API
+ */
+
+/**
+ * Holds all registered loaders.
+ *
+ * @var {Object}
+ * @api private
+ */
+var _loaders = {};
+
+/**
+ * z Loader API
+ * // info on how it works
+ * 
+ * @param {String} name If this is the only arg passed, 
+ *   the method will try to return a loader or will create
+ *   a new one.
+ * @param {Object} setup (optional) If you pass an arg here,
+ *   a new loader will be created EVEN if one already exists
+ *   for the provided name.
+ * @return {Loader}
+ */
+z.loader = function(name, setup){
+  if(arguments.length <= 1){
+    if(_loaders.hasOwnProperty(name)){
+      return _loaders[name];
+    }
+  }
+
+  _loaders[name] = new Loader(setup);
+  return _loaders[name];
+}
+
+/**
+ * filter API
+ */
+_filters = {};
+z.filter = function(name, cb){
+  if(arguments.length <= 1){
+    if(_filters.hasOwnProperty(name)){
+      return _filters[name];
+    }
+    return false;
+  }
+
+  _filters[name] = cb 
+  return _filters[name];
+}
+
+/**
+ * ----------------------------------------------------------------------
+ * Default loaders and filters
+ */
+
+/**
+ * Script loader
+ */
+z.loader('script', {
+  method: z.Script,
+  filters: ['default.src'],
+  handler: function(req, res, next, error){
+    z.ensureModule(req.from);
+    next();
+  },
+  options: {
+    ext: 'js'
+  }
+});
+
+/**
+ * Ajax loader
+ */
+z.loader('ajax', {
+  method: z.Ajax,
+  filters: ['default.src', 'ajax.method'],
+  handler: function(req, res, next, error){
+    z(req.from, function(){ return res; }).done(next, error);
+  },
+  options: {
+    ext: 'js',
+    method: 'GET'
+  }
+});
+
+/**
+ * Get a src from a request.
+ *
+ * @param {Object} req
+ */
+z.filter('default.src', function(req){
+  if(req.src){
+    return req;
+  }
+
+  var shim = z.config.shim
+    , alias = z.config.alias
+    , name = req.from
+    , ext = (req.options.ext || this.options.ext)
+    , nameParts = name.split('.')
+    , src = '';
+
+  u.each(nameParts, function(part, index){
+    if(alias.hasOwnProperty(part)){
+      nameParts[index] = alias[part];
+    }
+  });
+
+  name = nameParts.join('.');
+  if(shim.hasOwnProperty(name)){
+    src = shim[name].src;
+  } else {
+    src = name.replace(/\./g, '/');
+    src = z.config.root + src + '.' + ext;
+  }
+
+  req.src = src;
+
+  return req;
+});
+
+/**
+ * Method filter
+ *
+ * @param {Object} req
+ */
+z.filter('ajax.method', function(req){
+  req.method = (req.method || this.options.method);
+  return req;
+});
 
 
 /**
@@ -1011,15 +1628,7 @@ var _import = function(mod){
     
     u.each(queue, function(item, index){
       var type = (item.options.type || 'script')
-        , loader;
-
-      try {
-        loader = z.plugin(type);
-      } catch(e) {
-        // If a plugin is not found, an error will be thrown.
-        _resolve(mod, MODULE_STATE.FAILED);
-        throw e;
-      }
+        , loader = z.loader(type);
 
       loader.load(item, function(){
         remaining -= 1;
@@ -1119,457 +1728,9 @@ var _define = function(mod){
   _resolve(mod, MODULE_STATE.ENABLED);
 }
 
-
 /**
- * ----------------------------------------------------------------------
- * Plugable
- *
- * A wrapper for z plugins. Primarily ensures items are not loaded more then once.
- * This particular system is highly unstable -- I think there are much better
- * ways of making this user friendly, so it will likely change a lot.
- * For now, just use the provided 'script' and 'ajax' plugins.
+ * Module API in src/core.js
  */
-
-/**
- * Plugable is used by z.plugin to handle loading events.
- *
- * @param {Loader} loader A loader class. Requires a 'load' method
- *   and a 'done' method. See z.Loader for an example of how to
- *   create a compatable class.
- * @param {Function} loadEvent The callback that will be triggered
- *   when the module is loaded.
- * @param {Object} options Default options for requests.
- */
-var Plugable = function(loader, loadEvent, options){
-  this._queue = {};
-  this._loader = loader;
-  this.options = u.defaults(this.options, options);
-  this._loadEvent = loadEvent;
-}
-
-/**
- * The default options for a request.
- * Currently, you can set 'ext' to change the default extension,
- * and 'req' to modifiy all request objects.
- *
- * This is subject to change!
- *
- * @var {Object}
- */
-Plugable.prototype.options = {
-  ext: 'js'
-};
-
-/**
- * Create an URL using this plugables options.
- *
- * @param {Object} request
- * @api private
- */
-Plugable.prototype._makeUrl = function(req){
-  var shim = z.config.shim
-    , alias = z.config.alias
-    , name = req.from
-    , ext = (req.options.ext || this.options.ext)
-    , nameParts = name.split('.')
-    , changed = false
-    , src = '';
-
-  u.each(nameParts, function(part, index){
-    if(alias.hasOwnProperty(part)){
-      nameParts[index] = alias[part];
-    }
-  });
-
-  name = nameParts.join('.');
-  if(shim.hasOwnProperty(name)){
-    src = shim[name].src;
-  } else {
-    src = name.replace(/\./g, '/');
-    src = z.config.root + src + '.' + ext;
-  }
-
-  return src;
-}
-
-/**
- * Add a request to the queue.
- * 
- * @param {String} url
- * @param {Loader} obj
- */ 
-Plugable.prototype.enqueue = function(url, obj){
-  this._queue[url] = obj;
-}
-
-/**
- * Check the queue to see if an url is loading.
- *
- * @param {String} url
- */
-Plugable.prototype.has = function(url){
-  return this._queue.hasOwnProperty(url)
-}
-
-/**
- * Load a request.
- *
- * @param {Object} req
- * @param {Function} next
- * @param {Function} error
- */
-Plugable.prototype.load = function(req, next, error){
-  var self = this;
-  if(!req.url){
-    req.url = this._makeUrl(req);
-  }
-  if(this.options.req){
-    req = u.defaults(this.options.req, req);
-  }
-
-  // Ensure that we only load an item once.
-  // If a module requests the same URL again, have it subscribe to the 
-  // request alreay in progress.
-  if(!this.has(req.url)){
-    this.enqueue(req.url, new this._loader(req));
-  }
-  this._queue[req.url].done(function(res){
-    self._loadEvent(req, res, next, error);
-  }, error);
-}
-
-
-/**
- * ----------------------------------------------------------------------
- * Loader
- *
- * A class that contains some common functionality for z's script loader
- * and its ajax loader.
- */
-
-LOADER_STATE = {
-  PENDING: 0,
-  DONE: 1,
-  FAILED: -1
-};
-
-var Loader = z.Loader = z.Class({
-  
-  __new__: function(req, options){
-    this.options = u.defaults(this.options, options);
-    this.node = false;
-    this._state = LOADER_STATE.PENDING;
-    this._onReady = [];
-    this._onFailed = [];
-    this._value = false;
-    this.__init__.apply(this, arguments);
-    this.load(req);
-  },
-
-  __init__: function(){
-    // no-op
-  },
-
-  load: function(req){
-    // No op
-  },
-
-  /**
-   * Callbacks to run on done.
-   *
-   * @param {Function} onReady
-   * @param {Function} onFailed
-   */
-  done: function(onReady, onFailed){
-    if(onReady && u.isFunction(onReady)){
-      (this.isDone())?
-        onReady(this._value) :
-        this._onReady.push(onReady);
-    }
-    if(onFailed && u.isFunction(onFailed)){
-      (this.isFailed())?
-        onFailed(this._value):
-        this._onFailed.push(onFailed);
-    }
-  },
-
-  /**
-   * Resolve the loader based on the passed state.
-   *
-   * @param {Mixed} arg
-   * @param {Integer} state
-   */
-  _resolve: function(arg, state){
-    if(state){
-      this._state = state;
-    }
-
-    var self = this;
-
-    if(this.isDone()){
-      u.each(self._onReady, function(fn){
-        fn(arg);
-      });
-      this._onReady = [];
-      return;
-    }
-
-    if(this.isFailed()){
-      u.each(self._onFailed, function(fn){
-        fn(arg);
-      });
-      this._onFailed = [];
-      return;
-    }
-  }
-
-});
-
-u.each(['Done', 'Pending', 'Failed'], function(state){
-  Loader.prototype['is' + state] = function(){
-    return this._state === LOADER_STATE[state.toUpperCase()];
-  } 
-});
-
-
-/**
- * ----------------------------------------------------------------------
- * z.Scripts
- *
- * z's scripts loader.
- */
-
-var Script = z.Script = Loader.extend({
-
-  options: {
-    nodeType: 'text/javascript',
-    charset: 'utf-8',
-    async: true
-  },
-
-  /**
-   * Create a script node.
-   *
-   * @return {Element}
-   */
-  create: function(){
-    var node = this._value = document.createElement('script');
-    node.type = this.options.nodeType || 'text/javascript';
-    node.charset = this.options.charset;
-    node.async = this.options.async;
-    return node;
-  },
-
-  /**
-   * Load a request
-   */
-  load: function(req){
-
-    var node = this.create()
-      , head = document.getElementsByTagName('head')[0]
-      , self = this
-      , settings = this.scriptSettings
-      , defaults = {
-          url: ''
-        };
-
-    req = u.defaults(defaults, req);
-
-    node.setAttribute('data-from', (req.from || req.url));
-
-    _scriptLoadEvent(node, function(node){
-      self._resolve(node, LOADER_STATE.DONE);
-    }, function(e){
-      self._resolve(e, LOADER_STATE.FAILED);
-    });
-
-    // For ie8, code may start running as soon as the node
-    // is placed in the DOM, so we need to be ready:  
-    Script.currentlyAddingScript = node;
-    node.src = req.url;
-    head.appendChild(node);
-    // Clear out the current script after DOM insertion.
-    Script.currentlyAddingScript = null;
-  }
-
-});
-
-/**
- * The following methods and properties are for older browsers, which
- * may start defining a script before it is fully loaded.
- */
-Script.useInteractive = false;
-Script.currentlyAddingScript = null;
-Script.interactiveScript = null;
-Script.getInteractiveScript = function(){
-  if (Script.interactiveScript && Script.interactiveScript.readyState === 'interactive') {
-    return Script.interactiveScript;
-  }
-
-  u.eachReverse(Script.scripts(), function (script) {
-    if (script.readyState === 'interactive') {
-      Script.interactiveScript = script;
-      return true;
-    }
-  });
-  return Script.interactiveScript;
-}
-
-Script.scripts = function(){
-  return document.getElementsByTagName('script');
-} 
-
-/**
- * Configure the event listener.
- */
-var _scriptLoadEvent = (function(){
-
-  if(typeof document === "undefined"){
-    // Return an empty function if this is a server context
-    return function(node, next, err){ /* noop */ };
-  }
-
-  var testNode = document.createElement('script')
-    , loader = null;
-
-  // Test for support.
-  // Test for attach event as IE9 has a subtle error where it does not 
-  // fire its onload event right after script-load with addEventListener,
-  // like most other browsers.
-  // (based on requireJs)
-  if (testNode.attachEvent){
-
-    // Because onload is not fired right away, we can't add a define call to
-    // anonymous modules. However, IE reports the script as being in 'interactive'
-    // ready state at the time of the define call.
-    loader = function(node, next, err){
-      Script.useInteractive = true;
-      node.attachEvent('onreadystatechange', function(){
-        // if(node.readyState === 'loaded'){  // I could swear this was correct.
-        if(node.readyState === 'complete'){
-          next(node);
-          Script.interactiveScript = null;
-        }
-      });
-      // Error handler not possible I beleive.
-    }
-
-  } else {
-    
-    loader = function(node, next, err){
-      node.addEventListener('load', function(e){
-        next(node);
-      }, false);
-      node.addEventListener('error', function(e){
-        err(e);
-      }, false);
-    }
-
-  }
-
-  return loader;
-
-})();
-
-
-/**
- * ----------------------------------------------------------------------
- * z.Ajax
- *
- * Fit's ajax wrapper
- */
-
-var AJAX_STATE = {
-  PENDING: 0,
-  OPENED: 1,
-  HEADERS_RECEIVED: 2,
-  LOADING: 3,
-  DONE: 4,
-  FAILED: -1
-};
-
-var HTTP_METHODS = [
-  'GET',
-  'PUT',
-  'POST',
-  'DELETE'
-];
-
-var Ajax = z.Ajax = Loader.extend({
-
-  options: {
-    defaults: {
-      url: '',
-      method: 'GET',
-      data: false
-    }
-  },
-
-  load: function(req){
-    this.__super__(req);
-
-    var request
-      , self = this
-      , method = 'GET';
-
-    req = u.defaults(this.options.defaults, req);
-    
-    method = req.method.toUpperCase() === 'GET';
-
-    if(HTTP_METHODS.indexOf(method) <= 0){
-      // Ensure we have an allowed method.
-      method = 'GET';
-    }
-
-    if(window.XMLHttpRequest){
-      request = new XMLHttpRequest();
-    } else { // code for IE6, IE5
-      request = new ActiveXObject("Microsoft.XMLHTTP");
-    }
-
-    request.onreadystatechange = function(){
-      if(AJAX_STATE.DONE === this.readyState){
-        if(200 === this.status){
-          self._value = this.responseText;
-          self._resolve(self._value, AJAX_STATE.DONE);
-        } else {
-          self._value = this.status;
-          self._resolve(this.status, AJAX_STATE.FAILED);
-        }
-      }
-    }
-
-    if(method === "GET" && req.data){
-      req.url += '?' + this._buildQueryStr(req.data);
-    }
-
-    request.open(method, req.url, true);
-
-    if(method === "POST" && req.data){
-      var params = this._buildQueryStr(req.data)
-      request.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
-      request.send(params);
-    } else {
-      request.send();
-    }
-  },
-
-  _buildQueryStr: function(data){
-    var query = []
-      ;
-    for(var key in data){
-      query.push(key + '=' + data[key]);
-    }
-    return query.join('&');
-  }
-
-});
-
-u.each(['Done', 'Pending', 'Failed'], function(state){
-  Ajax.prototype['is' + state] = function(){
-    return this._state === AJAX_STATE[state.toUpperCase()];
-  } 
-});
 
 
 /**
@@ -1633,31 +1794,6 @@ root.define= function(name, reqs, factory){
 root.define.amd = {
   jQuery: true
 }
-
-
-/**
- * The default plugin, used for loading js files.
- */
-z.plugin('script', Script, function(req, res, next, error){
-  var name = req.from;
-  z.ensureModule(name);
-  next();
-}, {
-  ext: 'js'
-});
-
-/**
- * Load other files.
- */
-z.plugin('ajax', Ajax, function(req, res, next, error){
-  var name = req.from;
-  z(name, function(){ return res; }).done(next, error);
-}, {
-  req: {
-    method: 'GET',
-  },
-  ext: 'txt'
-});
 
 
 }));

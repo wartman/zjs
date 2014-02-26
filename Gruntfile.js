@@ -20,13 +20,14 @@ module.exports = function(grunt){
           // "src/util_small.js",
           "src/core.js",
           "src/Class.js",
-          "src/Module.js",
-          "src/Plugable.js",
-          "src/Loader.js",
+          "src/Resolver.js",
           "src/Script.js",
           "src/Ajax.js",
+          "src/Loader.js",
+          "src/Module.js",
+          //"src/Plugable.js",
           "src/amd.js",
-          "src/plugins.js",
+          //"src/plugins.js",
           "src/outro.js"
         ],
         dest: "dist/z.js"

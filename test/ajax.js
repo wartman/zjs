@@ -13,7 +13,7 @@
 
     new z.Ajax({
       method: 'GET',
-      url: 'resources/text/file.txt'
+      src: 'resources/text/file.txt'
     }).done(function(data){
       start();
       equal(data, 'Was fetched.', 'File loaded');
@@ -27,7 +27,7 @@
 
     z.ajax({
       method: 'GET',
-      url: 'resources/text/file.txt'
+      src: 'resources/text/file.txt'
     }, function(data){
       start();
       equal(data, 'Was fetched.', 'File loaded');

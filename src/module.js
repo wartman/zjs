@@ -298,15 +298,7 @@ var _import = function(mod){
     
     u.each(queue, function(item, index){
       var type = (item.options.type || 'script')
-        , loader;
-
-      try {
-        loader = z.plugin(type);
-      } catch(e) {
-        // If a plugin is not found, an error will be thrown.
-        _resolve(mod, MODULE_STATE.FAILED);
-        throw e;
-      }
+        , loader = z.loader(type);
 
       loader.load(item, function(){
         remaining -= 1;
@@ -405,3 +397,7 @@ var _define = function(mod){
   }
   _resolve(mod, MODULE_STATE.ENABLED);
 }
+
+/**
+ * Module API in src/core.js
+ */
