@@ -105,8 +105,7 @@ Naming modules is optional, z is smart enough to name them when requested
 adding a name:
 
     
-    z(function(){
-        // You can also use imports and exports here.
+    z(function(imports){
         return {
             foo: 'foo'
         }
