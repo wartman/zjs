@@ -59,31 +59,57 @@ You can also name each export individually, if you want:
     });
 
 
+Modules can also be defined by passing a callback directly to z(). If you
+don't pass any arguments to the callback, the callback will directly define
+the module:
 
-Naming modules is optional, z is smart enough to name them when requested
-(indeed, naming modules is not recomended). Here's an example of an anonymous 
-z module (the coding style here may not be strictly 'correct', but I
-find it more readable):
+    
+    z('app.foo', function(){
+        return {
+            foo: 'foo'
+        };
+    });
 
+
+Passing an 'imports' and an 'exports' arg to the callback will allow you to
+define the imports and exports of this module:
+
+
+    z(function(imports, exports){
   
-    imports('app.bar', ['Bar', 'Bin']).        // Calling 'imports(...)' is the same as calling 'z().imports(...)'
-    imports('app.fiz', ['Bin @ Bin2', 'Fod']). // Names can be aliased with '@' to avoid naming conflicts.
+        imports('app.bar', ['Bar', 'Bin']);
+        imports('app.fiz', ['Bin @ Bin2', 'Fod']); // Names can be aliased with '@' to avoid naming conflicts.
 
-    exports(function(__){
+        exports(function(__){
 
-        var Foo = __.Bin2.extends({ // 'Bin2' here is an alias for 'app.fiz.Bin'
+            var Foo = __.Bin2.extends({ // 'Bin2' here is an alias for 'app.fiz.Bin'
 
-            __init__:function(options){
-                this.__super__(options); // __super__ is availabe in all z.Classes
-                // code
-            }
+                __init__:function(options){
+                    this.__super__(options); // __super__ is availabe in all z.Classes
+                    // code
+                }
+
+            });
+
+            return {
+                Foo: Foo
+            };
 
         });
 
-        return {
-            Foo: Foo
-        };
+    });
 
+
+Naming modules is optional, z is smart enough to name them when requested
+(indeed, naming modules is not recomended). Simply create a module without
+adding a name:
+
+    
+    z(function(){
+        // You can also use imports and exports here.
+        return {
+            foo: 'foo'
+        }
     });
 
 

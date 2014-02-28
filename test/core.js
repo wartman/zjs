@@ -330,5 +330,35 @@
 
   });
 
+  test('alternate API', function(){
+
+    stop();
+
+    z('test.alt.foo', function(){
+      return {
+        foo: 'foo'
+      }
+    });
+
+    z('test.alt.bar', function(){
+      return {
+        foo: 'foo',
+        bar: 'bar'
+      }
+    });
+
+    z('test.alt', function(imports, exports){
+
+      imports('test.alt.foo', 'foo');
+      imports('test.alt.bar', ['foo @baz', 'bar']);
+
+      exports(function(__){
+        start();
+        equal(__.foo+__.bar+__.baz, 'foobarfoo', 'Alternate API works');
+      });
+
+    });
+
+  });
 
 })();

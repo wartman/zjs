@@ -12,21 +12,6 @@
  * @param {Function} factory Pass a function here to quickly define a module
  *   with no deps.
  */
-// var z = root.z = function(name, factory){
-//   if(z.has(name) && !factory){
-//     return z.modules[name];
-//   }
-//   if(u.isFunction(name)){
-//     factory = name;
-//     name = undef;
-//   }
-//   var mod = _addModule(name);
-//   if(factory){
-//     mod.exports(factory);
-//   }
-//   return mod;
-// }
-
 var z = root.z = function(name, factory){
   if(u.isFunction(name)){
     factory = name;
@@ -38,7 +23,7 @@ var z = root.z = function(name, factory){
   var mod = _addModule(name);
   if(u.isFunction(factory) && factory.length === 2){
     _runFactory(mod, factory);
-  } else if (u.isFunction(factory)) {
+  } else if (factory) {
     mod.exports(factory);
   }
   return mod;
@@ -150,15 +135,3 @@ z.setup = function(options){
  * Expose util funcs.
  */
 z.u = z.util = u;
-
-/**
- * Shortcut for anon modules. Same as calling z().imports.
- *
- * @param {String} from
- * @param {String | Array} uses (optional)
- * @param {Object} options (optional)
- * @return {Module}
- */
-root.imports = function(from, uses, options){
-  return z().imports(from, uses, options);
-}

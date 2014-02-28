@@ -1,8 +1,7 @@
 /**
  * Tests named modules.
  */
-z('resources.named')
-.exports(function(__){
+z('resources.named', function(){
   return{
     named: 'named'
   };
