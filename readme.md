@@ -75,7 +75,7 @@ Passing an 'imports' and an 'exports' arg to the callback will allow you to
 define the imports and exports of this module:
 
 
-    z(function(imports, exports){
+    z('app.foo', function(imports, exports){
   
         imports('app.bar', ['Bar', 'Bin']);
         imports('app.fiz', ['Bin @ Bin2', 'Fod']); // Names can be aliased with '@' to avoid naming conflicts.
@@ -105,10 +105,16 @@ Naming modules is optional, z is smart enough to name them when requested
 adding a name:
 
     
-    z(function(imports){
-        return {
-            foo: 'foo'
-        }
+    z(function(imports, exports){
+
+        imports('foo.bar');
+
+        exports(function(__){
+            return {
+                foo: 'foo'
+            }
+        });
+        
     });
 
 
@@ -121,12 +127,18 @@ with z.loader:
         return req; // Always return req
     });
 
-    z.loader('myLoader')
-        .method(z.Script)  // The class to load things with. The only requirement is that it have a 'done' method.
-        .filters(['default.src', 'app.filter']) // Register filters
-        .handler(function(req, res, next, error){ // The handler is run when the request is done.
+    z.loader('myLoader', {
+        method: z.Script,  // The class to load things with. The only requirement is that it have a 'done' method.
+        filters: ['default.src', 'app.filter'], // Register filters
+        handler: function(req, res, next, error){ // The handler is run when the request is done.
             // code
-        });
+        }
+    });
+
+    // Once you've defined a loader, you can open it up later and modify it:
+    z.loader('myLoader')
+        .filters(['app.filter'])
+        .method(z.Ajax);
 
     z('app.foo')
         .imports('app.bar', '*', {type: 'myLoader'}) // Use your new loader by setting 'type'
@@ -162,10 +174,11 @@ trouble (jQuery included).
         }
     });
 
-    z('main').
-    imports('jquery').
-    exports( function(__){
-        __.jquery('#foo'); // Got jquery!
+    z('main', function(imports, exports){
+        imports('jquery');
+        exports( function(__){
+            __.jquery('#foo'); // Got jquery!
+        });
     });
 
     
