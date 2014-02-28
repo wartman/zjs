@@ -1,12 +1,12 @@
 
 
 /**
- * zjs 0.1.3
+ * zjs 0.1.4
  *
  * Copyright 2014
  * Released under the MIT license
  *
- * Date: 2014-02-26T18:49Z
+ * Date: 2014-02-28T14:28Z
  */
 
 (function(global, factory){
@@ -401,19 +401,46 @@ u.prototype.value = function(){
  * @param {Function} factory Pass a function here to quickly define a module
  *   with no deps.
  */
+// var z = root.z = function(name, factory){
+//   if(z.has(name) && !factory){
+//     return z.modules[name];
+//   }
+//   if(u.isFunction(name)){
+//     factory = name;
+//     name = undef;
+//   }
+//   var mod = _addModule(name);
+//   if(factory){
+//     mod.exports(factory);
+//   }
+//   return mod;
+// }
+
 var z = root.z = function(name, factory){
-  if(z.has(name) && !factory){
-    return z.modules[name];
-  }
   if(u.isFunction(name)){
     factory = name;
     name = undef;
   }
+  if(z.has(name) && !factory){
+    return z.modules[name];
+  }
   var mod = _addModule(name);
-  if(factory){
+  if(u.isFunction(factory) && factory.length === 2){
+    _runFactory(mod, factory);
+  } else if (u.isFunction(factory)) {
     mod.exports(factory);
   }
   return mod;
+}
+
+var _runFactory = function(mod, factory){
+  var imports = function(){
+    return Module.prototype.imports.apply(mod, arguments);    
+  }
+  var exports = function(){
+    return Module.prototype.exports.apply(mod, arguments);
+  }
+  factory.call(mod, imports, exports);
 }
 
 /**
