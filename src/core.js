@@ -29,16 +29,6 @@ var z = root.z = function(name, factory){
   return mod;
 }
 
-var _runFactory = function(mod, factory){
-  var imports = function(){
-    return Module.prototype.imports.apply(mod, arguments);    
-  }
-  var exports = function(){
-    return Module.prototype.exports.apply(mod, arguments);
-  }
-  factory.call(mod, imports, exports);
-}
-
 /**
  * Helper for adding modules.
  *
@@ -64,6 +54,23 @@ var _addModule = function(name){
 
   z.modules[name] = new Module();
   return z.modules[name];
+}
+
+/**
+ * Helper for running module factories.
+ *
+ * @param {Module} mod
+ * @param {Function} factory
+ * @api private
+ */
+var _runFactory = function(mod, factory){
+  var imports = function(){
+    return Module.prototype.imports.apply(mod, arguments);    
+  }
+  var exports = function(){
+    return Module.prototype.exports.apply(mod, arguments);
+  }
+  factory.call(mod, imports, exports);
 }
 
 /**
