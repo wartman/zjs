@@ -110,10 +110,10 @@ z.Class = function(parent, props){
 
   if(parent && hasOwnProperty.call(parent, 'extend')){
     return parent.extend(props);
-  } else if (z.util.isFunction(parent)){
+  } else if (u.isFunction(parent)){
     // Use parent as constructor.
     return _classExtend.call(parent, props);
-  } else if(z.util.isObject(parent)){
+  } else if(u.isObject(parent)){
     // Bind the default constructor to the object.
     parent.__new__ = _classConstructor;
     return _classExtend.call(parent, props);

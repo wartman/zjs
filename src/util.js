@@ -3,8 +3,6 @@
  * z.util
  *
  * A few utility funcs.
- * This is a less intensive version of the full lib, using only the funcs
- * required for z to run.
  */
 
 var forEach = Array.prototype.forEach
@@ -63,6 +61,10 @@ u.extend = function(obj){
   return obj;
 }
 
+u.isObject = function(obj){
+  return obj === Object(obj);
+}
+
 u.defaults = function(obj, options){
   if(undefined === options){
     return obj;
@@ -83,10 +85,6 @@ u.keys = function(obj){
     keys.push(key);
   }
   return keys;
-}
-
-u.isObject = function(obj){
-  return obj === Object(obj);
 }
 
 u.isEmpty = function(obj){

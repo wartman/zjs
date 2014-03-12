@@ -18,11 +18,12 @@ var Loader = function(setup){
   setup = (setup || {});
 
   this._filters = (setup.filters || ['default.src']);
-  this.options = z.u.defaults(this.options, setup.options);
+  this.options = u.defaults(this.options, setup.options);
   this._method = (setup.method || z.Script);
   this._handler = (setup.handler || function(req, res, next, error){
     next(res);
   });
+  this._build = (setup.build || false);
 }
 
 /**
@@ -41,7 +42,7 @@ Loader.prototype.options = {
  */
 Loader.prototype.prefilter = function(req){
   var self = this;
-  z.u(this._filters).each(function(name, index){
+  u.each(this._filters, function(name, index){
     var filter = z.filter(name);
     if(filter)
       req = filter.call(self, req);
@@ -68,7 +69,7 @@ Loader.prototype.filters = function(name){
   if(!name){
     return;
   }
-  if(z.u.isArray(name)){
+  if(u.isArray(name)){
     this._filters.concat(name);
     return;
   }
@@ -84,9 +85,20 @@ Loader.prototype.filters = function(name){
  */
 Loader.prototype.handler = function(cb){
   if(!cb){
-    return;
+    return this;
   }
   this._handler = cb;
+  return this;
+}
+
+/**
+ * A callback to run when in server mode
+ */
+Loader.prototype.build = function(cb){
+  if(!cb){
+    return this;
+  }
+  this._build = cb;
   return this;
 }
 
@@ -105,6 +117,7 @@ Loader.prototype.has = function(src){
  * @param {Object} req
  * @param {Function} next
  * @param {Function} error
+ * @param {Function} builder
  */
 Loader.prototype.load = function(req, onDone, onRejected){
   var self = this;
@@ -114,6 +127,9 @@ Loader.prototype.load = function(req, onDone, onRejected){
   }
   this._queue[req.src].done(function(res){
     self._handler(req, res, onDone, onRejected);
+    if(z.config.env !== 'browser' && self._build && z.builder){
+      self._build(req, res, z.builder);
+    }
   }, onRejected);
   return this;
 }

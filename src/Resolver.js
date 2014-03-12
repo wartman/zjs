@@ -125,7 +125,7 @@ var Resolver = z.Resolver = z.Class({
 /** 
  * Add state helpers to the Resolver prototype.
  */
-z.u(['Ready', 'Rejected', 'Pending']).each(function(state){
+u.each(['Ready', 'Rejected', 'Pending'], function(state){
   var STATE = state.toUpperCase();
   Resolver.prototype['is'+state] = function(){
     return this._state === RESOLVER_STATE[STATE];

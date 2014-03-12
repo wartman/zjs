@@ -30,6 +30,20 @@ var z = root.z = function(name, factory){
 }
 
 /**
+ * `z` is aliased as `module` to allow for more readable code.
+ * Run z.noConflict() to return `module` to its original owner.
+ */
+var _lastModule = root.module;
+root.module = z;
+
+/**
+ * Return `module` to its original owner.
+ */
+z.noConflict = function(){
+  root.module = _lastModule;
+}
+
+/**
  * Helper for adding modules.
  *
  * @param {String} name
@@ -39,11 +53,11 @@ var z = root.z = function(name, factory){
 var _addModule = function(name){
   if(typeof name === "undefined"){
     var node;
-    if(Script.useInteractive){
+    if(_useInteractive){
       // For < IE9 (and 10, apparently -- seems to get called there too)
       // I think this is because <IE9 runs onload callbacks BEFORE the code
       // executes, while other browsers do it right after.
-      node = Script.currentlyAddingScript || Script.getInteractiveScript();
+      node = _currentlyAddingScript || Script.getInteractiveScript();
       name = node.getAttribute('data-from');
     } else {
       // Assign to a temp cache, to be named by the onload callback.
@@ -137,8 +151,3 @@ z.config = {
 z.setup = function(options){
   z.config = u.defaults(z.config, options);
 }
-
-/**
- * Expose util funcs.
- */
-z.u = z.util = u;

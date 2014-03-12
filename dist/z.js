@@ -1,12 +1,12 @@
 
 
 /**
- * zjs 0.1.4
+ * zjs 0.1.6
  *
  * Copyright 2014
  * Released under the MIT license
  *
- * Date: 2014-02-28T16:42Z
+ * Date: 2014-03-12T17:02Z
  */
 
 (function(global, factory){
@@ -23,99 +23,25 @@
 
 /**
  * ----------------------------------------------------------------------
- * z.u
+ * z.util
  *
- * z's utility functions.
+ * A few utility funcs.
  */
 
-/**
- * u api
- * Based on underscore, and can be used in OOP mode in much the 
- * same way.
- *
- * @param {Mixed} obj
- * @return {u} Always returns an instance;
- */
-var u = function(obj){
-  if(obj instanceof u){
-    return obj; 
-  }
-  if(!(this instanceof u)){ 
-    return new u(obj); 
-  }
-  this._chain = true;
-  this._obj = obj;
-}
-
-/**
- * Save a few bytes in minified form
- */
-var ArrayProto = Array.prototype
-  , ObjProto = Object.prototype
-  , FuncProto = Function.prototype
+var forEach = Array.prototype.forEach
+  , slice = Array.prototype.slice
+  , toString = Object.prototype.toString
+  , objKeys = Object.keys
   , undef;
 
-/**
- * Shortcuts to often used core prototypes.
- */
-var push             = ArrayProto.push
-  , slice            = ArrayProto.slice
-  , concat           = ArrayProto.concat
-  , toString         = ObjProto.toString
-  , hasOwnProperty   = ObjProto.hasOwnProperty;
+var u = {};
 
-// Look for native ECMAScript5 functions.
-var nativeForEach      = ArrayProto.forEach
-  , nativeMap          = ArrayProto.map
-  , nativeReduce       = ArrayProto.reduce
-  , nativeReduceRight  = ArrayProto.reduceRight
-  , nativeFilter       = ArrayProto.filter
-  , nativeEvery        = ArrayProto.every
-  , nativeSome         = ArrayProto.some
-  , nativeIndexOf      = ArrayProto.indexOf
-  , nativeLastIndexOf  = ArrayProto.lastIndexOf
-  , nativeKeys         = Object.keys;
-
-/**
- * Create a unique id.
- *
- * @param {String} prefix
- * @return {String}
- */
-u._idIndex = 0;
-u.uniqueId = function(prefix){
-  u._idIndex++;
-  return prefix + u._idIndex;
-}
-
-/**
- * Check if item is an array.
- * Default to the native implementation if it exists.
- *
- * @param {Mixed} item
- * @return {Boolean}
- */ 
-u.isArray = (Array.isArray || function(item){
-  return toString.call(obj) == '[object Array]';
-});
-
-/**
- * Iterate over an array or object. Return {true} to break.
- * The callback accepts the follwing arguments:
- *    function(value, key, items){ ... }
- * Will break the loop if truthy.
- *
- * @param {Mixed} obj An Array or Object to iterate over.
- * @param {Function} callback
- * @param {Object} context Set 'this'
- * @return {Object}
- */
 u.each = function(obj, callback, context) {
-  if(null === obj){
+  if(!obj){
     return obj;
   }
   context = (context || obj);
-  if(nativeForEach && obj.forEach){
+  if(forEach && obj.forEach){
     obj.forEach(callback)
   } else if ( u.isArray(obj) ){
     for (var i = 0; i < obj.length; i += 1) {
@@ -135,17 +61,6 @@ u.each = function(obj, callback, context) {
   return obj;
 }
 
-/**
- * Iterate over an array backwards. Return {true} to break.
- * The callback accepts the follwing arguments:
- *    function(value, key, items){ ... }
- * Will break the loop if truthy.
- *
- * @param {Array} obj An Array to iterate over.
- * @param {Function} callback
- * @param {Object} context Set 'this'
- * @return {Undefined}
- */
 u.eachReverse = function(obj, callback, context) {
   if (obj) {
     var i;
@@ -158,37 +73,6 @@ u.eachReverse = function(obj, callback, context) {
   return obj;
 }
 
-/**
- * Defines u.isArguments, u.isFunction etc.
- * Presumably, you can figure out what they should do.
- */
-u.each(['Arguments', 'Function', 'String', 'Number', 'Date', 'RegExp'], function(name) {
-  u['is' + name] = function(obj) {
-    return toString.call(obj) == '[object ' + name + ']';
-  };
-});
-
-/**
- * Check if passed var is undefined.
- */
-u.isUndefined = function(obj) {
-  return obj === void 0;
-};
-
-/**
- * Check if passed var is an object.
- */
-u.isObject = function(obj){
-  return obj === Object(obj);
-}
-
-/**
- * Extend an object or objects.
- *
- * @param {Object} obj The object to extend.
- * @param {Object} ... Each additional arg will be passed into the first obj.
- * @return {Object}
- */
 u.extend = function(obj){
   u.each(slice.call(arguments, 1), function(source){
     if(source){
@@ -200,28 +84,25 @@ u.extend = function(obj){
   return obj;
 }
 
-/**
- * Make a shallow-copy of an object.
- *
- * @param {Object} obj The object to clone
- * @return {Object}
- */
-u.clone = function(obj){
-  if(null === obj || false === u.isObject(obj)){
-    return obj;
-  }
-  return u.isArray(obj)? obj.slice() : u.extend({}, obj);
+u.isObject = function(obj){
+  return obj === Object(obj);
 }
 
-/**
- * Get all keys in an object.
- * Uses the native Object.keys if available.
- *
- * @return {Array}
- */
+u.defaults = function(obj, options){
+  if(undefined === options){
+    return obj;
+  }
+  for(var key in obj){
+    if(obj.hasOwnProperty(key) && ! options.hasOwnProperty(key)){
+      options[key] = obj[key];
+    }
+  }
+  return options;
+}
+
 u.keys = function(obj){
   if(!u.isObject(obj)) return [];
-  if(nativeKeys) return nativeKeys(obj);
+  if(objKeys) return objKeys(obj);
   var keys = [];
   for(var key in obj){
     keys.push(key);
@@ -229,90 +110,6 @@ u.keys = function(obj){
   return keys;
 }
 
-/**
- * Get values from an object and place them in an array.
- *
- * @return {array}
- */
-u.values = function(obj){
-  var vals = []
-    , keys = u.keys(obj) // Ensures that keys and vals will match up with both methods.
-    , length = keys.length;
-  for(var i = 0; i < length; i += 1){
-    vals[i] = obj(keys[i]);
-  }
-  return vals;
-}
-
-/**
- * Fill in an options object-literal with default values.
- *
- * @param {Object} obj
- * @param {Object} options
- * @return {Object}
- */
-u.defaults = function(obj, options){
-  var clone = u.clone(obj);
-  if(undefined === options){
-    return clone;
-  }
-  for(var key in clone){
-    if(clone.hasOwnProperty(key) && ! options.hasOwnProperty(key)){
-      options[key] = clone[key];
-    }
-  }
-  return options;
-}
-
-/**
- * Extract items from an object and apply them to another.
- *
- * @param {Array} obj
- * @param {Object} from
- * @param {Object} apply
- * @return {Undefined}
- */
-u.extract = function(obj, from, apply){
-  apply = (apply || {});
-  u.each(obj, function(key){
-    if(from.hasOwnProperty(key)){
-      if(apply.hasOwnProperty(key) && u.isObject(apply[key])){
-        // Don't overwrite an existing object
-        apply[key] = u.extend(apply[key], from[key]);
-      } else {
-        apply[key] = from[key];
-      }
-      delete from[key];
-    }
-  });
-  return apply;
-}
-
-/**
- * Only run a function once, no matter how many times you call it.
- * (per Underscore)
- *
- * @param {Function} obj
- * @return {Function}
- */
-u.once = function(obj, ctx) {
-  var ran = false, memo;
-  ctx = (ctx || this);
-  return function() {
-    if (ran) return memo;
-    ran = true;
-    memo = obj.apply(ctx, arguments);
-    obj = null;
-    return memo;
-  };
-}
-
-/**
- * Check to see if an object (of any type) is empty.
- *
- * @param {Object} Obj
- * @return {Boolean}
- */
 u.isEmpty = function(obj){
   if (obj == null){
     return true;
@@ -328,63 +125,15 @@ u.isEmpty = function(obj){
   return true;
 }
 
-/**
- * Start chianing an object.
- *
- * @param {Mixed} obj
- */
-u.chain = function(obj){
-  return u(obj).chain();
-}
-
-/**
- * Check if a number OR string is numeric.
- * Unlike u.isNumber, isNumeric will return true for both of the
- * following examples:
- *   u.isNumeric(1); // true
- *   u.isNumeric("1"); // true
- *
- * @param {Number||String} obj
- * @return {Boolean}
- */
-u.isNumeric = function(obj){
-  // parseFloat NaNs numeric-cast false positives (null|true|false|"")
-  // ...but misinterprets leading-number strings, particularly hex literals ("0x...")
-  // subtraction forces infinities to NaN
-  return obj - parseFloat( obj ) >= 0;
-}
-
-/**
- * Helper to chain results.
- *
- * @param {Mixed} obj
- */
-var uResult = function(obj){
-  return this._chain ? u(obj).chain() : obj;
-}
-
-/**
- * Add functions to the prototype to allow for underscore-style oop
- * All methods are chainable.
- */
-u.each(u, function(func, key){
-  if(u.isFunction(func)){
-    u.prototype[key] = function(){
-      var args = [this._obj];
-      push.apply(args, arguments);
-      return uResult.call(this, func.apply(u, args));
-    }
-  }
+u.each(['Arguments', 'Function', 'String', 'Number', 'Date', 'RegExp'], function(name) {
+  u['is' + name] = function(obj) {
+    return toString.call(obj) == '[object ' + name + ']';
+  };
 });
 
-u.prototype.chain = function(){
-  this._chain = true;
-  return this;
-}
-
-u.prototype.value = function(){
-  return this._obj;
-}
+u.isArray = (Array.isArray || function(obj){
+  return toString.call(obj) == '[object Array]';
+});
 
 
 /**
@@ -418,14 +167,18 @@ var z = root.z = function(name, factory){
   return mod;
 }
 
-var _runFactory = function(mod, factory){
-  var imports = function(){
-    return Module.prototype.imports.apply(mod, arguments);    
-  }
-  var exports = function(){
-    return Module.prototype.exports.apply(mod, arguments);
-  }
-  factory.call(mod, imports, exports);
+/**
+ * `z` is aliased as `module` to allow for more readable code.
+ * Run z.noConflict() to return `module` to its original owner.
+ */
+var _lastModule = root.module;
+root.module = z;
+
+/**
+ * Return `module` to its original owner.
+ */
+z.noConflict = function(){
+  root.module = _lastModule;
 }
 
 /**
@@ -438,11 +191,11 @@ var _runFactory = function(mod, factory){
 var _addModule = function(name){
   if(typeof name === "undefined"){
     var node;
-    if(Script.useInteractive){
+    if(_useInteractive){
       // For < IE9 (and 10, apparently -- seems to get called there too)
       // I think this is because <IE9 runs onload callbacks BEFORE the code
       // executes, while other browsers do it right after.
-      node = Script.currentlyAddingScript || Script.getInteractiveScript();
+      node = _currentlyAddingScript || Script.getInteractiveScript();
       name = node.getAttribute('data-from');
     } else {
       // Assign to a temp cache, to be named by the onload callback.
@@ -453,6 +206,23 @@ var _addModule = function(name){
 
   z.modules[name] = new Module();
   return z.modules[name];
+}
+
+/**
+ * Helper for running module factories.
+ *
+ * @param {Module} mod
+ * @param {Function} factory
+ * @api private
+ */
+var _runFactory = function(mod, factory){
+  var imports = function(){
+    return Module.prototype.imports.apply(mod, arguments);    
+  }
+  var exports = function(){
+    return Module.prototype.exports.apply(mod, arguments);
+  }
+  factory.call(mod, imports, exports);
 }
 
 /**
@@ -519,11 +289,6 @@ z.config = {
 z.setup = function(options){
   z.config = u.defaults(z.config, options);
 }
-
-/**
- * Expose util funcs.
- */
-z.u = z.util = u;
 
 
 /**
@@ -638,10 +403,10 @@ z.Class = function(parent, props){
 
   if(parent && hasOwnProperty.call(parent, 'extend')){
     return parent.extend(props);
-  } else if (z.util.isFunction(parent)){
+  } else if (u.isFunction(parent)){
     // Use parent as constructor.
     return _classExtend.call(parent, props);
-  } else if(z.util.isObject(parent)){
+  } else if(u.isObject(parent)){
     // Bind the default constructor to the object.
     parent.__new__ = _classConstructor;
     return _classExtend.call(parent, props);
@@ -779,7 +544,7 @@ var Resolver = z.Resolver = z.Class({
 /** 
  * Add state helpers to the Resolver prototype.
  */
-z.u(['Ready', 'Rejected', 'Pending']).each(function(state){
+u.each(['Ready', 'Rejected', 'Pending'], function(state){
   var STATE = state.toUpperCase();
   Resolver.prototype['is'+state] = function(){
     return this._state === RESOLVER_STATE[STATE];
@@ -837,7 +602,7 @@ var Script = z.Script = Resolver.extend({
         };
 
     // Allow the user to just pass an src.
-    if(z.u.isString(req)){
+    if(u.isString(req)){
       req = {
         src: req
       };
@@ -855,11 +620,11 @@ var Script = z.Script = Resolver.extend({
 
     // For ie8, code may start running as soon as the node
     // is placed in the DOM, so we need to be ready:  
-    Script.currentlyAddingScript = node;
+    _currentlyAddingScript = node;
     node.src = req.src;
     head.appendChild(node);
     // Clear out the current script after DOM insertion.
-    Script.currentlyAddingScript = null;
+    _currentlyAddingScript = null;
   }
 
 });
@@ -868,21 +633,21 @@ var Script = z.Script = Resolver.extend({
  * The following methods and properties are for older browsers, which
  * may start defining a script before it is fully loaded.
  */
-Script.useInteractive = false;
-Script.currentlyAddingScript = null;
-Script.interactiveScript = null;
+var _useInteractive = false;
+var _currentlyAddingScript = null;
+var _interactiveScript = null;
 Script.getInteractiveScript = function(){
-  if (Script.interactiveScript && Script.interactiveScript.readyState === 'interactive') {
-    return Script.interactiveScript;
+  if (_interactiveScript && _interactiveScript.readyState === 'interactive') {
+    return _interactiveScript;
   }
 
   u.eachReverse(Script.scripts(), function (script) {
     if (script.readyState === 'interactive') {
-      Script.interactiveScript = script;
+      _interactiveScript = script;
       return true;
     }
   });
-  return Script.interactiveScript;
+  return _interactiveScript;
 }
 
 Script.scripts = function(){
@@ -913,12 +678,12 @@ var _scriptLoadEvent = (function(){
     // anonymous modules. However, IE reports the script as being in 'interactive'
     // ready state at the time of the define call.
     loader = function(node, next, err){
-      Script.useInteractive = true;
+      _useInteractive = true;
       node.attachEvent('onreadystatechange', function(){
         // if(node.readyState === 'loaded'){  // I could swear this was correct.
         if(node.readyState === 'complete'){
           next(node);
-          Script.interactiveScript = null;
+          _interactiveScript = null;
         }
       });
       // Error handler not possible I beleive.
@@ -991,7 +756,7 @@ var Ajax = z.Ajax = Resolver.extend({
   },
 
   __init__: function(req, options){
-    this.options = z.u.defaults(this.options, options);
+    this.options = u.defaults(this.options, options);
     this.load(req);
   },
 
@@ -1094,11 +859,12 @@ var Loader = function(setup){
   setup = (setup || {});
 
   this._filters = (setup.filters || ['default.src']);
-  this.options = z.u.defaults(this.options, setup.options);
+  this.options = u.defaults(this.options, setup.options);
   this._method = (setup.method || z.Script);
   this._handler = (setup.handler || function(req, res, next, error){
     next(res);
   });
+  this._build = (setup.build || false);
 }
 
 /**
@@ -1117,7 +883,7 @@ Loader.prototype.options = {
  */
 Loader.prototype.prefilter = function(req){
   var self = this;
-  z.u(this._filters).each(function(name, index){
+  u.each(this._filters, function(name, index){
     var filter = z.filter(name);
     if(filter)
       req = filter.call(self, req);
@@ -1144,7 +910,7 @@ Loader.prototype.filters = function(name){
   if(!name){
     return;
   }
-  if(z.u.isArray(name)){
+  if(u.isArray(name)){
     this._filters.concat(name);
     return;
   }
@@ -1160,9 +926,20 @@ Loader.prototype.filters = function(name){
  */
 Loader.prototype.handler = function(cb){
   if(!cb){
-    return;
+    return this;
   }
   this._handler = cb;
+  return this;
+}
+
+/**
+ * A callback to run when in server mode
+ */
+Loader.prototype.build = function(cb){
+  if(!cb){
+    return this;
+  }
+  this._build = cb;
   return this;
 }
 
@@ -1181,6 +958,7 @@ Loader.prototype.has = function(src){
  * @param {Object} req
  * @param {Function} next
  * @param {Function} error
+ * @param {Function} builder
  */
 Loader.prototype.load = function(req, onDone, onRejected){
   var self = this;
@@ -1190,6 +968,9 @@ Loader.prototype.load = function(req, onDone, onRejected){
   }
   this._queue[req.src].done(function(res){
     self._handler(req, res, onDone, onRejected);
+    if(z.config.env !== 'browser' && self._build && z.builder){
+      self._build(req, res, z.builder);
+    }
   }, onRejected);
   return this;
 }
@@ -1507,7 +1288,7 @@ Module.prototype.exports = function(name, factory){
   }
 
   setTimeout(function(){
-    _resolve(self);
+    self.enable();
   }, 0); // Make sure all exports are defined first.
 
   return this;
@@ -1521,8 +1302,39 @@ Module.prototype.exports = function(name, factory){
  */
 Module.prototype.enable = function(next, error){
   this.done(next, error);
-  _resolve(this);
+
+  if(this.isPending()){
+    _import.call(this);
+    return this;
+  }
+
+  if(this.isLoaded()){
+    _define.call(this);
+    return this;
+  }
+
+  if(this.isFailed()){
+    // dispatch the failed queue.
+    _dispatch.call(this, this._onFailed, this);
+    this._onFailed = [];
+    return this;
+  }
+
+  if(this.isEnabled()){
+    // Dispatch the done queue.
+    _dispatch.call(this, this._onReady, this);
+    this._onReady = [];
+  }
+
   return this;
+}
+
+/**
+ * Disable the module
+ */
+Module.prototype.disable = function(error){
+  this.isFailed(true);
+  return this.enable();
 }
 
 /**
@@ -1555,9 +1367,20 @@ Module.prototype.fail = function(onFailed){
   return this.done(undef, onFailed);
 }
 
+/**
+ * Set up methods for checking the module state.
+ */
 u.each(['Enabled', 'Loaded', 'Pending', 'Failed'], function(state){
-  Module.prototype['is' + state] = function(){
-    return this._state === MODULE_STATE[state.toUpperCase()];
+  var modState = MODULE_STATE[state.toUpperCase()];
+  /**
+   * Check module state.
+   *
+   * @param {Boolean} state If true, will set the state.
+   * @return {Boolean}
+   */
+  Module.prototype['is' + state] = function(set){
+    if(set) this._state = modState;
+    return this._state === modState;
   } 
 });
 
@@ -1566,6 +1389,7 @@ u.each(['Enabled', 'Loaded', 'Pending', 'Failed'], function(state){
  *
  * @param {Array} fns
  * @param {Object} ctx
+ * @api private
  */
 var _dispatch = function(fns, ctx){
   u.each(fns, function(fn){
@@ -1574,49 +1398,15 @@ var _dispatch = function(fns, ctx){
 }
 
 /**
- * Resolve a module
- *
- * @param {Module} mod
- * @param {MODULE_STATE} state (optional)
- */
-var _resolve = function(mod, state){
-  if(state){
-    mod._state = state
-  }
-
-  if(mod.isPending()){
-    _import(mod);
-    return;
-  }
-
-  if(mod.isLoaded()){
-    _define(mod);
-    return;
-  }
-
-  if(mod.isFailed()){
-    // dispatch the failed queue.
-    _dispatch(mod._onFailed, mod);
-    mod._onFailed = [];
-    return;
-  }
-
-  if(mod.isEnabled()){
-    // Dispatch the done queue.
-    _dispatch(mod._onReady, mod);
-    mod._onReady = [];
-  }
-}
-
-/**
  * Import a module's deps.
  *
- * @param {Module} mod
+ * @api private
  */
-var _import = function(mod){
-  var queue = [];
+var _import = function(){
+  var queue = []
+    , self = this;
 
-  u.each(mod._deps, function(item){
+  u.each(this._deps, function(item){
     if(false === z.has(item.from)){
       queue.push(item);
     }
@@ -1633,51 +1423,58 @@ var _import = function(mod){
       loader.load(item, function(){
         remaining -= 1;
         if(remaining <=0 ){
-          _resolve(mod, MODULE_STATE.LOADED);
+          self.isLoaded(true);
+          self.enable();
         }
       }, function(e){
-        _resolve(mod, MODULE_STATE.FAILED);
+        self.disable();
         throw e;
       });
 
     });
+
   } else {
-    _resolve(mod, MODULE_STATE.LOADED);
+    this.isLoaded(true);
+    this.enable();
   }
 }
 
 /**
  * Define a module (that is, run its factory)
  *
- * @param {Module} mod
+ * @api private
  */
-var _define = function(mod){
-  var stop = false
-    , context = {};
+var _define = function(){
+  var context = {}
+    , self = this;
 
   // Make sure u.each of the deps has been enabled. If any need to be enabled, stop loading and
   // enable them.
-  u.each(mod._deps, function(dep){
+  u.each(this._deps, function(dep){
 
-    if(!z.has(dep)){
-      // error
+    if(!context){
+      return;
+    }
+
+    if(!z.has(dep.from)){
+      throw new Error('A dependency is not in the registry: '+ dep.from);
     }
 
     var current = z(dep.from)
       , parts = {};
 
     if(current.isFailed()){
-      _resolve(mod, MODULE_STATE.FAILED);
-      throw new Error('A depenency failed: '+current);
-      stop = true;
+      self.disable();
+      throw new Error('A dependency failed: '+ dep.from);
+      context = false;
       return true;
     }
 
     if(!current.isEnabled()){
       current.enable().done(function(){
-        mod.enable();
+        self.enable();
       });
-      stop = true;
+      context = false;
       return true;
     }
 
@@ -1694,38 +1491,37 @@ var _define = function(mod){
     context = u.extend(context, parts);
   });
 
-  if(true === stop){
+  if(!context){
     return;
   }
 
   try {
     if(z.config.env !== 'server'){
-      if(u.isFunction(mod._factory)){
-        mod._definition = mod._factory(context);
-      } else if(u.isObject(mod._factory)) {
-        mod._definition = {};
-        u.each(mod._factory, function(item, key){
+      if(u.isFunction(this._factory)){
+        this._definition = this._factory(context);
+      } else if(u.isObject(this._factory)) {
+        this._definition = {};
+        u.each(this._factory, function(item, key){
           if(u.isFunction(item)){
-            mod._definition[key] = item(context)
+            self._definition[key] = item(context)
           } else {
-            mod._definition[key] = item;
+            self._definition[key] = item;
           }
         })
       } else {
-        mod._definition = mod._factory;
+        this._definition = this._factory;
       }
     } else {
       // If we're in a node.js env we don't want to execute the factory.
-      // However, if the defintion is null z.module.start() will stall,
-      // so we need to set it to 'true'
-      mod._definition = true;
+      this._definition = true;
     }
   } catch(e) {
-    _resolve(mod, MODULE_STATE.FAILED);
+    this.disable();
     throw e;
     return;
   }
-  _resolve(mod, MODULE_STATE.ENABLED);
+  this.isEnabled(true);
+  this.enable();
 }
 
 /**

@@ -32,7 +32,7 @@ var Ajax = z.Ajax = Resolver.extend({
   },
 
   __init__: function(req, options){
-    this.options = z.u.defaults(this.options, options);
+    this.options = u.defaults(this.options, options);
     this.load(req);
   },
 

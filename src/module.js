@@ -177,7 +177,7 @@ Module.prototype.exports = function(name, factory){
   }
 
   setTimeout(function(){
-    _resolve(self);
+    self.enable();
   }, 0); // Make sure all exports are defined first.
 
   return this;
@@ -191,8 +191,39 @@ Module.prototype.exports = function(name, factory){
  */
 Module.prototype.enable = function(next, error){
   this.done(next, error);
-  _resolve(this);
+
+  if(this.isPending()){
+    _import.call(this);
+    return this;
+  }
+
+  if(this.isLoaded()){
+    _define.call(this);
+    return this;
+  }
+
+  if(this.isFailed()){
+    // dispatch the failed queue.
+    _dispatch.call(this, this._onFailed, this);
+    this._onFailed = [];
+    return this;
+  }
+
+  if(this.isEnabled()){
+    // Dispatch the done queue.
+    _dispatch.call(this, this._onReady, this);
+    this._onReady = [];
+  }
+
   return this;
+}
+
+/**
+ * Disable the module
+ */
+Module.prototype.disable = function(error){
+  this.isFailed(true);
+  return this.enable();
 }
 
 /**
@@ -225,9 +256,20 @@ Module.prototype.fail = function(onFailed){
   return this.done(undef, onFailed);
 }
 
+/**
+ * Set up methods for checking the module state.
+ */
 u.each(['Enabled', 'Loaded', 'Pending', 'Failed'], function(state){
-  Module.prototype['is' + state] = function(){
-    return this._state === MODULE_STATE[state.toUpperCase()];
+  var modState = MODULE_STATE[state.toUpperCase()];
+  /**
+   * Check module state.
+   *
+   * @param {Boolean} state If true, will set the state.
+   * @return {Boolean}
+   */
+  Module.prototype['is' + state] = function(set){
+    if(set) this._state = modState;
+    return this._state === modState;
   } 
 });
 
@@ -236,6 +278,7 @@ u.each(['Enabled', 'Loaded', 'Pending', 'Failed'], function(state){
  *
  * @param {Array} fns
  * @param {Object} ctx
+ * @api private
  */
 var _dispatch = function(fns, ctx){
   u.each(fns, function(fn){
@@ -244,49 +287,15 @@ var _dispatch = function(fns, ctx){
 }
 
 /**
- * Resolve a module
- *
- * @param {Module} mod
- * @param {MODULE_STATE} state (optional)
- */
-var _resolve = function(mod, state){
-  if(state){
-    mod._state = state
-  }
-
-  if(mod.isPending()){
-    _import(mod);
-    return;
-  }
-
-  if(mod.isLoaded()){
-    _define(mod);
-    return;
-  }
-
-  if(mod.isFailed()){
-    // dispatch the failed queue.
-    _dispatch(mod._onFailed, mod);
-    mod._onFailed = [];
-    return;
-  }
-
-  if(mod.isEnabled()){
-    // Dispatch the done queue.
-    _dispatch(mod._onReady, mod);
-    mod._onReady = [];
-  }
-}
-
-/**
  * Import a module's deps.
  *
- * @param {Module} mod
+ * @api private
  */
-var _import = function(mod){
-  var queue = [];
+var _import = function(){
+  var queue = []
+    , self = this;
 
-  u.each(mod._deps, function(item){
+  u.each(this._deps, function(item){
     if(false === z.has(item.from)){
       queue.push(item);
     }
@@ -303,51 +312,58 @@ var _import = function(mod){
       loader.load(item, function(){
         remaining -= 1;
         if(remaining <=0 ){
-          _resolve(mod, MODULE_STATE.LOADED);
+          self.isLoaded(true);
+          self.enable();
         }
       }, function(e){
-        _resolve(mod, MODULE_STATE.FAILED);
+        self.disable();
         throw e;
       });
 
     });
+
   } else {
-    _resolve(mod, MODULE_STATE.LOADED);
+    this.isLoaded(true);
+    this.enable();
   }
 }
 
 /**
  * Define a module (that is, run its factory)
  *
- * @param {Module} mod
+ * @api private
  */
-var _define = function(mod){
-  var stop = false
-    , context = {};
+var _define = function(){
+  var context = {}
+    , self = this;
 
   // Make sure u.each of the deps has been enabled. If any need to be enabled, stop loading and
   // enable them.
-  u.each(mod._deps, function(dep){
+  u.each(this._deps, function(dep){
 
-    if(!z.has(dep)){
-      // error
+    if(!context){
+      return;
+    }
+
+    if(!z.has(dep.from)){
+      throw new Error('A dependency is not in the registry: '+ dep.from);
     }
 
     var current = z(dep.from)
       , parts = {};
 
     if(current.isFailed()){
-      _resolve(mod, MODULE_STATE.FAILED);
-      throw new Error('A depenency failed: '+current);
-      stop = true;
+      self.disable();
+      throw new Error('A dependency failed: '+ dep.from);
+      context = false;
       return true;
     }
 
     if(!current.isEnabled()){
       current.enable().done(function(){
-        mod.enable();
+        self.enable();
       });
-      stop = true;
+      context = false;
       return true;
     }
 
@@ -364,38 +380,37 @@ var _define = function(mod){
     context = u.extend(context, parts);
   });
 
-  if(true === stop){
+  if(!context){
     return;
   }
 
   try {
     if(z.config.env !== 'server'){
-      if(u.isFunction(mod._factory)){
-        mod._definition = mod._factory(context);
-      } else if(u.isObject(mod._factory)) {
-        mod._definition = {};
-        u.each(mod._factory, function(item, key){
+      if(u.isFunction(this._factory)){
+        this._definition = this._factory(context);
+      } else if(u.isObject(this._factory)) {
+        this._definition = {};
+        u.each(this._factory, function(item, key){
           if(u.isFunction(item)){
-            mod._definition[key] = item(context)
+            self._definition[key] = item(context)
           } else {
-            mod._definition[key] = item;
+            self._definition[key] = item;
           }
         })
       } else {
-        mod._definition = mod._factory;
+        this._definition = this._factory;
       }
     } else {
       // If we're in a node.js env we don't want to execute the factory.
-      // However, if the defintion is null z.module.start() will stall,
-      // so we need to set it to 'true'
-      mod._definition = true;
+      this._definition = true;
     }
   } catch(e) {
-    _resolve(mod, MODULE_STATE.FAILED);
+    this.disable();
     throw e;
     return;
   }
-  _resolve(mod, MODULE_STATE.ENABLED);
+  this.isEnabled(true);
+  this.enable();
 }
 
 /**

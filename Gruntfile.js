@@ -16,8 +16,7 @@ module.exports = function(grunt){
         options: { process: process },
         src: [
           "src/intro.js",
-          "src/util_large.js",
-          // "src/util_small.js",
+          "src/util.js",
           "src/core.js",
           "src/Class.js",
           "src/Resolver.js",
@@ -25,9 +24,7 @@ module.exports = function(grunt){
           "src/Ajax.js",
           "src/Loader.js",
           "src/Module.js",
-          //"src/Plugable.js",
           "src/amd.js",
-          //"src/plugins.js",
           "src/outro.js"
         ],
         dest: "dist/z.js"
