@@ -1,12 +1,12 @@
 
 
 /**
- * zjs 0.1.6
+ * zjs 0.1.7
  *
  * Copyright 2014
  * Released under the MIT license
  *
- * Date: 2014-03-12T17:16Z
+ * Date: 2014-03-17T20:52Z
  */
 
 (function(global, factory){
@@ -968,8 +968,8 @@ Loader.prototype.load = function(req, onDone, onRejected){
   }
   this._queue[req.src].done(function(res){
     self._handler(req, res, onDone, onRejected);
-    if(z.config.env !== 'browser' && self._build && z.builder){
-      self._build(req, res, z.builder);
+    if(z.config.env !== 'browser' && self._build){
+      z.loader.build(req, res, self);
     }
   }, onRejected);
   return this;
@@ -1009,6 +1009,13 @@ z.loader = function(name, setup){
 
   _loaders[name] = new Loader(setup);
   return _loaders[name];
+}
+
+/**
+ * A hook to allow the builder to interact with the loader.
+ */
+z.loader.build = function(req, res, loader){
+  // no-op -- defined in Build.js
 }
 
 /**
