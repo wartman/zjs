@@ -18,7 +18,7 @@ program
 
     if(typeof src === "undefined"){
       // Look for a buildz.js file
-      src = "buildz.js";
+      src = process.cwd() + "/buildz.json";
       options.buildfile = true;
     }
 

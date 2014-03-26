@@ -140,7 +140,8 @@ z.config = {
   root: '',
   shim: {},
   alias: {},
-  env: 'browser'
+  env: 'browser',
+  auto: true // Set to false to wait for z to start.
 };
 
 /**

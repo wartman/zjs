@@ -6,7 +6,7 @@
  * Copyright 2014
  * Released under the MIT license
  *
- * Date: 2014-03-17T20:52Z
+ * Date: 2014-03-26T22:33Z
  */
 
 (function(global, factory){
@@ -134,6 +134,13 @@ u.each(['Arguments', 'Function', 'String', 'Number', 'Date', 'RegExp'], function
 u.isArray = (Array.isArray || function(obj){
   return toString.call(obj) == '[object Array]';
 });
+
+// Make things async.
+u.async = function(cb, ctx){
+  setTimeout(function(){
+    cb.apply(ctx, Array.prototype.slice.call(arguments, 2));
+  })
+}
 
 
 /**
@@ -278,7 +285,8 @@ z.config = {
   root: '',
   shim: {},
   alias: {},
-  env: 'browser'
+  env: 'browser',
+  auto: true // Set to false to wait for z to start.
 };
 
 /**
@@ -1034,6 +1042,7 @@ z.filter = function(name, cb){
   return _filters[name];
 }
 
+
 /**
  * ----------------------------------------------------------------------
  * Default loaders and filters
@@ -1084,20 +1093,28 @@ z.filter('default.src', function(req){
     , name = req.from
     , ext = (req.options.ext || this.options.ext)
     , nameParts = name.split('.')
+    , parsed = []
     , src = '';
 
   u.each(nameParts, function(part, index){
     if(alias.hasOwnProperty(part)){
-      nameParts[index] = alias[part];
+      if(alias[part] === "" || alias[part] === false){
+        return;
+      }
+      parsed.push(alias[part]);
+    } else {
+      parsed.push(nameParts[index])
     }
   });
 
-  name = nameParts.join('.');
+  name = parsed.join('.');
+
   if(shim.hasOwnProperty(name)){
     src = shim[name].src;
   } else {
     src = name.replace(/\./g, '/');
     src = z.config.root + src + '.' + ext;
+    src = src.trim('/')
   }
 
   req.src = src;
@@ -1285,8 +1302,6 @@ Module.prototype.exports = function(name, factory){
     name = false;
   }
 
-  var self = this;
-
   if(!name){
     this._factory = factory;
   } else {
@@ -1294,9 +1309,10 @@ Module.prototype.exports = function(name, factory){
     this._factory[name] = factory;
   }
 
-  setTimeout(function(){
-    self.enable();
-  }, 0); // Make sure all exports are defined first.
+  // Make sure all exports are defined first.
+  u.async(function(){
+    this.enable();
+  }, this);
 
   return this;
 }
@@ -1352,16 +1368,19 @@ Module.prototype.disable = function(error){
  * @param {Function} onFailed
  */
 Module.prototype.done = function(onReady, onFailed){
-  if(onReady && u.isFunction(onReady)){
-    (this.isEnabled())?
-      onReady.call(this) :
-      this._onReady.push(onReady);
-  }
-  if(onFailed && u.isFunction(onFailed)){
-    (this.isFailed())?
-      onFailed.call(this):
-      this._onFailed.push(onFailed);
-  }
+  u.async(function(){
+    // Keep things async.
+    if(onReady && u.isFunction(onReady)){
+      (this.isEnabled())?
+        onReady.call(this) :
+        this._onReady.push(onReady);
+    }
+    if(onFailed && u.isFunction(onFailed)){
+      (this.isFailed())?
+        onFailed.call(this):
+        this._onFailed.push(onFailed);
+    }
+  }, this);
   return this;
 }
 
@@ -1548,8 +1567,12 @@ root.define= function(name, reqs, factory){
 
   if(2 === arguments.length){
     factory = reqs;
-    reqs = name;
-    name = undefined;
+    if(typeof name === 'array'){
+      reqs = name;
+      name = undefined;
+    } else {
+      reqs = [];
+    }
   }
 
   if(1 === arguments.length){

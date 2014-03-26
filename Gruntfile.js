@@ -23,6 +23,7 @@ module.exports = function(grunt){
           "src/Script.js",
           "src/Ajax.js",
           "src/Loader.js",
+          "src/plugins.http.js",
           "src/Module.js",
           "src/amd.js",
           "src/outro.js"

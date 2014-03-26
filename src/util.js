@@ -111,3 +111,10 @@ u.each(['Arguments', 'Function', 'String', 'Number', 'Date', 'RegExp'], function
 u.isArray = (Array.isArray || function(obj){
   return toString.call(obj) == '[object Array]';
 });
+
+// Make things async.
+u.async = function(cb, ctx){
+  setTimeout(function(){
+    cb.apply(ctx, Array.prototype.slice.call(arguments, 2));
+  })
+}

@@ -167,8 +167,6 @@ Module.prototype.exports = function(name, factory){
     name = false;
   }
 
-  var self = this;
-
   if(!name){
     this._factory = factory;
   } else {
@@ -176,9 +174,10 @@ Module.prototype.exports = function(name, factory){
     this._factory[name] = factory;
   }
 
-  setTimeout(function(){
-    self.enable();
-  }, 0); // Make sure all exports are defined first.
+  // Make sure all exports are defined first.
+  u.async(function(){
+    this.enable();
+  }, this);
 
   return this;
 }
@@ -234,16 +233,19 @@ Module.prototype.disable = function(error){
  * @param {Function} onFailed
  */
 Module.prototype.done = function(onReady, onFailed){
-  if(onReady && u.isFunction(onReady)){
-    (this.isEnabled())?
-      onReady.call(this) :
-      this._onReady.push(onReady);
-  }
-  if(onFailed && u.isFunction(onFailed)){
-    (this.isFailed())?
-      onFailed.call(this):
-      this._onFailed.push(onFailed);
-  }
+  u.async(function(){
+    // Keep things async.
+    if(onReady && u.isFunction(onReady)){
+      (this.isEnabled())?
+        onReady.call(this) :
+        this._onReady.push(onReady);
+    }
+    if(onFailed && u.isFunction(onFailed)){
+      (this.isFailed())?
+        onFailed.call(this):
+        this._onFailed.push(onFailed);
+    }
+  }, this);
   return this;
 }
 

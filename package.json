@@ -21,7 +21,8 @@
     "qunitjs": "~1.13.0",
     "grunt": "~0.4.2",
     "grunt-contrib-uglify": "~0.3.1",
-    "grunt-contrib-concat": "~0.3.0"
+    "grunt-contrib-concat": "~0.3.0",
+    "should": "~3.2.0-beta1"
   },
   "bin": {
     "zjs": "./bin/zjs"
