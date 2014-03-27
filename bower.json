@@ -1,0 +1,25 @@
+{
+  "name": "zjs",
+  "version": "0.1.8",
+  "authors": [
+    "Peter Wartman"
+  ],
+  "description": "A module manager for the web",
+  "main": "dist/z.js",
+  "keywords": [
+    "module",
+    "loader",
+    "amd"
+  ],
+  "license": "MIT",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "lib",
+    "bin",
+    "test",
+    "bower_components",
+    "test",
+    "tests"
+  ]
+}
