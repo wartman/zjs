@@ -1,12 +1,12 @@
 
 
 /**
- * zjs 0.2.2
+ * zjs 0.2.3
  *
  * Copyright 2014
  * Released under the MIT license
  *
- * Date: 2014-03-27T18:44Z
+ * Date: 2014-03-27T19:52Z
  */
 
 (function(global, factory){

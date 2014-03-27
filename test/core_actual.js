@@ -3,7 +3,12 @@
   module('z core actual', {
     setup: function(){
       z.setup({
-        root: ''
+        root: '',
+        shim: {
+          'shimmed': {
+            src: 'resources/shim'
+          }
+        }
       });
     }
   });
@@ -115,5 +120,19 @@
     });
 
   });
+
+  test('shim', function(){
+
+    stop();
+
+    z('test shimmed').
+    imports('shimmed').
+    exports(function(__){
+      equal(__.shimmed.shim, 'shimmed', 'Shimmed file was loaded.');
+
+      start();
+    });
+
+  })
 
 })();
