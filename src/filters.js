@@ -43,11 +43,13 @@ z.filter('shim', function(req, filters){
     return req;
   }
 
+  var ext = (req.options.ext || this.options.ext)
+
   if(u.isFunction(filters[req.from])){
     return filters[req.from](req);
   }
 
-  req.from = filters[req.from];
+  req.src = z.config.root + filters[req.from].src + '.' + ext;
   return req;
 
 });

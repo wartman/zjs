@@ -28,6 +28,11 @@
     var mockLoader = {options:{ext:'js'}}
       , src = z.filter('src');
 
+
+    z.setup({
+      root: ''
+    });
+
     var actual = src(mockReq, mockLoader);
 
     equal('fin/bin.js', actual.src, 'Parsed correctly.');
@@ -47,6 +52,44 @@
     actual = z.filter('src')(actual, mockLoader);
 
     equal('scripts/lib/bin.js', actual.src, 'Parsed correctly.');
+
+  });
+
+  test('shim', function(){
+
+    var mockReq = {
+        from: 'jquery',
+        options: {}
+      }
+      , mockLoader = {options:{ext:'js'}}
+
+    z.setup({
+      root: 'scripts/',
+      shim: {
+        'jquery': {
+          src: 'bower_components/jquery-2.1.0.min',
+          exports: '$'
+        },
+        'plugin': function(req){
+          req.src = z.config.root + 'bower_components/plugins.js';
+          return req;
+        }
+      }
+    });
+
+    actual = z.filter('shim')(mockReq, mockLoader);
+
+    equal('scripts/bower_components/jquery-2.1.0.min.js', actual.src, 'Parsed correctly.');
+
+    mockReq = {
+      from: 'plugin',
+      options: {}
+    };
+
+    actual = z.filter('shim')(mockReq, mockLoader);
+    equal('scripts/bower_components/plugins.js', actual.src, 'Parsed callback correctly.');
+
+
 
   });
 

@@ -1,12 +1,12 @@
 
 
 /**
- * zjs 0.2.0
+ * zjs 0.2.2
  *
  * Copyright 2014
  * Released under the MIT license
  *
- * Date: 2014-03-27T18:16Z
+ * Date: 2014-03-27T18:44Z
  */
 
 (function(global, factory){
@@ -996,11 +996,13 @@ z.filter('shim', function(req, filters){
     return req;
   }
 
+  var ext = (req.options.ext || this.options.ext)
+
   if(u.isFunction(filters[req.from])){
     return filters[req.from](req);
   }
 
-  req.from = filters[req.from];
+  req.src = z.config.root + filters[req.from].src + '.' + ext;
   return req;
 
 });
@@ -1219,7 +1221,7 @@ z.loader.build = function(req, res, loader){
 
 /**
  * ----------------------------------------------------------------------
- * Default loaders and filters
+ * Default loaders
  */
 
 /**
