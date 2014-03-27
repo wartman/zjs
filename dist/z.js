@@ -1,12 +1,12 @@
 
 
 /**
- * zjs 0.1.71
+ * zjs 0.2.0
  *
  * Copyright 2014
  * Released under the MIT license
  *
- * Date: 2014-03-27T14:33Z
+ * Date: 2014-03-27T18:16Z
  */
 
 (function(global, factory){
@@ -125,6 +125,23 @@ u.isEmpty = function(obj){
   return true;
 }
 
+/**
+ * Escape a string
+ */
+var _escapes = {
+      "'" : "'",
+      '\\': '\\',
+      '\r': 'r',
+      '\n': 'n',
+      '\t': 't',
+      '\u2028': 'u2028',
+      '\u2029': 'u2029'
+    }
+  , _escaper = /\\|'|\r|\n|\t|\u2028|\u2029/g;
+u.escape = function (txt){
+  return txt.replace(_escaper, function(match) { return '\\' + _escapes[match]; });
+}
+
 u.each(['Arguments', 'Function', 'String', 'Number', 'Date', 'RegExp'], function(name) {
   u['is' + name] = function(obj) {
     return toString.call(obj) == '[object ' + name + ']';
@@ -136,11 +153,68 @@ u.isArray = (Array.isArray || function(obj){
 });
 
 // Make things async.
-u.async = function(cb, ctx){
-  setTimeout(function(){
-    cb.apply(ctx, Array.prototype.slice.call(arguments, 2));
-  })
-}
+u.async = (function(){
+  var fns = []
+    , enqueueFn = function(fn){
+        return fns.push(fn) === 1;
+      }
+    , dispatchFns = function(ctx){
+        var toCall = fns
+          , i = 0
+          , len = fns.length;
+        fns = [];
+        while(i < len){
+          toCall[i++]();
+        }
+      };
+
+  if(typeof setImmediate !== "undefined" && u.isFunction(setImmediate)){ // ie10, node < 0.10
+    return function(fn, ctx) {
+      enqueueFn(fn) && setImmediate(dispatchFns);
+    };
+  }
+
+  if(typeof process === "object" && process.nextTick){ // node > 0.10
+    return function(fn, ctx){
+      enqueueFn(fn) && process.nextTick(dispatchFns);
+    }
+  }
+
+  if(root.postMessage){ // modern browsers
+    var isAsync = true;
+    if(root.attachEvent){
+      var checkAsync = function(){
+        isAsync = false;
+      }
+      root.attachEvent('onmessage', checkAsync);
+      root.postMessage('__checkAsync', '*');
+      root.detachEvent('onmessage', checkAsync);
+    }
+
+    if(isAsync){
+      var msg = "__promise" + new Date
+        , onMessage = function(e){
+            if(e.data === msg){
+              e.stopPropagation && e.stopPropagation();
+              dispatchFns();
+            }
+          };
+
+      root.addEventListener?
+        root.addEventListener('message', onMessage, true) :
+        root.attachEvent('onmessage', onMessage);
+
+      return function(fn, ctx){
+        enqueueFn(fn) && root.postMessage(msg, '*');
+      }
+
+    }
+  }
+
+  return function(fn, ctx) { // old browsers.
+    enqueueFn(fn) && setTimeout(dispatchFns, 0);
+  };
+})();
 
 
 /**
@@ -849,6 +923,122 @@ z.ajax = function(req, next, err){
 
 /**
  * ----------------------------------------------------------------------
+ * z.Filters
+ *
+ * Request filtering
+ */
+
+/**
+ * filter API
+ */
+_filters = {};
+z.filter = function(name, cb, global){
+  if(arguments.length <= 1){
+    if(_filters.hasOwnProperty(name)){
+      return _filters[name];
+    }
+    return false;
+  }
+
+  _filters[name] = function(req, ctx){
+    var filters = (z.config[name] || z.config);
+    return cb.apply(ctx, [req, filters, u]);
+  }
+
+  // gloablize??
+
+  return _filters[name];
+}
+
+
+/**
+ * ----------------------------------------------------------------------
+ * Default filters
+ */
+
+/**
+ * Search for a matching pattern and replace.
+ *
+ * @example
+ * z.setup({
+ *   'foo.bar': 'root.foo.bar'
+ * });
+ */
+z.filter('alias', function(req, filters){
+
+  var nsTest = new RegExp('[' + req.from.replace(/\./g, '\\.') + ']+?')
+    , search = false
+    , replace = '';
+
+  for (var key in filters){
+    if(nsTest.test(key)){
+      search = key;
+      replace = filters[key];
+    }
+  }
+
+  if(!search){
+    return req;
+  }
+
+  req.fromAlias = req.from.replace(search, replace);
+
+  return req;
+
+});
+
+/**
+ * Basic shim support.
+ */
+z.filter('shim', function(req, filters){
+
+  if(!filters.hasOwnProperty(req.from)){
+    return req;
+  }
+
+  if(u.isFunction(filters[req.from])){
+    return filters[req.from](req);
+  }
+
+  req.from = filters[req.from];
+  return req;
+
+});
+
+/**
+ * Get a src from a request.
+ */
+z.filter('src', function(req){
+
+  if(req.src){
+    return req;
+  }
+
+  var name = (req.fromAlias || req.from)
+    , ext = (req.options.ext || this.options.ext)
+    , src = name.replace(/\./g, '/');
+
+  src = z.config.root + src + '.' + ext;
+  src = src.trim();
+
+  req.src = src;
+  return req;
+
+});
+
+/**
+ * Method filter
+ *
+ * @param {Object} req
+ */
+z.filter('ajaxMethod', function(req){
+  req.method = (req.method || this.options.method);
+  return req;
+});
+
+
+/**
+ * ----------------------------------------------------------------------
  * Loader
  *
  * The Loader is ultimately responsable for loading scripts, files, etc.
@@ -894,7 +1084,7 @@ Loader.prototype.prefilter = function(req){
   u.each(this._filters, function(name, index){
     var filter = z.filter(name);
     if(filter)
-      req = filter.call(self, req);
+      req = filter(req, self);
   });
   return req;
 }
@@ -1026,22 +1216,6 @@ z.loader.build = function(req, res, loader){
   // no-op -- defined in Build.js
 }
 
-/**
- * filter API
- */
-_filters = {};
-z.filter = function(name, cb){
-  if(arguments.length <= 1){
-    if(_filters.hasOwnProperty(name)){
-      return _filters[name];
-    }
-    return false;
-  }
-
-  _filters[name] = cb 
-  return _filters[name];
-}
-
 
 /**
  * ----------------------------------------------------------------------
@@ -1053,7 +1227,7 @@ z.filter = function(name, cb){
  */
 z.loader('script', {
   method: z.Script,
-  filters: ['default.src'],
+  filters: ['alias', 'shim', 'src'],
   handler: function(req, res, next, error){
     z.ensureModule(req.from);
     next();
@@ -1068,7 +1242,7 @@ z.loader('script', {
  */
 z.loader('ajax', {
   method: z.Ajax,
-  filters: ['default.src', 'ajax.method'],
+  filters: ['alias', 'shim', 'src', 'ajaxMethod'],
   handler: function(req, res, next, error){
     z(req.from, function(){ return res; }).done(next, error);
   },
@@ -1076,60 +1250,6 @@ z.loader('ajax', {
     ext: 'js',
     method: 'GET'
   }
-});
-
-/**
- * Get a src from a request.
- *
- * @param {Object} req
- */
-z.filter('default.src', function(req){
-  if(req.src){
-    return req;
-  }
-
-  var shim = z.config.shim
-    , alias = z.config.alias
-    , name = req.from
-    , ext = (req.options.ext || this.options.ext)
-    , nameParts = name.split('.')
-    , parsed = []
-    , src = '';
-
-  u.each(nameParts, function(part, index){
-    if(alias.hasOwnProperty(part)){
-      if(alias[part] === "" || alias[part] === false){
-        return;
-      }
-      parsed.push(alias[part]);
-    } else {
-      parsed.push(nameParts[index])
-    }
-  });
-
-  name = parsed.join('.');
-
-  if(shim.hasOwnProperty(name)){
-    src = shim[name].src;
-  } else {
-    src = name.replace(/\./g, '/');
-    src = z.config.root + src + '.' + ext;
-    src = src.trim('/')
-  }
-
-  req.src = src;
-
-  return req;
-});
-
-/**
- * Method filter
- *
- * @param {Object} req
- */
-z.filter('ajax.method', function(req){
-  req.method = (req.method || this.options.method);
-  return req;
 });
 
 
@@ -1161,11 +1281,9 @@ var MODULE_STATE = {
 
 /**
  * The module constructor.
- *
- * @param {Array} deps This arg is only used by the zjs optimizer.
  */
-var Module = function(deps){
-  this._deps = (deps && u.isArray(deps))? deps : [];
+var Module = function(){
+  this._deps = [];
   this._state = MODULE_STATE.PENDING;
   this._factory = null;
   this._definition = null;
@@ -1297,6 +1415,8 @@ Module.prototype.imports = function(from, uses, options){
  * @return {this}
  */
 Module.prototype.exports = function(name, factory){
+  var self = this;
+
   if(arguments.length <= 1){
     factory = name;
     name = false;
@@ -1311,8 +1431,8 @@ Module.prototype.exports = function(name, factory){
 
   // Make sure all exports are defined first.
   u.async(function(){
-    this.enable();
-  }, this);
+    self.enable();
+  });
 
   return this;
 }
@@ -1368,19 +1488,20 @@ Module.prototype.disable = function(error){
  * @param {Function} onFailed
  */
 Module.prototype.done = function(onReady, onFailed){
+  var self = this;
+  // Keep things async.
   u.async(function(){
-    // Keep things async.
     if(onReady && u.isFunction(onReady)){
-      (this.isEnabled())?
-        onReady.call(this) :
-        this._onReady.push(onReady);
+      (self.isEnabled())?
+        onReady.call(self) :
+        self._onReady.push(onReady);
     }
     if(onFailed && u.isFunction(onFailed)){
-      (this.isFailed())?
-        onFailed.call(this):
-        this._onFailed.push(onFailed);
+      (self.isFailed())?
+        onFailed.call(self):
+        self._onFailed.push(onFailed);
     }
-  }, this);
+  });
   return this;
 }
 
@@ -1567,10 +1688,10 @@ root.define= function(name, reqs, factory){
 
   if(2 === arguments.length){
     factory = reqs;
-    if(typeof name === 'array'){
-      reqs = name;
-      name = undefined;
-    } else {
+    reqs = name;
+    name = undefined;
+    if(!u.isArray(reqs)){
+      name = reqs;
       reqs = [];
     }
   }

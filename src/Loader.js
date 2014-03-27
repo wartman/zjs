@@ -45,7 +45,7 @@ Loader.prototype.prefilter = function(req){
   u.each(this._filters, function(name, index){
     var filter = z.filter(name);
     if(filter)
-      req = filter.call(self, req);
+      req = filter(req, self);
   });
   return req;
 }
@@ -175,20 +175,4 @@ z.loader = function(name, setup){
  */
 z.loader.build = function(req, res, loader){
   // no-op -- defined in Build.js
-}
-
-/**
- * filter API
- */
-_filters = {};
-z.filter = function(name, cb){
-  if(arguments.length <= 1){
-    if(_filters.hasOwnProperty(name)){
-      return _filters[name];
-    }
-    return false;
-  }
-
-  _filters[name] = cb 
-  return _filters[name];
 }

@@ -26,11 +26,9 @@ var MODULE_STATE = {
 
 /**
  * The module constructor.
- *
- * @param {Array} deps This arg is only used by the zjs optimizer.
  */
-var Module = function(deps){
-  this._deps = (deps && u.isArray(deps))? deps : [];
+var Module = function(){
+  this._deps = [];
   this._state = MODULE_STATE.PENDING;
   this._factory = null;
   this._definition = null;
@@ -162,6 +160,8 @@ Module.prototype.imports = function(from, uses, options){
  * @return {this}
  */
 Module.prototype.exports = function(name, factory){
+  var self = this;
+
   if(arguments.length <= 1){
     factory = name;
     name = false;
@@ -176,8 +176,8 @@ Module.prototype.exports = function(name, factory){
 
   // Make sure all exports are defined first.
   u.async(function(){
-    this.enable();
-  }, this);
+    self.enable();
+  });
 
   return this;
 }
@@ -233,19 +233,20 @@ Module.prototype.disable = function(error){
  * @param {Function} onFailed
  */
 Module.prototype.done = function(onReady, onFailed){
+  var self = this;
+  // Keep things async.
   u.async(function(){
-    // Keep things async.
     if(onReady && u.isFunction(onReady)){
-      (this.isEnabled())?
-        onReady.call(this) :
-        this._onReady.push(onReady);
+      (self.isEnabled())?
+        onReady.call(self) :
+        self._onReady.push(onReady);
     }
     if(onFailed && u.isFunction(onFailed)){
-      (this.isFailed())?
-        onFailed.call(this):
-        this._onFailed.push(onFailed);
+      (self.isFailed())?
+        onFailed.call(self):
+        self._onFailed.push(onFailed);
     }
-  }, this);
+  });
   return this;
 }
 

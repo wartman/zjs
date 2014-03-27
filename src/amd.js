@@ -10,10 +10,10 @@ root.define= function(name, reqs, factory){
 
   if(2 === arguments.length){
     factory = reqs;
-    if(typeof name === 'array'){
-      reqs = name;
-      name = undefined;
-    } else {
+    reqs = name;
+    name = undefined;
+    if(!u.isArray(reqs)){
+      name = reqs;
       reqs = [];
     }
   }

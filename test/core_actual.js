@@ -1,6 +1,12 @@
 (function(){
   
-  module('z core actual');
+  module('z core actual', {
+    setup: function(){
+      z.setup({
+        root: ''
+      });
+    }
+  });
 
   test('imports', function(){
 

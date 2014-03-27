@@ -102,6 +102,23 @@ u.isEmpty = function(obj){
   return true;
 }
 
+/**
+ * Escape a string
+ */
+var _escapes = {
+      "'" : "'",
+      '\\': '\\',
+      '\r': 'r',
+      '\n': 'n',
+      '\t': 't',
+      '\u2028': 'u2028',
+      '\u2029': 'u2029'
+    }
+  , _escaper = /\\|'|\r|\n|\t|\u2028|\u2029/g;
+u.escape = function (txt){
+  return txt.replace(_escaper, function(match) { return '\\' + _escapes[match]; });
+}
+
 u.each(['Arguments', 'Function', 'String', 'Number', 'Date', 'RegExp'], function(name) {
   u['is' + name] = function(obj) {
     return toString.call(obj) == '[object ' + name + ']';
@@ -113,8 +130,65 @@ u.isArray = (Array.isArray || function(obj){
 });
 
 // Make things async.
-u.async = function(cb, ctx){
-  setTimeout(function(){
-    cb.apply(ctx, Array.prototype.slice.call(arguments, 2));
-  })
-}
+u.async = (function(){
+  var fns = []
+    , enqueueFn = function(fn){
+        return fns.push(fn) === 1;
+      }
+    , dispatchFns = function(ctx){
+        var toCall = fns
+          , i = 0
+          , len = fns.length;
+        fns = [];
+        while(i < len){
+          toCall[i++]();
+        }
+      };
+
+  if(typeof setImmediate !== "undefined" && u.isFunction(setImmediate)){ // ie10, node < 0.10
+    return function(fn, ctx) {
+      enqueueFn(fn) && setImmediate(dispatchFns);
+    };
+  }
+
+  if(typeof process === "object" && process.nextTick){ // node > 0.10
+    return function(fn, ctx){
+      enqueueFn(fn) && process.nextTick(dispatchFns);
+    }
+  }
+
+  if(root.postMessage){ // modern browsers
+    var isAsync = true;
+    if(root.attachEvent){
+      var checkAsync = function(){
+        isAsync = false;
+      }
+      root.attachEvent('onmessage', checkAsync);
+      root.postMessage('__checkAsync', '*');
+      root.detachEvent('onmessage', checkAsync);
+    }
+
+    if(isAsync){
+      var msg = "__promise" + new Date
+        , onMessage = function(e){
+            if(e.data === msg){
+              e.stopPropagation && e.stopPropagation();
+              dispatchFns();
+            }
+          };
+
+      root.addEventListener?
+        root.addEventListener('message', onMessage, true) :
+        root.attachEvent('onmessage', onMessage);
+
+      return function(fn, ctx){
+        enqueueFn(fn) && root.postMessage(msg, '*');
+      }
+
+    }
+  }
+
+  return function(fn, ctx) { // old browsers.
+    enqueueFn(fn) && setTimeout(dispatchFns, 0);
+  };
+})();

@@ -1,5 +1,7 @@
 module.exports = function(grunt){
 
+  // The makefile for zjs
+  var make = grunt.file.readJSON( __dirname + '/make.json');
 
   function process( code ) {
     return "\n\n" + code
@@ -14,20 +16,7 @@ module.exports = function(grunt){
     concat: {
       dist: {
         options: { process: process },
-        src: [
-          "src/intro.js",
-          "src/util.js",
-          "src/core.js",
-          "src/Class.js",
-          "src/Resolver.js",
-          "src/Script.js",
-          "src/Ajax.js",
-          "src/Loader.js",
-          "src/plugins.http.js",
-          "src/Module.js",
-          "src/amd.js",
-          "src/outro.js"
-        ],
+        src: make.base,
         dest: "dist/z.js"
       },
     },
