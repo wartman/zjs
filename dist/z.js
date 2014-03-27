@@ -1,12 +1,12 @@
 
 
 /**
- * zjs 0.2.3
+ * zjs 0.2.4
  *
  * Copyright 2014
  * Released under the MIT license
  *
- * Date: 2014-03-27T19:52Z
+ * Date: 2014-03-27T22:21Z
  */
 
 (function(global, factory){
@@ -164,7 +164,13 @@ u.async = (function(){
           , len = fns.length;
         fns = [];
         while(i < len){
-          toCall[i++]();
+          try {
+            toCall[i++]();
+          } catch(e) {
+            u.async(function(){
+              throw e;
+            })
+          }
         }
       };
 
