@@ -4,6 +4,51 @@
  */
 
 /**
+ * Set the plugin
+ *
+ * Note: not really extensable yet. Perhaps have it investigate loaders
+ * and apply values based on that?
+ */
+var pluginTest = /([\S^\!]+?)\!/g
+  , extTest = /\.([txt|json]+?)$/g
+  , pluginMatch = {
+      ajax: ['ajax', 'json', 'txt']
+    }
+z.filter('all', 'plugin', function(req, filters){
+
+  if(!pluginTest.test(req.from)){
+    return req;
+  }
+
+  req.from.replace(pluginTest, function(match, type, index, value){
+    if(pluginMatch.ajax.indexOf(type) >= 0){
+      req.options.type = 'ajax';
+      req.options.ext = ( req.options.ext || ( (type === 'ajax')? 'json' : type ) );
+    } else {
+      var loader = z.loader(type);
+      if(loader){
+        req.options.type = (loader.options.type || type);
+        req.options.ext = ( req.options.ext || loader.options.ext );
+      }
+    }
+
+    req.fromAlias = (req.fromAlias)?
+      req.fromAlias.replace(match, ''):
+      req.from.replace(match, '');
+  });
+  
+  if(extTest.test(req.from)){
+    req.from.replace(extTest, function(match, ext, index, value){
+      req.options.ext = ext;
+      req.fromAlias = req.fromAlias.replace(match, '');
+    });
+  }
+
+  return req;
+
+});
+
+/**
  * Search for a matching pattern and replace.
  *
  * @example
@@ -11,7 +56,7 @@
  *   'foo.bar': 'root.foo.bar'
  * });
  */
-z.filter('alias', function(req, filters){
+z.filter('all', 'alias', function(req, filters){
 
   var nsTest = new RegExp('[' + req.from.replace(/\./g, '\\.') + ']+?')
     , search = false
@@ -28,7 +73,9 @@ z.filter('alias', function(req, filters){
     return req;
   }
 
-  req.fromAlias = req.from.replace(search, replace);
+  req.fromAlias = (req.fromAlias)? 
+    req.fromAlias.replace(search, replace) :
+    req.from.replace(search, replace);
 
   return req;
 
@@ -37,13 +84,13 @@ z.filter('alias', function(req, filters){
 /**
  * Basic shim support.
  */
-z.filter('shim', function(req, filters){
+z.filter('all', 'shim', function(req, filters){
 
   if(!filters.hasOwnProperty(req.from)){
     return req;
   }
 
-  var ext = (req.options.ext || this.options.ext)
+  var ext = (req.options.ext || 'js')
 
   if(u.isFunction(filters[req.from])){
     return filters[req.from](req);
@@ -57,14 +104,19 @@ z.filter('shim', function(req, filters){
 /**
  * Get a src from a request.
  */
-z.filter('src', function(req){
+z.filter('all', 'src', function(req){
 
   if(req.src){
     return req;
   }
 
+  if(!req.options.ext) {
+    var loader = z.loader( (req.options.type || 'script') );
+    req.options.ext = loader.options.ext;
+  }
+
   var name = (req.fromAlias || req.from)
-    , ext = (req.options.ext || this.options.ext)
+    , ext = req.options.ext
     , src = name.replace(/\./g, '/');
 
   src = z.config.root + src + '.' + ext;
@@ -80,7 +132,16 @@ z.filter('src', function(req){
  *
  * @param {Object} req
  */
-z.filter('ajaxMethod', function(req){
-  req.method = (req.method || this.options.method);
+z.filter('ajax', 'method', function(req){
+  if(req.method){
+    return req;
+  }
+  if(req.options.method){
+    req.method = req.options.method;
+    delete req.options.method;
+    return req;
+  }
+  var loader = z.loader( (req.options.type || 'ajax') );
+  req.method = loader.options.method.toLowerCase();
   return req;
 });

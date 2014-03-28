@@ -6,7 +6,7 @@
  * Copyright 2014
  * Released under the MIT license
  *
- * Date: 2014-03-27T22:21Z
+ * Date: 2014-03-28T19:26Z
  */
 
 (function(global, factory){
@@ -934,26 +934,82 @@ z.ajax = function(req, next, err){
  * Request filtering
  */
 
+var Filters = {
+
+  _scopes: {
+    all: {}
+  },
+
+  /**
+   * Add a filter to the given scope.
+   *
+   * @param {String} scope
+   * @param {String} name An identifier. Just used for debugging.
+   * @param {Function} cb
+   */
+  add: function(scope, name, cb){
+    if(!this._scopes.hasOwnProperty(scope)){
+      this._scopes[scope] = {};
+    }
+
+    // Wrap the filter
+    var filter = function(req){
+      var filters = (z.config[name] || {});
+      return cb(req, filters, u);
+    }
+
+    this._scopes[scope][name] = filter;
+  },
+
+  /**
+   * Run all filters in given scope.
+   *
+   * @throws {Error}
+   * @throws {TypeError}
+   * @param {String} scope
+   * @param {Object} req The request to be filtered.
+   * @return {Object | False} Returns the modified request or false if failed.
+   **/
+  dispatch: function(scope, req){
+    if(!this._scopes.hasOwnProperty(scope)){
+      throw new Error('No filters in the requested scope: ' + scope);
+      return false;
+    }
+    if(!req || !u.isObject(req)){
+      throw new TypeError('Request must be an object: ' + typeof req);
+      return false;
+    }
+
+    var fns = this._scopes[scope];
+
+    u.each(fns, function(fn, name){
+      try {
+        req = fn(req);
+      } catch(e) {
+        throw new Error('Filter `' + name + '` failed with error: ' + e.message);
+      }
+    });
+
+    return req;
+  }
+
+}
+
 /**
  * filter API
  */
-_filters = {};
-z.filter = function(name, cb, global){
+z.filter = function(scope, name, cb){
   if(arguments.length <= 1){
-    if(_filters.hasOwnProperty(name)){
-      return _filters[name];
+    if(Filters._scopes.hasOwnProperty(scope)){
+      return Filters._scopes[scope];
     }
-    return false;
   }
+  Filters.add(scope, name, cb);
+  return Filters._scopes[scope];
+}
 
-  _filters[name] = function(req, ctx){
-    var filters = (z.config[name] || z.config);
-    return cb.apply(ctx, [req, filters, u]);
-  }
-
-  // gloablize??
-
-  return _filters[name];
+z.runFilters = function(scope, req){
+  return Filters.dispatch(scope, req);
 }
 
 
@@ -963,6 +1019,51 @@ z.filter = function(name, cb, global){
  */
 
 /**
+ * Set the plugin
+ *
+ * Note: not really extensable yet. Perhaps have it investigate loaders
+ * and apply values based on that?
+ */
+var pluginTest = /([\S^\!]+?)\!/g
+  , extTest = /\.([txt|json]+?)$/g
+  , pluginMatch = {
+      ajax: ['ajax', 'json', 'txt']
+    }
+z.filter('all', 'plugin', function(req, filters){
+
+  if(!pluginTest.test(req.from)){
+    return req;
+  }
+
+  req.from.replace(pluginTest, function(match, type, index, value){
+    if(pluginMatch.ajax.indexOf(type) >= 0){
+      req.options.type = 'ajax';
+      req.options.ext = ( req.options.ext || ( (type === 'ajax')? 'json' : type ) );
+    } else {
+      var loader = z.loader(type);
+      if(loader){
+        req.options.type = (loader.options.type || type);
+        req.options.ext = ( req.options.ext || loader.options.ext );
+      }
+    }
+
+    req.fromAlias = (req.fromAlias)?
+      req.fromAlias.replace(match, ''):
+      req.from.replace(match, '');
+  });
+  
+  if(extTest.test(req.from)){
+    req.from.replace(extTest, function(match, ext, index, value){
+      req.options.ext = ext;
+      req.fromAlias = req.fromAlias.replace(match, '');
+    });
+  }
+
+  return req;
+
+});
+
+/**
  * Search for a matching pattern and replace.
  *
  * @example
@@ -970,7 +1071,7 @@ z.filter = function(name, cb, global){
  *   'foo.bar': 'root.foo.bar'
  * });
  */
-z.filter('alias', function(req, filters){
+z.filter('all', 'alias', function(req, filters){
 
   var nsTest = new RegExp('[' + req.from.replace(/\./g, '\\.') + ']+?')
     , search = false
@@ -987,7 +1088,9 @@ z.filter('alias', function(req, filters){
     return req;
   }
 
-  req.fromAlias = req.from.replace(search, replace);
+  req.fromAlias = (req.fromAlias)? 
+    req.fromAlias.replace(search, replace) :
+    req.from.replace(search, replace);
 
   return req;
 
@@ -996,13 +1099,13 @@ z.filter('alias', function(req, filters){
 /**
  * Basic shim support.
  */
-z.filter('shim', function(req, filters){
+z.filter('all', 'shim', function(req, filters){
 
   if(!filters.hasOwnProperty(req.from)){
     return req;
   }
 
-  var ext = (req.options.ext || this.options.ext)
+  var ext = (req.options.ext || 'js')
 
   if(u.isFunction(filters[req.from])){
     return filters[req.from](req);
@@ -1016,14 +1119,19 @@ z.filter('shim', function(req, filters){
 /**
  * Get a src from a request.
  */
-z.filter('src', function(req){
+z.filter('all', 'src', function(req){
 
   if(req.src){
     return req;
   }
 
+  if(!req.options.ext) {
+    var loader = z.loader( (req.options.type || 'script') );
+    req.options.ext = loader.options.ext;
+  }
+
   var name = (req.fromAlias || req.from)
-    , ext = (req.options.ext || this.options.ext)
+    , ext = req.options.ext
     , src = name.replace(/\./g, '/');
 
   src = z.config.root + src + '.' + ext;
@@ -1039,8 +1147,17 @@ z.filter('src', function(req){
  *
  * @param {Object} req
  */
-z.filter('ajaxMethod', function(req){
-  req.method = (req.method || this.options.method);
+z.filter('ajax', 'method', function(req){
+  if(req.method){
+    return req;
+  }
+  if(req.options.method){
+    req.method = req.options.method;
+    delete req.options.method;
+    return req;
+  }
+  var loader = z.loader( (req.options.type || 'ajax') );
+  req.method = loader.options.method.toLowerCase();
   return req;
 });
 
@@ -1064,7 +1181,7 @@ var Loader = function(setup){
   this._queue = {};
   setup = (setup || {});
 
-  this._filters = (setup.filters || ['default.src']);
+  this._filters = (setup.filters || false);
   this.options = u.defaults(this.options, setup.options);
   this._method = (setup.method || z.Script);
   this._handler = (setup.handler || function(req, res, next, error){
@@ -1083,16 +1200,17 @@ Loader.prototype.options = {
 }
 
 /**
- * Run the request through all registered filters.
+ * Run the request through requested scopes.
  *
  * @param {Object} req
  */
 Loader.prototype.prefilter = function(req){
   var self = this;
-  u.each(this._filters, function(name, index){
-    var filter = z.filter(name);
-    if(filter)
-      req = filter(req, self);
+  if(!this._filters){
+    return req;
+  }
+  u.each(this._filters, function(scope, index){
+      req = z.runFilters(scope, req);
   });
   return req;
 }
@@ -1108,7 +1226,7 @@ Loader.prototype.method = function(method){
 }
 
 /**
- * Register a filter or filters.
+ * Run filters in another scope
  *
  * @param {String | Array} name
  */
@@ -1211,6 +1329,7 @@ z.loader = function(name, setup){
     if(_loaders.hasOwnProperty(name)){
       return _loaders[name];
     }
+    return false;
   }
 
   _loaders[name] = new Loader(setup);
@@ -1235,7 +1354,6 @@ z.loader.build = function(req, res, loader){
  */
 z.loader('script', {
   method: z.Script,
-  filters: ['alias', 'shim', 'src'],
   handler: function(req, res, next, error){
     z.ensureModule(req.from);
     next();
@@ -1250,7 +1368,7 @@ z.loader('script', {
  */
 z.loader('ajax', {
   method: z.Ajax,
-  filters: ['alias', 'shim', 'src', 'ajaxMethod'],
+  filters: ['ajax'],
   handler: function(req, res, next, error){
     z(req.from, function(){ return res; }).done(next, error);
   },
@@ -1572,6 +1690,9 @@ var _import = function(){
   if(remaining > 0){
     
     u.each(queue, function(item, index){
+
+      item = z.runFilters('all', item);
+
       var type = (item.options.type || 'script')
         , loader = z.loader(type);
 

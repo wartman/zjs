@@ -17,7 +17,7 @@ var Loader = function(setup){
   this._queue = {};
   setup = (setup || {});
 
-  this._filters = (setup.filters || ['default.src']);
+  this._filters = (setup.filters || false);
   this.options = u.defaults(this.options, setup.options);
   this._method = (setup.method || z.Script);
   this._handler = (setup.handler || function(req, res, next, error){
@@ -36,16 +36,17 @@ Loader.prototype.options = {
 }
 
 /**
- * Run the request through all registered filters.
+ * Run the request through requested scopes.
  *
  * @param {Object} req
  */
 Loader.prototype.prefilter = function(req){
   var self = this;
-  u.each(this._filters, function(name, index){
-    var filter = z.filter(name);
-    if(filter)
-      req = filter(req, self);
+  if(!this._filters){
+    return req;
+  }
+  u.each(this._filters, function(scope, index){
+      req = z.runFilters(scope, req);
   });
   return req;
 }
@@ -61,7 +62,7 @@ Loader.prototype.method = function(method){
 }
 
 /**
- * Register a filter or filters.
+ * Run filters in another scope
  *
  * @param {String | Array} name
  */
@@ -164,6 +165,7 @@ z.loader = function(name, setup){
     if(_loaders.hasOwnProperty(name)){
       return _loaders[name];
     }
+    return false;
   }
 
   _loaders[name] = new Loader(setup);

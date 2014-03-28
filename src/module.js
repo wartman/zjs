@@ -309,6 +309,9 @@ var _import = function(){
   if(remaining > 0){
     
     u.each(queue, function(item, index){
+
+      item = z.runFilters('all', item);
+
       var type = (item.options.type || 'script')
         , loader = z.loader(type);
 

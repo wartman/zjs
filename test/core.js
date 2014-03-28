@@ -256,29 +256,17 @@
 
     stop();
 
-    z.filter('test.filter', function(req){
-      req.tested = 'tested';
-      return req;
-    });
-
-    z.filter('test.filter2', function(req){
-      req.tested = (req.tested || '') + '2';
-      return req;
-    })
-
     z.loader('test', {
       method: z.Resolver.extend({
         __init__: function(){
           this.resolve(true);
         }
       }),
-      filters: ['test.filter', 'test.filter2'],
       handler: function(req, res, next, err){
         start();
         // Define the request so the loader doesn't throw an error.
         z('fake.request', function(){/*no-op*/});
         ok('plugin was called.');
-        equal(req.tested, 'tested2', 'Filters ran and in order expected');
         next();
       }
     });
