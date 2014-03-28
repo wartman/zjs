@@ -5,9 +5,6 @@
 
 /**
  * Set the plugin
- *
- * Note: not really extensable yet. Perhaps have it investigate loaders
- * and apply values based on that?
  */
 var pluginTest = /([\S^\!]+?)\!/g
   , extTest = /\.([txt|json]+?)$/g
