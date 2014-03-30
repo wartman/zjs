@@ -1,4 +1,4 @@
-/**
+*
  * ----------------------------------------------------------------------
  * z.Module
  *
@@ -310,6 +310,21 @@ var _import = function(){
     
     u.each(queue, function(item, index){
 
+      // Middleware idea (not yet ready):
+
+      // z.request(item, function(){
+      //   remaining -= 1;
+      //   if(remaining <=0 ){
+      //     self.isLoaded(true);
+      //     self.enable();
+      //   }
+      // }, function(e){
+      //   self.disable();
+      //   throw e;
+      // }));
+    
+      // Just have to make sure it runs in the right order.
+
       item = z.runFilters('all', item);
 
       var type = (item.options.type || 'script')
@@ -421,4 +436,4 @@ var _define = function(){
 
 /**
  * Module API in src/core.js
- */
+ 
