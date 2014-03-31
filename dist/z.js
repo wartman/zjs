@@ -1,12 +1,12 @@
 
 
 /**
- * zjs 0.2.4
+ * zjs 0.2.5
  *
  * Copyright 2014
  * Released under the MIT license
  *
- * Date: 2014-03-28T19:26Z
+ * Date: 2014-03-31T16:40Z
  */
 
 (function(global, factory){
@@ -164,13 +164,7 @@ u.async = (function(){
           , len = fns.length;
         fns = [];
         while(i < len){
-          try {
-            toCall[i++]();
-          } catch(e) {
-            u.async(function(){
-              throw e;
-            })
-          }
+          toCall[i++]();
         }
       };
 
@@ -620,10 +614,15 @@ var Resolver = z.Resolver = z.Class({
   _dispatch: function(fns){
     var value = this._value
       , self = this;
+
     // Execute fns from first added to last.
     while(fns.length){
       var fn = fns.shift();
-      fn.call(self, value);
+      try {
+        fn.call(self, value);
+      } catch(e) {
+        self.reject(e);
+      }
     }
   }
 
@@ -1020,9 +1019,6 @@ z.runFilters = function(scope, req){
 
 /**
  * Set the plugin
- *
- * Note: not really extensable yet. Perhaps have it investigate loaders
- * and apply values based on that?
  */
 var pluginTest = /([\S^\!]+?)\!/g
   , extTest = /\.([txt|json]+?)$/g
@@ -1204,16 +1200,16 @@ Loader.prototype.options = {
  *
  * @param {Object} req
  */
-Loader.prototype.prefilter = function(req){
-  var self = this;
-  if(!this._filters){
-    return req;
-  }
-  u.each(this._filters, function(scope, index){
-      req = z.runFilters(scope, req);
-  });
-  return req;
-}
+// Loader.prototype.prefilter = function(req){
+//   var self = this;
+//   if(!this._filters){
+//     return req;
+//   }
+//   u.each(this._filters, function(scope, index){
+//       req = z.runFilters(scope, req);
+//   });
+//   return req;
+// }
 
 /**
  * Register a method
@@ -1230,17 +1226,17 @@ Loader.prototype.method = function(method){
  *
  * @param {String | Array} name
  */
-Loader.prototype.filters = function(name){
-  if(!name){
-    return;
-  }
-  if(u.isArray(name)){
-    this._filters.concat(name);
-    return;
-  }
-  this._filters.push(name);
-  return this;
-}
+// Loader.prototype.filters = function(name){
+//   if(!name){
+//     return;
+//   }
+//   if(u.isArray(name)){
+//     this._filters.concat(name);
+//     return;
+//   }
+//   this._filters.push(name);
+//   return this;
+// }
 
 /**
  * Register handler.
@@ -1286,7 +1282,7 @@ Loader.prototype.has = function(src){
  */
 Loader.prototype.load = function(req, onDone, onRejected){
   var self = this;
-  req = this.prefilter(req);
+  // req = this.prefilter(req);
   if(!this.has(req.src)){
     this._queue[req.src] = new this._method(req);
   }
@@ -1368,7 +1364,6 @@ z.loader('script', {
  */
 z.loader('ajax', {
   method: z.Ajax,
-  filters: ['ajax'],
   handler: function(req, res, next, error){
     z(req.from, function(){ return res; }).done(next, error);
   },
@@ -1541,6 +1536,7 @@ Module.prototype.imports = function(from, uses, options){
  * @return {this}
  */
 Module.prototype.exports = function(name, factory){
+
   var self = this;
 
   if(arguments.length <= 1){
@@ -1555,7 +1551,6 @@ Module.prototype.exports = function(name, factory){
     this._factory[name] = factory;
   }
 
-  // Make sure all exports are defined first.
   u.async(function(){
     self.enable();
   });
@@ -1615,11 +1610,10 @@ Module.prototype.disable = function(error){
  */
 Module.prototype.done = function(onReady, onFailed){
   var self = this;
-  // Keep things async.
   u.async(function(){
     if(onReady && u.isFunction(onReady)){
       (self.isEnabled())?
-        onReady.call(self) :
+        onReady.call(self):
         self._onReady.push(onReady);
     }
     if(onFailed && u.isFunction(onFailed)){
@@ -1627,8 +1621,8 @@ Module.prototype.done = function(onReady, onFailed){
         onFailed.call(self):
         self._onFailed.push(onFailed);
     }
+    return this;
   });
-  return this;
 }
 
 /**
@@ -1802,7 +1796,7 @@ var _define = function(){
 
 /**
  * Module API in src/core.js
- */
+ 
 
 
 /**

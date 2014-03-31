@@ -141,13 +141,7 @@ u.async = (function(){
           , len = fns.length;
         fns = [];
         while(i < len){
-          try {
-            toCall[i++]();
-          } catch(e) {
-            u.async(function(){
-              throw e;
-            })
-          }
+          toCall[i++]();
         }
       };
 

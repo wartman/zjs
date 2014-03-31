@@ -1,4 +1,4 @@
-*
+/**
  * ----------------------------------------------------------------------
  * z.Module
  *
@@ -160,6 +160,7 @@ Module.prototype.imports = function(from, uses, options){
  * @return {this}
  */
 Module.prototype.exports = function(name, factory){
+
   var self = this;
 
   if(arguments.length <= 1){
@@ -174,7 +175,6 @@ Module.prototype.exports = function(name, factory){
     this._factory[name] = factory;
   }
 
-  // Make sure all exports are defined first.
   u.async(function(){
     self.enable();
   });
@@ -234,11 +234,10 @@ Module.prototype.disable = function(error){
  */
 Module.prototype.done = function(onReady, onFailed){
   var self = this;
-  // Keep things async.
   u.async(function(){
     if(onReady && u.isFunction(onReady)){
       (self.isEnabled())?
-        onReady.call(self) :
+        onReady.call(self):
         self._onReady.push(onReady);
     }
     if(onFailed && u.isFunction(onFailed)){
@@ -246,8 +245,8 @@ Module.prototype.done = function(onReady, onFailed){
         onFailed.call(self):
         self._onFailed.push(onFailed);
     }
+    return this;
   });
-  return this;
 }
 
 /**
@@ -309,21 +308,6 @@ var _import = function(){
   if(remaining > 0){
     
     u.each(queue, function(item, index){
-
-      // Middleware idea (not yet ready):
-
-      // z.request(item, function(){
-      //   remaining -= 1;
-      //   if(remaining <=0 ){
-      //     self.isLoaded(true);
-      //     self.enable();
-      //   }
-      // }, function(e){
-      //   self.disable();
-      //   throw e;
-      // }));
-    
-      // Just have to make sure it runs in the right order.
 
       item = z.runFilters('all', item);
 

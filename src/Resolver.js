@@ -113,10 +113,15 @@ var Resolver = z.Resolver = z.Class({
   _dispatch: function(fns){
     var value = this._value
       , self = this;
+
     // Execute fns from first added to last.
     while(fns.length){
       var fn = fns.shift();
-      fn.call(self, value);
+      try {
+        fn.call(self, value);
+      } catch(e) {
+        self.reject(e);
+      }
     }
   }
 

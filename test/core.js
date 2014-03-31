@@ -183,7 +183,7 @@
 
   });
 
-  test('exports', function(){
+  test('exports with multiple names', function(){
 
     // Reset the modules.
     z.modules = {};
@@ -348,5 +348,21 @@
     });
 
   });
+
+  test('Thrown errors are caught from module exports', function(){
+
+    stop();
+
+    z('error').
+    exports(function(){
+
+      start();
+
+      throws(function(){
+        throw new Error('Catch me');
+      }, 'Error was caught.');
+    });
+
+  })
 
 })();
