@@ -342,7 +342,7 @@ var _define = function(){
   var context = {}
     , self = this;
 
-  // Make sure u.each of the deps has been enabled. If any need to be enabled, stop loading and
+  // Make sure each of the deps has been enabled. If any need to be enabled, stop loading and
   // enable them.
   u.each(this._deps, function(dep){
 

@@ -22,6 +22,7 @@ z.loader('script', {
  */
 z.loader('ajax', {
   method: z.Ajax,
+  filters: ['ajax'],
   handler: function(req, res, next, error){
     z(req.from, function(){ return res; }).done(next, error);
   },

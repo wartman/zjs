@@ -40,16 +40,16 @@ Loader.prototype.options = {
  *
  * @param {Object} req
  */
-// Loader.prototype.prefilter = function(req){
-//   var self = this;
-//   if(!this._filters){
-//     return req;
-//   }
-//   u.each(this._filters, function(scope, index){
-//       req = z.runFilters(scope, req);
-//   });
-//   return req;
-// }
+Loader.prototype.prefilter = function(req){
+  var self = this;
+  if(!this._filters){
+    return req;
+  }
+  u.each(this._filters, function(scope, index){
+      req = z.runFilters(scope, req);
+  });
+  return req;
+}
 
 /**
  * Register a method
@@ -66,17 +66,17 @@ Loader.prototype.method = function(method){
  *
  * @param {String | Array} name
  */
-// Loader.prototype.filters = function(name){
-//   if(!name){
-//     return;
-//   }
-//   if(u.isArray(name)){
-//     this._filters.concat(name);
-//     return;
-//   }
-//   this._filters.push(name);
-//   return this;
-// }
+Loader.prototype.filters = function(name){
+  if(!name){
+    return;
+  }
+  if(u.isArray(name)){
+    this._filters.concat(name);
+    return;
+  }
+  this._filters.push(name);
+  return this;
+}
 
 /**
  * Register handler.
@@ -150,7 +150,6 @@ var _loaders = {};
 
 /**
  * z Loader API
- * // info on how it works
  * 
  * @param {String} name If this is the only arg passed, 
  *   the method will try to return a loader or will create

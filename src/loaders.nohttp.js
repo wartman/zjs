@@ -22,7 +22,6 @@ var UseModule = z.UseModule = z.Resolver.extend({
  */
 z.loader('script', {
   method: z.UseModule,
-  filters: ['alias', 'shim', 'src'],
   handler: function(req, res, next, error){
     next();
   },
@@ -36,7 +35,7 @@ z.loader('script', {
  */
 z.loader('ajax', {
   method: z.UseModule,
-  filters: ['alias', 'shim', 'src', 'ajaxMethod'],
+  filters: ['ajax'],
   handler: function(req, res, next, error){
     next();
   },
