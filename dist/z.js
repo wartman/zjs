@@ -6,7 +6,7 @@
  * Copyright 2014
  * Released under the MIT license
  *
- * Date: 2014-04-01T17:03Z
+ * Date: 2014-04-03T20:10Z
  */
 
 (function(global, factory){
@@ -1393,6 +1393,12 @@ z.loader('ajax', {
  *  });
  */
 
+/**
+ * Module states
+ *
+ * @const {Object}
+ * @api private
+ */
 var MODULE_STATE = {
   PENDING: 0,
   LOADED: 1,
@@ -1401,9 +1407,39 @@ var MODULE_STATE = {
 };
 
 /**
+ * Regexp to get a module alias as the last item in a module name
+ * @example
+ *   'app.foo.bar' -> 'bar'
+ *
+ * @const {RegExp}
+ * @api private
+ */
+ var MODULE_ALIAS = /\.([\w]+?)$|([\w]+?)$/;
+
+/**
+ * Get an alias defined by a user.
+ * @example
+ *   'app.foo.bar @baz' -> 'baz'
+ *
+ * @const {RegExp}
+ * @api private
+ */
+var MODULE_USER_ALIAS = /\s?([\S]+?)\s?\@\s?([\S]+?)\s?$/;
+
+/**
+ * Get a module type/plugin
+ * @example
+ *   'ajax!app.foo.bin' -> type:'ajax'
+ * 
+ * @const {RegExp}
+ * @api private
+ */
+var MODULE_TYPE = /([\S^\!]+?)\!/;
+
+/**
  * The module constructor.
  */
-var Module = function(){
+var Module = z.Module = function(){
   this._deps = [];
   this._state = MODULE_STATE.PENDING;
   this._factory = null;
@@ -1413,17 +1449,10 @@ var Module = function(){
 }
 
 /**
- * Regexp to parse aliases.
- *
- * @var {RegExp}
- * @api private
- */
-var _alias = /\s?([\S]+?)\s?\@\s?([\S]+?)\s?$/;
-
-/**
  * Check the module's definition and return requested item(s)
  *
- * @param {String | Array} items An item or items that you want from this module.
+ * @param {String | Array} items 
+ *   An item or items that you want from this module.
  *   Passing a string will always return a single item, an array returns an object.
  *   You can alias items with '@'. For example:
  *     z('myModule').get(['foo @ bar', 'baz']);
@@ -1452,8 +1481,8 @@ Module.prototype.use = function(items){
   u.each(items, function(item){
     var alias = item
       , name = item;
-    if(_alias.test(item)){
-      item.replace(_alias, function(match, actual, replace, index){
+    if(MODULE_USER_ALIAS.test(item)){
+      item.replace(MODULE_USER_ALIAS, function(match, actual, replace, index){
         name = actual;
         alias = replace;
         return match;
@@ -1498,25 +1527,42 @@ Module.prototype.use = function(items){
  */
 Module.prototype.imports = function(from, uses, options){
 
-  this._state = MODULE_STATE.PENDING;
+  this.isPending(true);
 
-  var alias = false;
-  if(_alias.test(from)){
-    var ret = from;
-    ret.replace(_alias, function(match, actual, replace){
-      from = actual.trim();
-      alias = replace.trim();
-    });
+  var alias
+    , match
+    , type = 'script';
+
+  if(MODULE_TYPE.test(from)){
+    match = from.match(MODULE_TYPE);
+    type = match[1];
+    from = from.replace(type + '!', "");
   }
 
-  uses = (!uses || '*' === uses)? false : (!u.isArray(uses))? [uses] : uses;
-  options = u.defaults({type:'script'}, options);
+  if(MODULE_USER_ALIAS.test(from)){
+    match = from.match(MODULE_USER_ALIAS);
+    from = match[1].trim();
+    alias = match[2].trim();
+  } else {
+    match = from.match(MODULE_ALIAS);
+    alias = (match[1])
+      ? match[1].trim()
+      : match[2].trim();
+  }
+
+  uses = (!uses || '*' === uses)
+    ? false 
+    : (!u.isArray(uses))
+      ? [uses] 
+      : uses;
+
+  options = u.defaults({type:type}, options);
 
   var dep = {
-    from:from,
-    alias:alias,
-    uses:uses,
-    options:options
+    from: from,
+    alias: alias,
+    uses: uses,
+    options: options
   };
 
   this._deps.push(dep);
@@ -1595,6 +1641,8 @@ Module.prototype.enable = function(next, error){
 
 /**
  * Disable the module
+ *
+ * @param {Function} error
  */
 Module.prototype.disable = function(error){
   this.isFailed(true);
@@ -1612,14 +1660,14 @@ Module.prototype.done = function(onReady, onFailed){
   var self = this;
   u.async(function(){
     if(onReady && u.isFunction(onReady)){
-      (self.isEnabled())?
-        onReady.call(self):
-        self._onReady.push(onReady);
+      (self.isEnabled())
+        ? onReady.call(self)
+        : self._onReady.push(onReady);
     }
     if(onFailed && u.isFunction(onFailed)){
-      (self.isFailed())?
-        onFailed.call(self):
-        self._onFailed.push(onFailed);
+      (self.isFailed())
+        ? onFailed.call(self)
+        : self._onFailed.push(onFailed);
     }
     return this;
   });
@@ -1683,8 +1731,10 @@ var _import = function(){
 
   if(remaining > 0){
     
-    u.each(queue, function(item, index){
+    u.each(queue, function importItem(item, index){
 
+      // @TODO: I think this filters thing is a bit much.
+      // Work on removing them.
       item = z.runFilters('all', item);
 
       var type = (item.options.type || 'script')
@@ -1720,7 +1770,7 @@ var _define = function(){
 
   // Make sure each of the deps has been enabled. If any need to be enabled, stop loading and
   // enable them.
-  u.each(this._deps, function(dep){
+  u.each(this._deps, function collectDependency(dep){
 
     if(!context){
       return;
@@ -1728,10 +1778,12 @@ var _define = function(){
 
     if(!z.has(dep.from)){
       throw new Error('A dependency is not in the registry: '+ dep.from);
+      self.disable();
+      return true;
     }
 
     var current = z(dep.from)
-      , parts = {};
+      , currentContext = {};
 
     if(current.isFailed()){
       self.disable();
@@ -1741,7 +1793,7 @@ var _define = function(){
     }
 
     if(!current.isEnabled()){
-      current.enable().done(function(){
+      current.enable().done(function enableDependency(){
         self.enable();
       });
       context = false;
@@ -1749,16 +1801,12 @@ var _define = function(){
     }
 
     if(dep.uses){
-      parts = current.use(dep.uses);
+      currentContext = current.use(dep.uses);
     } else {
-      if(dep.alias){
-        parts[dep.alias] = current._definition;
-      } else {
-        parts[dep.from.split('.').pop()] = current._definition;
-      }
+      currentContext[dep.alias] = current.use();
     }
 
-    context = u.extend(context, parts);
+    context = u.extend(context, currentContext);
   });
 
   if(!context){
