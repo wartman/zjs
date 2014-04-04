@@ -31,6 +31,13 @@ zjs uses a simple API to manage dependencies. A module is written as follows:
 Compiled, it looks like this:
 
     
+    /* namespaces */
+    global = {};
+    global.app = {};
+    // etc.
+    
+    /* modules */
+    // more here
     ;(function(){
         
         this.Foo = function(){
@@ -41,7 +48,7 @@ Compiled, it looks like this:
             // code
         });
 
-    }).call( global.app.my.dependency );
+    }).call( global.app.module );
 
 
 That's pretty much all there is to it.
