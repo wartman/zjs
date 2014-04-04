@@ -32,8 +32,8 @@ Compiled, it looks like this:
 
     
     /* namespaces */
-    global = {};
-    global.app = {};
+    var app = global.app = {};
+    global.app.module = {};
     // etc.
     
     /* modules */
