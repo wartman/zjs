@@ -1,8 +1,5 @@
 module.exports = function(grunt){
 
-  // The makefile for zjs
-  var make = grunt.file.readJSON( __dirname + '/make.json');
-
   function process( code ) {
     return "\n\n" + code
       // Embed version
@@ -13,11 +10,13 @@ module.exports = function(grunt){
 
   grunt.initConfig({
     pkg: grunt.file.readJSON('package.json'),
-    concat: {
-      dist: {
-        options: { process: process },
-        src: make.base,
-        dest: "dist/z.js"
+    copy: {
+      main: {
+        src: 'z.js',
+        dest: 'dist/z.js',
+        options: {
+          process: process
+        }
       },
     },
     uglify: {
@@ -25,33 +24,25 @@ module.exports = function(grunt){
         options: {
           banner: '/*! z | <%= grunt.template.today("yyyy-mm-dd") %> */\n'
         },
-        src: 'dist/z.js',
+        src: 'z.js',
         dest: 'dist/z-min.js'
       }
     },
-    // qunit: {
-    //   options: {
-    //     timeout: 10000
-    //   },
-    //   all:[
-    //     'test/**/*-grunt.html'
-    //   ]
-    // },
-    // connect: {
-    //   server: {
-    //     options: {
-    //       port: 8080
-    //     }
-    //   }
-    // }
+    mochaTest: {
+      test: {
+        options: {
+          reporter: 'spec'
+        },
+        src: ['test/build/*.js']
+      }
+    }
   });
 
   grunt.loadNpmTasks('grunt-contrib-uglify');
-  grunt.loadNpmTasks('grunt-contrib-concat');
+  grunt.loadNpmTasks('grunt-mocha-test');
+  grunt.loadNpmTasks('grunt-contrib-copy');
 
-  grunt.registerTask('test', ['connect', 'qunit'] );
-  grunt.registerTask('default', ['concat']);
-  grunt.registerTask('build', ['concat'] );
-  grunt.registerTask('build-min', ['concat', 'uglify'] );
+  grunt.registerTask('default', ['mochaTest', 'copy', 'uglify']);
+  grunt.registerTask('test', 'mochaTest');
 
 }

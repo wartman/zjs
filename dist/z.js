@@ -6,159 +6,35 @@
  * Copyright 2014
  * Released under the MIT license
  *
- * Date: 2014-04-03T20:10Z
+ * Date: 2014-04-04T20:10Z
  */
 
 (function(global, factory){
 
-  // For CommonJS environments.
   if ( typeof module === "object" && typeof module.exports === "object" ) {
-    global = module.exports;
-  }
-  
-  factory( global );
-
-}( typeof window !== "undefined" ? window : this, function( root ) {
-
-
-/**
- * ----------------------------------------------------------------------
- * z.util
- *
- * A few utility funcs.
- */
-
-var forEach = Array.prototype.forEach
-  , slice = Array.prototype.slice
-  , toString = Object.prototype.toString
-  , objKeys = Object.keys
-  , undef;
-
-var u = {};
-
-u.each = function(obj, callback, context) {
-  if(!obj){
-    return obj;
-  }
-  context = (context || obj);
-  if(forEach && obj.forEach){
-    obj.forEach(callback)
-  } else if ( u.isArray(obj) ){
-    for (var i = 0; i < obj.length; i += 1) {
-      if (obj[i] && callback.call(context, obj[i], i, obj)) {
-        break;
-      }
-    }
+    // For CommonJS environments.
+    module.exports = factory;
   } else {
-    for(var key in obj){
-      if(obj.hasOwnProperty(key)){
-        if(key && callback.call(context, obj[key], key, obj)){
-          break
-        }
-      }
-    }
+    factory(global);
   }
-  return obj;
-}
 
-u.eachReverse = function(obj, callback, context) {
-  if (obj) {
-    var i;
-    for (i = obj.length - 1; i > -1; i -= 1) {
-      if (obj[i] && callback.call(context, obj[i], i, obj)) {
-        break;
-      }
-    }
-  }
-  return obj;
-}
+}( typeof window !== "undefined" ? window : this, function ( global, undefined ) {
 
-u.extend = function(obj){
-  u.each(slice.call(arguments, 1), function(source){
-    if(source){
-      for(var prop in source){
-        obj[prop] = source[prop]
-      }
-    }
-  });
-  return obj;
-}
-
-u.isObject = function(obj){
-  return obj === Object(obj);
-}
-
-u.defaults = function(obj, options){
-  if(undefined === options){
-    return obj;
-  }
-  for(var key in obj){
-    if(obj.hasOwnProperty(key) && ! options.hasOwnProperty(key)){
-      options[key] = obj[key];
-    }
-  }
-  return options;
-}
-
-u.keys = function(obj){
-  if(!u.isObject(obj)) return [];
-  if(objKeys) return objKeys(obj);
-  var keys = [];
-  for(var key in obj){
-    keys.push(key);
-  }
-  return keys;
-}
-
-u.isEmpty = function(obj){
-  if (obj == null){
-    return true;
-  } 
-  if (obj instanceof Array || obj instanceof String){
-    return obj.length === 0;
-  }
-  for (var key in obj){ // Does not handle enum bugs in ie <9
-    if(obj.hasOwnProperty(key)){
-      return false;
-    }
-  }
-  return true;
-}
+/*
+ * -------
+ * Helpers
+ * -------
+ */
 
 /**
- * Escape a string
+ * Ensure async loading.
  */
-var _escapes = {
-      "'" : "'",
-      '\\': '\\',
-      '\r': 'r',
-      '\n': 'n',
-      '\t': 't',
-      '\u2028': 'u2028',
-      '\u2029': 'u2029'
-    }
-  , _escaper = /\\|'|\r|\n|\t|\u2028|\u2029/g;
-u.escape = function (txt){
-  return txt.replace(_escaper, function(match) { return '\\' + _escapes[match]; });
-}
-
-u.each(['Arguments', 'Function', 'String', 'Number', 'Date', 'RegExp'], function(name) {
-  u['is' + name] = function(obj) {
-    return toString.call(obj) == '[object ' + name + ']';
-  };
-});
-
-u.isArray = (Array.isArray || function(obj){
-  return toString.call(obj) == '[object Array]';
-});
-
-// Make things async.
-u.async = (function(){
+var nextTick = (function () {
   var fns = []
-    , enqueueFn = function(fn){
+    , enqueueFn = function ( fn ) {
         return fns.push(fn) === 1;
       }
-    , dispatchFns = function(ctx){
+    , dispatchFns = function ( ctx ) {
         var toCall = fns
           , i = 0
           , len = fns.length;
@@ -168,30 +44,30 @@ u.async = (function(){
         }
       };
 
-  if(typeof setImmediate !== "undefined" && u.isFunction(setImmediate)){ // ie10, node < 0.10
-    return function(fn, ctx) {
+  if ( typeof setImmediate !== "undefined" && ( "function" === typeof setImmediate) ) { // ie10, node < 0.10
+    return function ( fn, ctx ) {
       enqueueFn(fn) && setImmediate(dispatchFns);
     };
   }
 
-  if(typeof process === "object" && process.nextTick){ // node > 0.10
+  if ( typeof process === "object" && process.nextTick ) { // node > 0.10
     return function(fn, ctx){
       enqueueFn(fn) && process.nextTick(dispatchFns);
     }
   }
 
-  if(root.postMessage){ // modern browsers
+  if ( global.postMessage ) { // modern browsers
     var isAsync = true;
-    if(root.attachEvent){
+    if ( global.attachEvent ) {
       var checkAsync = function(){
         isAsync = false;
       }
-      root.attachEvent('onmessage', checkAsync);
-      root.postMessage('__checkAsync', '*');
-      root.detachEvent('onmessage', checkAsync);
+      global.attachEvent('onmessage', checkAsync);
+      global.postMessage('__checkAsync', '*');
+      global.detachEvent('onmessage', checkAsync);
     }
 
-    if(isAsync){
+    if ( isAsync ) {
       var msg = "__promise" + new Date
         , onMessage = function(e){
             if(e.data === msg){
@@ -200,1439 +76,295 @@ u.async = (function(){
             }
           };
 
-      root.addEventListener?
-        root.addEventListener('message', onMessage, true) :
-        root.attachEvent('onmessage', onMessage);
+      global.addEventListener?
+        global.addEventListener('message', onMessage, true) :
+        global.attachEvent('onmessage', onMessage);
 
       return function(fn, ctx){
-        enqueueFn(fn) && root.postMessage(msg, '*');
+        enqueueFn(fn) && global.postMessage(msg, '*');
       }
 
     }
   }
 
-  return function(fn, ctx) { // old browsers.
+  return function (fn, ctx) { // old browsers.
     enqueueFn(fn) && setTimeout(dispatchFns, 0);
   };
 })();
 
-
 /**
- * ----------------------------------------------------------------------
- * z API
- */
-
-/**
- * The top-level API for z
+ * Iterate over arrays OR objects.
  *
- * @param {String | Function} name The module name. If this is the only arg given,
- *   and the name exists in the registry, this will return an existing module.
- *   If you pass a function here, you will define a ananymous module with no deps.
- * @param {Function} factory Pass a function here to quickly define a module
- *   with no deps.
+ * @param {*} obj
+ * @param {Function} callback
+ * @param {Object} context (optional)
  */
-var z = root.z = function(name, factory){
-  if(u.isFunction(name)){
-    factory = name;
-    name = undef;
+var each = function (obj, callback, context) {
+  if(!obj){
+    return obj;
   }
-  if(z.has(name) && !factory){
-    return z.modules[name];
-  }
-  var mod = _addModule(name);
-  if(u.isFunction(factory) && factory.length === 2){
-    _runFactory(mod, factory);
-  } else if (factory) {
-    mod.exports(factory);
-  }
-  return mod;
-}
-
-/**
- * `z` is aliased as `module` to allow for more readable code.
- * Run z.noConflict() to return `module` to its original owner.
- */
-var _lastModule = root.module;
-root.module = z;
-
-/**
- * Return `module` to its original owner.
- */
-z.noConflict = function(){
-  root.module = _lastModule;
-}
-
-/**
- * Helper for adding modules.
- *
- * @param {String} name
- * @return {Module}
- * @api private
- */
-var _addModule = function(name){
-  if(typeof name === "undefined"){
-    var node;
-    if(_useInteractive){
-      // For < IE9 (and 10, apparently -- seems to get called there too)
-      // I think this is because <IE9 runs onload callbacks BEFORE the code
-      // executes, while other browsers do it right after.
-      node = _currentlyAddingScript || Script.getInteractiveScript();
-      name = node.getAttribute('data-from');
-    } else {
-      // Assign to a temp cache, to be named by the onload callback.
-      _tmpModule = new Module();
-      return _tmpModule;
-    }
-  }
-
-  z.modules[name] = new Module();
-  return z.modules[name];
-}
-
-/**
- * Helper for running module factories.
- *
- * @param {Module} mod
- * @param {Function} factory
- * @api private
- */
-var _runFactory = function(mod, factory){
-  var imports = function(){
-    return Module.prototype.imports.apply(mod, arguments);    
-  }
-  var exports = function(){
-    return Module.prototype.exports.apply(mod, arguments);
-  }
-  factory.call(mod, imports, exports);
-}
-
-/**
- * Anonymous modules are stored here until they can be named.
- *
- * @var {Module | null}
- * @api private
- */
-var _tmpModule = null;
-
-/**
- * All modules are registered here.
- *
- * @var {Object}
- */
-z.modules = {};
-
-/**
- * Check to see if a module exists in the registry.
- *
- * @param {String} name
- */
-z.has = function(name){
-  return z.modules.hasOwnProperty(name);
-}
-
-/**
- * This method checks _tmpModule and assigns the name provided
- * if it finds a module there. Should be called by plugins in
- * their onLoad callbacks.
- *
- * @param {String} name
- */
-z.ensureModule = function(name){
-  var tmp = _tmpModule;
-  if(null === tmp){
-    return;
-  }
-  _tmpModule = null;
-  if(!tmp instanceof Module){
-    return;
-  }
-  z.modules[name] = tmp;
-  return;
-}
-
-/**
- * The app configuration.
- *
- * @var {Object}
- */
-z.config = {
-  root: '',
-  shim: {},
-  alias: {},
-  env: 'browser',
-  auto: true // Set to false to wait for z to start.
-};
-
-/**
- * Configure z
- *
- * @param {Object} options
- */
-z.setup = function(options){
-  z.config = u.defaults(z.config, options);
-}
-
-
-/**
- * ----------------------------------------------------------------------
- * z.Class
- *
- * Based on John Resig's inheritance technique,
- * (see http://ejohn.org/blog/simple-javascript-inheritance/)
- * that was inspired by base2 and Prototype.
- * 
- * Modified a bit -- uses a diferent method (based on coffescript)
- * to avoid calling the constructor, with the intention to allow
- * the direct definition of the constructor.
- *
- * MIT Licensed.
- */
-var fnTest = /xyz/.test(function(){xyz;}) ? /\b__super__\b/ : /[\D|\d]*/;
-
-/**
- * The function used to actually extend classes.
- *   var Foo = z.Class({ ... });
- *   var Bar = Foo.extend({ ... });
- *
- * @param {Object} props
- * @return {Object}
- * @api private
- */
-var _classExtend = function(props) {
-  // The parent.
-  var __super__ = this.prototype
-    , parent = this
-    // props["__new__"] will overwrite the constructor of the new class.
-    , Class = (u.isFunction(props["__new__"]))? 
-      (function(){
-        var ret = props["__new__"];
-        delete props["__new__"];
-        return ret;
-      })() :
-      // Inherit the parent constructor.
-      function(){
-        parent.apply(this, arguments);
+  context = (context || obj);
+  if(Array.prototype.forEach && obj.forEach){
+    obj.forEach(callback)
+  } else if ( obj instanceof Array ){
+    for (var i = 0; i < obj.length; i += 1) {
+      if (obj[i] && callback.call(context, obj[i], i, obj)) {
+        break;
       }
-
-  // Set up the prototype chain from the parent.
-  // Use a surrogate so that we don't call the constructor.
-  // (per backbone)
-  var Surrogate = function(){ this.constructor = Class; }
-  Surrogate.prototype = this.prototype;
-  Class.prototype = new Surrogate;
-
-  // Copy the properties over onto the new prototype
-  for (var name in props) {
-    // Check if we're overwriting an existing function in the parent and make sure
-    // the method actually uses "__super__", otherwise don't bother creating a closure
-    // with the "__super__" call.
-    Class.prototype[name] = ( u.isFunction(props[name]) 
-    && u.isFunction(__super__[name]) 
-    && fnTest.test(props[name]) ) ?
-      (function(name, fn){
-        return function() {
-          var tmp = this.__super__;
-          this.__super__ = __super__[name];
-          var ret = fn.apply(this, arguments);
-          this.__super__ = tmp;
-
-          return ret;
-        };
-      })(name, props[name]) :
-      props[name];
-  }
-
-  // Make sure constructor is the one you expect.
-  Class.prototype.constructor = Class;
-
-  // Make this class extendable
-  Class.extend = arguments.callee;
- 
-  return Class;
-};
-
-/**
- * The default class constructor.
- */
-var _classConstructor = function(){
-  if(this.__init__){
-    this.__init__.apply(this, arguments);
-  }
-}
-
-/**
- * The Class API.
- * Creates a new class, or acts as an alternate way to extend a class.
- *   var Foo = z.Class({ ... });
- *   var Bar = z.Class(Bar, {...});
- * You can also use this function to extend generic objects or functions.
- *   var Foo = z.Class({...}, {...})
- *
- * @param {Object} parent (optional)
- * @param {Object} props
- * @return {Object}
- */
-z.Class = function(parent, props){
-  if(!props){
-    props = parent;
-    parent = false;
-  }
-
-  // The most common case, so try it first.
-  if(!parent){
-    return _classExtend.call(_classConstructor, props);
-  }
-
-  if(parent && hasOwnProperty.call(parent, 'extend')){
-    return parent.extend(props);
-  } else if (u.isFunction(parent)){
-    // Use parent as constructor.
-    return _classExtend.call(parent, props);
-  } else if(u.isObject(parent)){
-    // Bind the default constructor to the object.
-    parent.__new__ = _classConstructor;
-    return _classExtend.call(parent, props);
+    }
   } else {
-    // I guess they tried to pass a string or something crazy.
-    throw new TypeError('{parent} must be a function, object or undefined.');
-  }
-}
-
-
-/**
- * ----------------------------------------------------------------------
- * z.Resolver
- *
- * The resolver is basically a very stripped down promise. Having a full-on
- * promise implementation is a bit overkill for the module loader, so this
- * is the smallest implementation we can get away with.
- *
- * Resolvers can, however, be bound to Promise/A+ implementations in the
- * following ways:
- *   var resolver = new z.Resolver;
- *   var promise = new Promise(resolver.ready); // Binds the resolver to the promise.
- *   // or
- *   promise.then(resolver); // Binds the promise to the resolver.
- *   resolver.resolve(onFulfilled, onRejected); // Will resolve the promise.
- */
-
-var RESOLVER_STATE = {
-  PENDING: 0,
-  READY: 1,
-  REJECTED: -1
-};
-
-var Resolver = z.Resolver = z.Class({
-
-  /**
-   * Initilize the resolver.
-   *
-   * @param {Object} options (optional)
-   */
-  __new__: function(){
-    this._onReady = [];
-    this._onRejected = [];
-    this._value = null;
-    this._state = RESOLVER_STATE.PENDING;
-
-    if(this.__init__)
-      this.__init__.apply(this, arguments);
-  },
-
-  /**
-   * Add a ready callback. 
-   *
-   * @param {Function} onReady
-   * @param {Function} onRejected
-   * @return {Resolver}
-   */
-  done: function(onReady, onRejected){
-    if(onReady){
-      (this.isReady())?
-        onReady(this._value) :
-        this._onReady.push(onReady);
-    }
-    if(onRejected){
-      (this.isRejected())?
-        onRejected(this._value) :
-        this._onRejected.push(onRejected);
-    }
-    return this;
-  },
-
-  /**
-   * Add a failure callback. 
-   *
-   * @param {Function} onRejected
-   * @return {Resolver}
-   */
-  failed: function(onRejected){
-    return this.ready(undefined, onRejected);
-  },
-
-  /**
-   * An alias for Resolver#ready.
-   * This method is here only to ensure that it can be complient
-   * with /A+ promises -- please do not try to use the resolver 
-   * as a promise.
-   *
-   * @param {Function} onReady
-   * @param {Function} onRejected
-   * @return {Resolver}
-   */
-  then: function(onReady, onRejected){
-    return this.ready(onReady, onFailed);
-  },
-
-  /**
-   * Resolve the resolver with the provided value.
-   *
-   * @param {Mixed} value
-   */
-  resolve: function(value){
-    this._value = value;
-    this._state = RESOLVER_STATE.READY;
-    this._dispatch(this._onReady);
-  },
-  
-  /**
-   * Reject the resolver with the provided value.
-   *
-   * @param {Mixed} reason
-   */
-  reject: function(reason){
-    this._value = reason;
-    this._state = RESOLVER_STATE.REJECTED;
-    this._dispatch(this._onRejected);
-  },
-
-  /**
-   * A helper function to run callbacks.
-   *
-   * @param {Array} fns
-   */
-  _dispatch: function(fns){
-    var value = this._value
-      , self = this;
-
-    // Execute fns from first added to last.
-    while(fns.length){
-      var fn = fns.shift();
-      try {
-        fn.call(self, value);
-      } catch(e) {
-        self.reject(e);
+    for(var key in obj){
+      if(obj.hasOwnProperty(key)){
+        if(key && callback.call(context, obj[key], key, obj)){
+          break;
+        }
       }
     }
   }
+  return obj;
+}
 
-});
+/*
+ * ---
+ * API
+ * ---
+ */
+
+/**
+ * The module factory.
+ *
+ * @param {String} name Assign a namespace to this module.
+ * @param {Function} factory Define a namespace via callback.
+ * @constructor
+ * @return {z instance}
+ */
+var z = function (name, factory) {
+  if( !(this instanceof z) ){
+    return new z(name, factory);
+  }
+
+  // Raise an error if a namespace is redefined
+  if(z.namespaceExists(name)){
+    throw Error('Namespace was already defined: ' + name);
+  }
+  delete z.env.namespaces[name];
+
+  var namespace = name;
+  while ( (namespace = namespace.substring(0, namespace.lastIndexOf('.') ) ) ) {
+    if(z.getObjectByName(namespace)){
+      break;
+    }
+    z.env.namespaces[namespace] = true;
+  }
+
+  // Register this loader
+  z.env.modules[name] = this;
+
+  this._state = z.env.MODULE_STATE.PENDING;
+  this._namespaceString = name;
+  this._namespace = z.createNamespace(name);
+  this._dependencies = [];
+  this._factory = null;
+  this._onFailed = [];
+  this._onReady = [];
+
+  if(factory && ('function' === typeof factory) ){
+    if(factory.length < 2){
+      this.export(factory);
+    } else {
+      factory.call(this);
+    }
+  }
+}
+
+/*
+ * -------
+ * Statics
+ * -------
+ */
+
+/**
+ * Z's environment
+ */
+z.env = {
+  namespaces: {},
+  root: '',
+  map: {},
+  modules: {},
+  environment: 'browser',
+  MODULE_STATE: {
+    PENDING: 0,
+    LOADED: 1,
+    ENABLED: 2,
+    FAILED: -1
+  }
+};
+
+/**
+ * A holder for the global var.
+ */
+z.global = global;
+
+/**
+ * Check if a namespace has been defined.
+ *
+ * @param {String} namespace
+ */
+z.namespaceExists = function ( namespace ) {
+  return !z.env.namespaces[namespace] 
+    && z.env.namespaces[namespace] !== undefined;
+}
+
+/**
+ * Map imports to a given path.
+ * @example
+ *    z.map('lib/foo.js', ['foo.bar', 'foo.bin']);
+ *
+ * You can also map a file to a base namespace
+ * @example
+ *    z.map('lib/foo.js', ['foo.*']);
+ *    // The following will now load lib/foo.js:
+ *    z('myModule').import('foo.bar').export(function(){ });
+ *
+ * @param {String} path Should be a fully-qualified path.
+ * @param {Array} provides A list of modules this path provides.
+ */
+z.map = function ( path, provides ) {
+  if(!z.env.map[path]){
+    z.env.map[path] = [];
+  }
+  z.env.map[path] = z.env.map[path].concat(provides);
+}
+
+/**
+ * Check if a namespace is mapped to a path.
+ *
+ * @param {String} namespace
+ * @return {String | Bool}
+ */
+z.getMappedPath = function ( namespace ) {
+  var mappedPath = false
+    , base = namespace.substring(0, namespace.lastIndexOf('.') ) + '.*';
+
+  // Check for base paths first.
+  each(z.env.map, function(map, path){
+    if(map.indexOf(base) > -1){
+      mappedPath = path;
+    }
+  });
+
+  if(mappedPath) return mappedPath;
+
+  each(z.env.map, function(map, path){
+    if(map.indexOf(namespace) > -1){
+      mappedPath = path;
+    }
+  });
+  return mappedPath;
+}
 
 /** 
- * Add state helpers to the Resolver prototype.
- */
-u.each(['Ready', 'Rejected', 'Pending'], function(state){
-  var STATE = state.toUpperCase();
-  Resolver.prototype['is'+state] = function(){
-    return this._state === RESOLVER_STATE[STATE];
-  }
-});
-
-
-/**
- * ----------------------------------------------------------------------
- * z.Script
+ * Create a namespace path, ensuring that every level is defined
+ * @example
+ *    foo.bar.baz -> (foo={}), (foo.bar={}), (foo.bar.baz={})
  *
- * z's script loader. Extends z.Resolver.
+ * @param {String} namespace
  */
-
-var Script = z.Script = Resolver.extend({
-
-  options: {
-    nodeType: 'text/javascript',
-    charset: 'utf-8',
-    async: true
-  },
-
-  __init__: function(req, options){
-    this.options = u.defaults(this.options, options);
-    this.node = false;
-    this.load(req);
-  },
-
-  /**
-   * Create a script node.
-   *
-   * @return {Element}
-   */
-  create: function(){
-    var node = document.createElement('script');
-    node.type = this.options.nodeType || 'text/javascript';
-    node.charset = this.options.charset;
-    node.async = this.options.async;
-    return node;
-  },
-
-  /**
-   * Load a request
-   *
-   * @param {Object | String} req
-   */
-  load: function(req){
-
-    var node = this.create()
-      , head = document.getElementsByTagName('head')[0]
-      , self = this
-      , settings = this.scriptSettings
-      , defaults = {
-          src: ''
-        };
-
-    // Allow the user to just pass an src.
-    if(u.isString(req)){
-      req = {
-        src: req
-      };
-    }
-
-    req = u.defaults(defaults, req);
-
-    node.setAttribute('data-from', (req.from || req.src));
-
-    _scriptLoadEvent(node, function(node){
-      self.resolve(node);
-    }, function(e){
-      self.reject(e);
-    });
-
-    // For ie8, code may start running as soon as the node
-    // is placed in the DOM, so we need to be ready:  
-    _currentlyAddingScript = node;
-    node.src = req.src;
-    head.appendChild(node);
-    // Clear out the current script after DOM insertion.
-    _currentlyAddingScript = null;
-  }
-
-});
-
-/**
- * The following methods and properties are for older browsers, which
- * may start defining a script before it is fully loaded.
- */
-var _useInteractive = false;
-var _currentlyAddingScript = null;
-var _interactiveScript = null;
-Script.getInteractiveScript = function(){
-  if (_interactiveScript && _interactiveScript.readyState === 'interactive') {
-    return _interactiveScript;
-  }
-
-  u.eachReverse(Script.scripts(), function (script) {
-    if (script.readyState === 'interactive') {
-      _interactiveScript = script;
-      return true;
-    }
-  });
-  return _interactiveScript;
-}
-
-Script.scripts = function(){
-  return document.getElementsByTagName('script');
-} 
-
-/**
- * Configure the event listener.
- */
-var _scriptLoadEvent = (function(){
-
-  if(typeof document === "undefined"){
-    // Return an empty function if this is a server context
-    return function(node, next, err){ /* noop */ };
-  }
-
-  var testNode = document.createElement('script')
-    , loader = null;
-
-  // Test for support.
-  // Test for attach event as IE9 has a subtle error where it does not 
-  // fire its onload event right after script-load with addEventListener,
-  // like most other browsers.
-  // (based on requireJs)
-  if (testNode.attachEvent){
-
-    // Because onload is not fired right away, we can't add a define call to
-    // anonymous modules. However, IE reports the script as being in 'interactive'
-    // ready state at the time of the define call.
-    loader = function(node, next, err){
-      _useInteractive = true;
-      node.attachEvent('onreadystatechange', function(){
-        // if(node.readyState === 'loaded'){  // I could swear this was correct.
-        if(node.readyState === 'complete'){
-          next(node);
-          _interactiveScript = null;
-        }
-      });
-      // Error handler not possible I beleive.
-    }
-
-  } else {
-    
-    loader = function(node, next, err){
-      node.addEventListener('load', function(e){
-        next(node);
-      }, false);
-      node.addEventListener('error', function(e){
-        err(e);
-      }, false);
-    }
-
-  }
-
-  return loader;
-
-})();
-
-/**
- * ----------------------------------------------------------------------
- * Script API
- *
- * @param {Object} req
- * @param {Function} next
- * @param {Function} err
- * @return {Script}
- */
-z.script = function(req, next, error){
-  var s = new Script(req, z.config.script);
-  s.done(next, error);
-  return s;
-}
-
-
-/**
- * ----------------------------------------------------------------------
- * z.Ajax
- *
- * Fit's ajax wrapper
- */
-
-var AJAX_STATE = {
-  PENDING: 0,
-  OPENED: 1,
-  HEADERS_RECEIVED: 2,
-  LOADING: 3,
-  DONE: 4,
-  FAILED: -1
-};
-
-var HTTP_METHODS = [
-  'GET',
-  'PUT',
-  'POST',
-  'DELETE'
-];
-
-var Ajax = z.Ajax = Resolver.extend({
-
-  options: {
-    defaults: {
-      src: '',
-      method: 'GET',
-      data: false
-    }
-  },
-
-  __init__: function(req, options){
-    this.options = u.defaults(this.options, options);
-    this.load(req);
-  },
-
-  load: function(req){
-
-    var request
-      , self = this
-      , method = 'GET';
-
-    req = u.defaults(this.options.defaults, req);
-    
-    method = req.method.toUpperCase() === 'GET';
-
-    if(HTTP_METHODS.indexOf(method) <= 0){
-      // Ensure we have an allowed method.
-      method = 'GET';
-    }
-
-    if(window.XMLHttpRequest){
-      request = new XMLHttpRequest();
-    } else { // code for IE6, IE5
-      request = new ActiveXObject("Microsoft.XMLHTTP");
-    }
-
-    request.onreadystatechange = function(){
-      if(AJAX_STATE.DONE === this.readyState){
-        if(200 === this.status){
-          self.resolve(this.responseText);
-        } else {
-          self.reject(this.status);
-        }
-      }
-    }
-
-    if(method === "GET" && req.data){
-      req.src += '?' + this._buildQueryStr(req.data);
-    }
-
-    request.open(method, req.src, true);
-
-    if(method === "POST" && req.data){
-      var params = this._buildQueryStr(req.data)
-      request.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
-      request.send(params);
+z.createNamespace = function ( namespace, exports, env ) {
+  var cur = env || z.global
+    , parts = namespace.split('.');
+  for (var part; parts.length && (part = parts.shift()); ) {
+    if(!parts.length && exports !== undefined){
+      // Last part, so export to this.
+      cur[part] = exports;
+    } else if (cur[part]) {
+      cur = cur[part];
     } else {
-      request.send();
+      cur = cur[part] = {};
     }
-  },
-
-  _buildQueryStr: function(data){
-    var query = []
-      ;
-    for(var key in data){
-      query.push(key + '=' + data[key]);
-    }
-    return query.join('&');
   }
 
-});
-
-u.each(['Done', 'Pending', 'Failed'], function(state){
-  Ajax.prototype['is' + state] = function(){
-    return this._state === AJAX_STATE[state.toUpperCase()];
-  } 
-});
+  return cur;
+}
 
 /**
- * ----------------------------------------------------------------------
- * Ajax API
+ * Convert a string into a namespace
  *
- * @param {Object} req
- * @param {Function} next
- * @param {Function} err
- * @retrun {Ajax}
+ * @param {String} name
+ * @param {Object} env (optional)
  */
-z.ajax = function(req, next, err){
-  var a = new Ajax(req, z.config.ajax);
-  a.done(next, err);
-  return a;
-}
-
-
-/**
- * ----------------------------------------------------------------------
- * z.Filters
- *
- * Request filtering
- */
-
-var Filters = {
-
-  _scopes: {
-    all: {}
-  },
-
-  /**
-   * Add a filter to the given scope.
-   *
-   * @param {String} scope
-   * @param {String} name An identifier. Just used for debugging.
-   * @param {Function} cb
-   */
-  add: function(scope, name, cb){
-    if(!this._scopes.hasOwnProperty(scope)){
-      this._scopes[scope] = {};
-    }
-
-    // Wrap the filter
-    var filter = function(req){
-      var filters = (z.config[name] || {});
-      return cb(req, filters, u);
-    }
-
-    this._scopes[scope][name] = filter;
-  },
-
-  /**
-   * Run all filters in given scope.
-   *
-   * @throws {Error}
-   * @throws {TypeError}
-   * @param {String} scope
-   * @param {Object} req The request to be filtered.
-   * @return {Object | False} Returns the modified request or false if failed.
-   **/
-  dispatch: function(scope, req){
-    if(!this._scopes.hasOwnProperty(scope)){
-      throw new Error('No filters in the requested scope: ' + scope);
-      return false;
-    }
-    if(!req || !u.isObject(req)){
-      throw new TypeError('Request must be an object: ' + typeof req);
-      return false;
-    }
-
-    var fns = this._scopes[scope];
-
-    u.each(fns, function(fn, name){
-      try {
-        req = fn(req);
-      } catch(e) {
-        throw new Error('Filter `' + name + '` failed with error: ' + e.message);
-      }
-    });
-
-    return req;
-  }
-
-}
-
-/**
- * filter API
- */
-z.filter = function(scope, name, cb){
-  if(arguments.length <= 1){
-    if(Filters._scopes.hasOwnProperty(scope)){
-      return Filters._scopes[scope];
-    }
-  }
-  Filters.add(scope, name, cb);
-  return Filters._scopes[scope];
-}
-
-z.runFilters = function(scope, req){
-  return Filters.dispatch(scope, req);
-}
-
-
-/**
- * ----------------------------------------------------------------------
- * Default filters
- */
-
-/**
- * Set the plugin
- */
-var pluginTest = /([\S^\!]+?)\!/g
-  , extTest = /\.([txt|json]+?)$/g
-  , pluginMatch = {
-      ajax: ['ajax', 'json', 'txt']
-    }
-z.filter('all', 'plugin', function(req, filters){
-
-  if(!pluginTest.test(req.from)){
-    return req;
-  }
-
-  req.from.replace(pluginTest, function(match, type, index, value){
-    if(pluginMatch.ajax.indexOf(type) >= 0){
-      req.options.type = 'ajax';
-      req.options.ext = ( req.options.ext || ( (type === 'ajax')? 'json' : type ) );
+z.getObjectByName = function ( name, env ) {
+  var cur = env || z.global
+    , parts = name.split('.');
+  for (var part; part = parts.shift(); ) {
+    if(typeof cur[part] !== "undefined"){
+      cur = cur[part];
     } else {
-      var loader = z.loader(type);
-      if(loader){
-        req.options.type = (loader.options.type || type);
-        req.options.ext = ( req.options.ext || loader.options.ext );
-      }
-    }
-
-    req.fromAlias = (req.fromAlias)?
-      req.fromAlias.replace(match, ''):
-      req.from.replace(match, '');
-  });
-  
-  if(extTest.test(req.from)){
-    req.from.replace(extTest, function(match, ext, index, value){
-      req.options.ext = ext;
-      req.fromAlias = req.fromAlias.replace(match, '');
-    });
-  }
-
-  return req;
-
-});
-
-/**
- * Search for a matching pattern and replace.
- *
- * @example
- * z.setup({
- *   'foo.bar': 'root.foo.bar'
- * });
- */
-z.filter('all', 'alias', function(req, filters){
-
-  var nsTest = new RegExp('[' + req.from.replace(/\./g, '\\.') + ']+?')
-    , search = false
-    , replace = '';
-
-  for (var key in filters){
-    if(nsTest.test(key)){
-      search = key;
-      replace = filters[key];
+      return null;
     }
   }
-
-  if(!search){
-    return req;
-  }
-
-  req.fromAlias = (req.fromAlias)? 
-    req.fromAlias.replace(search, replace) :
-    req.from.replace(search, replace);
-
-  return req;
-
-});
-
-/**
- * Basic shim support.
- */
-z.filter('all', 'shim', function(req, filters){
-
-  if(!filters.hasOwnProperty(req.from)){
-    return req;
-  }
-
-  var ext = (req.options.ext || 'js')
-
-  if(u.isFunction(filters[req.from])){
-    return filters[req.from](req);
-  }
-
-  req.src = z.config.root + filters[req.from].src + '.' + ext;
-  return req;
-
-});
-
-/**
- * Get a src from a request.
- */
-z.filter('all', 'src', function(req){
-
-  if(req.src){
-    return req;
-  }
-
-  if(!req.options.ext) {
-    var loader = z.loader( (req.options.type || 'script') );
-    req.options.ext = loader.options.ext;
-  }
-
-  var name = (req.fromAlias || req.from)
-    , ext = req.options.ext
-    , src = name.replace(/\./g, '/');
-
-  src = z.config.root + src + '.' + ext;
-  src = src.trim();
-
-  req.src = src;
-  return req;
-
-});
-
-/**
- * Method filter
- *
- * @param {Object} req
- */
-z.filter('ajax', 'method', function(req){
-  if(req.method){
-    return req;
-  }
-  if(req.options.method){
-    req.method = req.options.method;
-    delete req.options.method;
-    return req;
-  }
-  var loader = z.loader( (req.options.type || 'ajax') );
-  req.method = loader.options.method.toLowerCase();
-  return req;
-});
-
-
-/**
- * ----------------------------------------------------------------------
- * Loader
- *
- * The Loader is ultimately responsable for loading scripts, files, etc.
- * Use the API to register new loaders and filters.
- */
-
-/**
- * Create a new Loader.
- * The setup object is where you define how the loader should function:
- * see the API under the class for more on how to set up Loaders.
- *
- * @param {Object} setup
- */
-var Loader = function(setup){
-  this._queue = {};
-  setup = (setup || {});
-
-  this._filters = (setup.filters || false);
-  this.options = u.defaults(this.options, setup.options);
-  this._method = (setup.method || z.Script);
-  this._handler = (setup.handler || function(req, res, next, error){
-    next(res);
-  });
-  this._build = (setup.build || false);
+  return cur;  
 }
 
-/**
- * Default options.
- *
- * @var {Object}
+/* 
+ * ----------------
+ * Instance Methods
+ * ----------------
  */
-Loader.prototype.options = {
-  ext: 'js'
-}
 
 /**
- * Run the request through requested scopes.
+ * Import a namespace
  *
- * @param {Object} req
+ * @param {String} namespace
+ * @return {z}
  */
-Loader.prototype.prefilter = function(req){
-  var self = this;
-  if(!this._filters){
-    return req;
-  }
-  u.each(this._filters, function(scope, index){
-      req = z.runFilters(scope, req);
-  });
-  return req;
-}
-
-/**
- * Register a method
- *
- * @param {Class} method
- */
-Loader.prototype.method = function(method){
-  this._method = method;
+z.prototype.import = function ( namespace ) {
+  this._dependencies.push(namespace);
   return this;
 }
 
 /**
- * Run filters in another scope
+ * Define this namespace when all dependencies are ready.
  *
- * @param {String | Array} name
+ * @param {Function} factory
+ * @return {z}
  */
-Loader.prototype.filters = function(name){
-  if(!name){
-    return;
-  }
-  if(u.isArray(name)){
-    this._filters.concat(name);
-    return;
-  }
-  this._filters.push(name);
-  return this;
-}
-
-/**
- * Register handler.
- * Callbacks should have the args 'req', 'res', 'next' and 'error'
- *
- * @param {Function | Array} cb
- */
-Loader.prototype.handler = function(cb){
-  if(!cb){
-    return this;
-  }
-  this._handler = cb;
-  return this;
-}
-
-/**
- * A callback to run when in server mode
- */
-Loader.prototype.build = function(cb){
-  if(!cb){
-    return this;
-  }
-  this._build = cb;
-  return this;
-}
-
-/**
- * Check the queue to see if an url is loading.
- *
- * @param {String} url
- */
-Loader.prototype.has = function(src){
-  return this._queue.hasOwnProperty(src);
-}
-
-/**
- * Load a request.
- *
- * @param {Object} req
- * @param {Function} next
- * @param {Function} error
- * @param {Function} builder
- */
-Loader.prototype.load = function(req, onDone, onRejected){
-  var self = this;
-  // req = this.prefilter(req);
-  if(!this.has(req.src)){
-    this._queue[req.src] = new this._method(req);
-  }
-  this._queue[req.src].done(function(res){
-    self._handler(req, res, onDone, onRejected);
-    if(z.config.env !== 'browser' && self._build){
-      z.loader.build(req, res, self);
-    }
-  }, onRejected);
-  return this;
-}
-
-/**
- * ----------------------------------------------------------------------
- * Loader API
- */
-
-/**
- * Holds all registered loaders.
- *
- * @var {Object}
- * @api private
- */
-var _loaders = {};
-
-/**
- * z Loader API
- * 
- * @param {String} name If this is the only arg passed, 
- *   the method will try to return a loader or will create
- *   a new one.
- * @param {Object} setup (optional) If you pass an arg here,
- *   a new loader will be created EVEN if one already exists
- *   for the provided name.
- * @return {Loader}
- */
-z.loader = function(name, setup){
-  if(arguments.length <= 1){
-    if(_loaders.hasOwnProperty(name)){
-      return _loaders[name];
-    }
-    return false;
-  }
-
-  _loaders[name] = new Loader(setup);
-  return _loaders[name];
-}
-
-/**
- * A hook to allow the builder to interact with the loader.
- */
-z.loader.build = function(req, res, loader){
-  // no-op -- defined in Build.js
-}
-
-
-/**
- * ----------------------------------------------------------------------
- * Default loaders
- */
-
-/**
- * Script loader
- */
-z.loader('script', {
-  method: z.Script,
-  handler: function(req, res, next, error){
-    z.ensureModule(req.from);
-    next();
-  },
-  options: {
-    ext: 'js'
-  }
-});
-
-/**
- * Ajax loader
- */
-z.loader('ajax', {
-  method: z.Ajax,
-  filters: ['ajax'],
-  handler: function(req, res, next, error){
-    z(req.from, function(){ return res; }).done(next, error);
-  },
-  options: {
-    ext: 'js',
-    method: 'GET'
-  }
-});
-
-
-/**
- * ----------------------------------------------------------------------
- * z.Module
- *
- * The core of z.
- * 
- * This class will never be called directly -- instead, use z's constructor to
- * add and retrieve modules.
- *
- * @example:
- *
- *  z('foo.bar').
- *  imports('foo.bin', ['Bar @ Foo', 'Bin']).
- *  imports('foo.baz', 'Bar').
- *  exports(function(__){
- *    // code
- *  });
- */
-
-/**
- * Module states
- *
- * @const {Object}
- * @api private
- */
-var MODULE_STATE = {
-  PENDING: 0,
-  LOADED: 1,
-  ENABLED: 2,
-  FAILED: -1
-};
-
-/**
- * Regexp to get a module alias as the last item in a module name
- * @example
- *   'app.foo.bar' -> 'bar'
- *
- * @const {RegExp}
- * @api private
- */
- var MODULE_ALIAS = /\.([\w]+?)$|([\w]+?)$/;
-
-/**
- * Get an alias defined by a user.
- * @example
- *   'app.foo.bar @baz' -> 'baz'
- *
- * @const {RegExp}
- * @api private
- */
-var MODULE_USER_ALIAS = /\s?([\S]+?)\s?\@\s?([\S]+?)\s?$/;
-
-/**
- * Get a module type/plugin
- * @example
- *   'ajax!app.foo.bin' -> type:'ajax'
- * 
- * @const {RegExp}
- * @api private
- */
-var MODULE_TYPE = /([\S^\!]+?)\!/;
-
-/**
- * The module constructor.
- */
-var Module = z.Module = function(){
-  this._deps = [];
-  this._state = MODULE_STATE.PENDING;
-  this._factory = null;
-  this._definition = null;
-  this._onReady = [];
-  this._onFailed = [];
-}
-
-/**
- * Check the module's definition and return requested item(s)
- *
- * @param {String | Array} items 
- *   An item or items that you want from this module.
- *   Passing a string will always return a single item, an array returns an object.
- *   You can alias items with '@'. For example:
- *     z('myModule').get(['foo @ bar', 'baz']);
- *   This will return an object where 'bar' will alias 'foo'. Note that if you
- *   pass a string the alias will be ignored.
- * @return {Object | Mixed}
- */
-Module.prototype.use = function(items){
-  if(!this.isEnabled()){
-    return false;
-  }
-
-  var self = this
-    , single = false
-    , ctx = {};
-
-  if(!items){
-    return this._definition;
-  }
-
-  if(!u.isArray(items)){
-    single = true;
-    items = [items];
-  }
-
-  u.each(items, function(item){
-    var alias = item
-      , name = item;
-    if(MODULE_USER_ALIAS.test(item)){
-      item.replace(MODULE_USER_ALIAS, function(match, actual, replace, index){
-        name = actual;
-        alias = replace;
-        return match;
-      });
-    }
-    if(self._definition.hasOwnProperty(name)){
-      if(single){
-        ctx = self._definition[name];
-      } else {
-        ctx[alias] = self._definition[name];
-      }
-    }
-  });
-
-  return ctx;
-}
-
-/**
- * Import modules.
- *
- * @param {String} from The name of a module, using period-delimited
- *   syntax. A loader will map this name to an url later. If this is the
- *   only arg provided (or [uses] indicates you want the entire module:
- *   see below) this module will be available, by default, using the last
- *   segment of the name.
- *      imports('foo.bar') ... -> imports as 'bar'
- *   Alternately, you can alias the name with '@'.
- *      imports('foo.bar @foo') ... -> imports as 'foo'
- *   If [uses] is defined, then the alias will be ignored.
- * @param {String | Array | Boolean} uses Specific item or items you want
- *   from the module. 
- *      imports('foo.bar', 'Bin') ... -> imports Bin from foo.bar
- *      imports('foo.bar', ['Bin', 'Ban']) ... -> imports Bin and Ban from foo.bar.
- *   Passing '*', 'false' or leaving this arg undefined will return the entire module.
- *      imports('foo.bar', '*') ... -> imports as 'bar' 
- *   Items requested here can be also be aliased using '@'.
- *      imports('foo.bar', ['Bin @ foo', 'Ban']) ... -> imports Bin (as 'foo') and Ban from foo.bar.
- * @param {Object} options Allows you to further modify the import request. A common
- *    example will be to use a plugin.
- *      imports('foo.bar', '*', {type:'ajax', ext:'txt'}) ... -> Import a txt file
- * @return {this}
- */
-Module.prototype.imports = function(from, uses, options){
-
-  this.isPending(true);
-
-  var alias
-    , match
-    , type = 'script';
-
-  if(MODULE_TYPE.test(from)){
-    match = from.match(MODULE_TYPE);
-    type = match[1];
-    from = from.replace(type + '!', "");
-  }
-
-  if(MODULE_USER_ALIAS.test(from)){
-    match = from.match(MODULE_USER_ALIAS);
-    from = match[1].trim();
-    alias = match[2].trim();
-  } else {
-    match = from.match(MODULE_ALIAS);
-    alias = (match[1])
-      ? match[1].trim()
-      : match[2].trim();
-  }
-
-  uses = (!uses || '*' === uses)
-    ? false 
-    : (!u.isArray(uses))
-      ? [uses] 
-      : uses;
-
-  options = u.defaults({type:type}, options);
-
-  var dep = {
-    from: from,
-    alias: alias,
-    uses: uses,
-    options: options
-  };
-
-  this._deps.push(dep);
-
-  return this;
-}
-
-/**
- * Define module exports.
- *
- * @param {String} name (optional) If a name is passed, then [factory]
- *   will define [name] in the module definition.
- * @param {Function} factory A callback to define the module (or
- *   module component, if [name] is passed).
- * @example:
- *   TODO
- * @return {this}
- */
-Module.prototype.exports = function(name, factory){
-
+z.prototype.export = function ( factory ) {
   var self = this;
 
-  if(arguments.length <= 1){
-    factory = name;
-    name = false;
-  }
+  this._factory = factory;
 
-  if(!name){
-    this._factory = factory;
-  } else {
-    if(null === this._factory) this._factory = {};
-    this._factory[name] = factory;
-  }
-
-  u.async(function(){
+  nextTick(function(){
     self.enable();
   });
-
   return this;
 }
 
 /**
- * Enable the module.
+ * Enable this module.
  *
- * @param {Function} next (optional)
- * @parma {Function} error (optional)
+ * @return {z}
  */
-Module.prototype.enable = function(next, error){
-  this.done(next, error);
+z.prototype.enable = function () {
 
   if(this.isPending()){
-    _import.call(this);
+    this.getDependencies();
     return this;
   }
 
   if(this.isLoaded()){
-    _define.call(this);
+    this._define();
     return this;
   }
 
   if(this.isFailed()){
-    // dispatch the failed queue.
-    _dispatch.call(this, this._onFailed, this);
+    this._dispatch(this._onFailed);
     this._onFailed = [];
     return this;
   }
 
   if(this.isEnabled()){
-    // Dispatch the done queue.
-    _dispatch.call(this, this._onReady, this);
+    this._dispatch(this._onReady);
     this._onReady = [];
   }
 
@@ -1640,64 +372,158 @@ Module.prototype.enable = function(next, error){
 }
 
 /**
- * Disable the module
- *
- * @param {Function} error
- */
-Module.prototype.disable = function(error){
-  this.isFailed(true);
-  return this.enable();
-}
-
-/**
- * Callbacks to fire once the module has loaded all dependencies. 
- * If called on a enabled module, the callback will be fired immediately.
+ * Callbacks to run when the module has finished loading dependencies
  *
  * @param {Function} onReady
  * @param {Function} onFailed
+ * @return {z}
  */
-Module.prototype.done = function(onReady, onFailed){
+z.prototype.done = function ( onReady, onFailed ) {
   var self = this;
-  u.async(function(){
-    if(onReady && u.isFunction(onReady)){
+  nextTick(function(){
+    if(onReady && ( "function" === typeof onReady)){
       (self.isEnabled())
         ? onReady.call(self)
         : self._onReady.push(onReady);
     }
-    if(onFailed && u.isFunction(onFailed)){
+    if(onFailed && ( "function" === typeof onFailed)){
       (self.isFailed())
         ? onFailed.call(self)
         : self._onFailed.push(onFailed);
     }
-    return this;
   });
+  return this;
 }
 
 /**
- * Shortcut for Module#done(undefined, onFailed)
+ * Callbacks to run on an error.
+ * Alias for z.prototype.done(null, {Function})
  *
  * @param {Function} onFailed
+ * @return {z}
  */
-Module.prototype.fail = function(onFailed){
-  return this.done(undef, onFailed);
+z.prototype.catch = function ( onFailed ) {
+  this.done(null, onFailed);
+  return this;
 }
 
 /**
- * Set up methods for checking the module state.
+ * Mark this module as failed.
+ *
+ * @param {String} reason
+ * @throws {Error}
+ * @return {z}
  */
-u.each(['Enabled', 'Loaded', 'Pending', 'Failed'], function(state){
-  var modState = MODULE_STATE[state.toUpperCase()];
-  /**
-   * Check module state.
-   *
-   * @param {Boolean} state If true, will set the state.
-   * @return {Boolean}
-   */
-  Module.prototype['is' + state] = function(set){
-    if(set) this._state = modState;
-    return this._state === modState;
-  } 
-});
+z.prototype.disable = function ( reason ) {
+  this.isFailed(true);
+  this.catch(function(){
+    nextTick(function(){
+      throw Error(reason);
+    })
+  });
+  return this.enable();
+}
+
+/**
+ * Iterate through deps and load them.
+ *
+ * @return {z}
+ */
+z.prototype.getDependencies = function () {
+  var queue = []
+    , self = this
+    , len = this._dependencies.length;
+
+  each(this._dependencies, function(item){
+    if (!z.namespaceExists(item)) queue.push(item);
+  });
+
+  len = queue.length;
+  var remaining = len;
+
+  if(len > 0){
+    each(queue, function(item){
+      z.global.MODULE_LOADER(item, function(){
+        remaining -= 1;
+        if(remaining <=0 ){
+          self.isLoaded(true);
+          self.enable();
+        }
+      }, function(reason){
+        self.disable('Could not load dependency: ' + item);
+      });
+    });
+  } else {
+    this.isLoaded(true);
+    this.enable();
+  }
+
+  return this;
+}
+
+/**
+ * Run the factory, making sure dependncies have been enabled.
+ *
+ * @api private
+ */
+z.prototype._define = function () {
+  var state = true
+    , self = this;
+
+  // Make sure each of the deps has been enabled. If any need to be enabled, 
+  // stop loading and enable them.
+  each(this._dependencies, function ensureDependency ( namespace ) {
+    if(!state){
+      return;
+    }
+
+    if(!z.env.modules.hasOwnProperty(namespace)){
+      self.disable('A dependency was not loaded: '+ namespace);
+      state = false;
+      return;
+    }
+
+    var current = z.env.modules[namespace];
+
+    if(current.isFailed()){
+      self.disable('A dependency failed: '+ namespace);
+      state = false;
+      return;
+    }
+
+    if(!current.isEnabled()){
+      current.enable().done(function enableWhenReady () {
+        self.enable();
+      });
+      state = false;
+      return;
+    }
+  });
+
+  if(!state){
+    return;
+  }
+
+  if(!this._factory){
+    this.disable('No factory defined: ' + this._namespaceString);
+  }
+
+  if(z.env.environment !== 'node'){
+    this._factory.call(this._namespace);
+  } else {
+    this._factory = this._factory.toString();
+  }
+
+  // If 'exports' is defined, make that the base export of the current namespace.
+  if(this._namespace.hasOwnProperty('exports')){
+    var exports = this._namespace.exports;
+    z.createNamespace(this._namespaceString, exports);
+    this._namespace = z.getObjectByName(this._namespaceString);
+  }
+
+  this.isEnabled(true);
+  this.enable();
+}
 
 /**
  * Helper to dispatch a function queue.
@@ -1706,212 +532,107 @@ u.each(['Enabled', 'Loaded', 'Pending', 'Failed'], function(state){
  * @param {Object} ctx
  * @api private
  */
-var _dispatch = function(fns, ctx){
-  u.each(fns, function(fn){
-    fn.call(ctx);
-  });
+z.prototype._dispatch = function(fns, ctx){
+  ctx = ctx || this;
+  each(fns, function(fn){ fn.call(ctx); });
 }
 
 /**
- * Import a module's deps.
- *
- * @api private
+ * Set up methods for checking the module state.
  */
-var _import = function(){
-  var queue = []
-    , self = this;
+each(['Enabled', 'Loaded', 'Pending', 'Failed'], function ( state ) {
+  var modState = z.env.MODULE_STATE[state.toUpperCase()];
+  /**
+   * Check module state.
+   *
+   * @param {Boolean} state If true, will set the state.
+   * @return {Boolean}
+   */
+  z.prototype['is' + state] = function(set){
+    if(set) this._state = modState;
+    return this._state === modState;
+  } 
+});
 
-  u.each(this._deps, function(item){
-    if(false === z.has(item.from)){
-      queue.push(item);
+/* 
+ * -------
+ * Globals
+ * -------
+ */
+
+/**
+ * The default loader and associated handlers.
+ */
+if(!z.global.MODULE_LOADER){
+  z.global.MODULE_LOADER = function ( namespace, next, error ) {
+    var src = z.getMappedPath(namespace)
+      , node = document.createElement('script')
+      , head = document.getElementsByTagName('head')[0];
+
+    if(!src){
+      src = namespace.replace(/\./g, '/') + '.js';
     }
-  });
 
-  var remaining = queue.length;
+    src = z.env.root + src;
 
-  if(remaining > 0){
-    
-    u.each(queue, function importItem(item, index){
+    node.type = 'text/javascript';
+    node.charset = 'utf-8';
+    node.async = true;
+    node.setAttribute('data-namespace', namespace);
 
-      // @TODO: I think this filters thing is a bit much.
-      // Work on removing them.
-      item = z.runFilters('all', item);
-
-      var type = (item.options.type || 'script')
-        , loader = z.loader(type);
-
-      loader.load(item, function(){
-        remaining -= 1;
-        if(remaining <=0 ){
-          self.isLoaded(true);
-          self.enable();
-        }
-      }, function(e){
-        self.disable();
-        throw e;
-      });
-
+    z.global.MODULE_ON_LOAD_EVENT(node, function ( node ) {
+      next();
+    }, function(e){
+      error(e);
     });
 
-  } else {
-    this.isLoaded(true);
-    this.enable();
-  }
-}
-
-/**
- * Define a module (that is, run its factory)
- *
- * @api private
- */
-var _define = function(){
-  var context = {}
-    , self = this;
-
-  // Make sure each of the deps has been enabled. If any need to be enabled, stop loading and
-  // enable them.
-  u.each(this._deps, function collectDependency(dep){
-
-    if(!context){
-      return;
-    }
-
-    if(!z.has(dep.from)){
-      throw new Error('A dependency is not in the registry: '+ dep.from);
-      self.disable();
-      return true;
-    }
-
-    var current = z(dep.from)
-      , currentContext = {};
-
-    if(current.isFailed()){
-      self.disable();
-      throw new Error('A dependency failed: '+ dep.from);
-      context = false;
-      return true;
-    }
-
-    if(!current.isEnabled()){
-      current.enable().done(function enableDependency(){
-        self.enable();
-      });
-      context = false;
-      return true;
-    }
-
-    if(dep.uses){
-      currentContext = current.use(dep.uses);
-    } else {
-      currentContext[dep.alias] = current.use();
-    }
-
-    context = u.extend(context, currentContext);
-  });
-
-  if(!context){
-    return;
+    node.src = src;
+    head.appendChild(node);
   }
 
-  try {
-    if(z.config.env !== 'server'){
-      if(u.isFunction(this._factory)){
-        this._definition = this._factory(context);
-      } else if(u.isObject(this._factory)) {
-        this._definition = {};
-        u.each(this._factory, function(item, key){
-          if(u.isFunction(item)){
-            self._definition[key] = item(context)
-          } else {
-            self._definition[key] = item;
+  z.global.MODULE_ON_LOAD_EVENT = (function () {
+    var testNode = document.createElement('script')
+      , loader = null;
+
+    if (testNode.attachEvent){
+      loader = function(node, next, err){
+        node.attachEvent('onreadystatechange', function () {
+          if(node.readyState === 'complete'){
+            next(node);
           }
-        })
-      } else {
-        this._definition = this._factory;
+        });
+        // Can't handle errors with old browsers.
       }
     } else {
-      // If we're in a node.js env we don't want to execute the factory.
-      this._definition = true;
+      loader = function(node, next, err){
+        node.addEventListener('load', function ( e ) {
+          next(node);
+        }, false);
+        node.addEventListener('error', function ( e ) {
+          err(e);
+        }, false);
+      }
     }
-  } catch(e) {
-    this.disable();
-    throw e;
-    return;
-  }
-  this.isEnabled(true);
-  this.enable();
+
+    return loader;
+  })();
 }
 
 /**
- * Module API in src/core.js
- 
-
-
-/**
- * Provides AMD compatability. Use exactly as you would with any other 
- * AMD system. This also allows z to import AMD modules natively.
- *
- * @param {String} name (optional)
- * @param {Array} reqs
- * @param {Fnction} factory
+ * `z` is aliased as `module` to allow for more readable code.
+ * Run z.noConflict() to return `module` to its original owner.
  */
-root.define= function(name, reqs, factory){
+var _lastModule = z.global.module;
+z.global.module = z;
 
-  if(2 === arguments.length){
-    factory = reqs;
-    reqs = name;
-    name = undefined;
-    if(!u.isArray(reqs)){
-      name = reqs;
-      reqs = [];
-    }
-  }
-
-  if(1 === arguments.length){
-    factory = name;
-    reqs = [];
-    name = undefined;
-  }
-
-  var mod = z(name);
-
-  u.each(reqs, function(req){
-    mod.imports(req.split('/').join('.'));
-  });
-
-  mod.exports(function(__){
-    var args = [];
-    for(var dep in __){
-      args.push(__[dep]);
-    }
-
-    var noConflictExports = root.exports // save the exports func.
-      , noConflictModule = root.module
-      , result;
-
-    root.exports = {}; // Allows the use of exports.
-    root.module = {}; // Allows the use of module.exports
-    result = factory.apply(this, args);
-
-    if(false === u.isEmpty(root.exports)){
-      result = root.exports;
-    }
-
-    if(root.module.exports){
-      result = root.module.exports;
-    }
-
-    root.exports = noConflictExports;
-    root.module = noConflictModule;
-
-    return result;
-  });
-
+/**
+ * Return `module` to its original owner.
+ */
+z.noConflict = function () {
+  z.global.module = _lastModule;
 }
 
-root.define.amd = {
-  jQuery: true
-}
-
+// Return z.
+global.z = global.z || z;
 
 }));

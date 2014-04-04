@@ -138,7 +138,7 @@ var each = function (obj, callback, context) {
  */
 var z = function (name, factory) {
   if( !(this instanceof z) ){
-    return new z(name);
+    return new z(name, factory);
   }
 
   // Raise an error if a namespace is redefined
@@ -168,7 +168,7 @@ var z = function (name, factory) {
 
   if(factory && ('function' === typeof factory) ){
     if(factory.length < 2){
-      this._factory = factory;
+      this.export(factory);
     } else {
       factory.call(this);
     }
@@ -215,6 +215,14 @@ z.namespaceExists = function ( namespace ) {
 
 /**
  * Map imports to a given path.
+ * @example
+ *    z.map('lib/foo.js', ['foo.bar', 'foo.bin']);
+ *
+ * You can also map a file to a base namespace
+ * @example
+ *    z.map('lib/foo.js', ['foo.*']);
+ *    // The following will now load lib/foo.js:
+ *    z('myModule').import('foo.bar').export(function(){ });
  *
  * @param {String} path Should be a fully-qualified path.
  * @param {Array} provides A list of modules this path provides.
@@ -223,7 +231,7 @@ z.map = function ( path, provides ) {
   if(!z.env.map[path]){
     z.env.map[path] = [];
   }
-  z.env.map[path].concat(provides);
+  z.env.map[path] = z.env.map[path].concat(provides);
 }
 
 /**
@@ -233,7 +241,18 @@ z.map = function ( path, provides ) {
  * @return {String | Bool}
  */
 z.getMappedPath = function ( namespace ) {
-  var mappedPath = false;
+  var mappedPath = false
+    , base = namespace.substring(0, namespace.lastIndexOf('.') ) + '.*';
+
+  // Check for base paths first.
+  each(z.env.map, function(map, path){
+    if(map.indexOf(base) > -1){
+      mappedPath = path;
+    }
+  });
+
+  if(mappedPath) return mappedPath;
+
   each(z.env.map, function(map, path){
     if(map.indexOf(namespace) > -1){
       mappedPath = path;
@@ -425,7 +444,6 @@ z.prototype.getDependencies = function () {
       z.global.MODULE_LOADER(item, function(){
         remaining -= 1;
         if(remaining <=0 ){
-          console.log('Loaded: ', self._namespaceString);
           self.isLoaded(true);
           self.enable();
         }
@@ -473,7 +491,6 @@ z.prototype._define = function () {
 
     if(!current.isEnabled()){
       current.enable().done(function enableWhenReady () {
-        console.log('Enabling: ', self._namespaceString);
         self.enable();
       });
       state = false;
@@ -501,8 +518,6 @@ z.prototype._define = function () {
     z.createNamespace(this._namespaceString, exports);
     this._namespace = z.getObjectByName(this._namespaceString);
   }
-
-  console.log(this._namespace);
 
   this.isEnabled(true);
   this.enable();

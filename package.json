@@ -21,13 +21,16 @@
     "qunitjs": "~1.13.0",
     "grunt": "~0.4.2",
     "grunt-contrib-uglify": "~0.3.1",
-    "grunt-contrib-concat": "~0.3.0"
+    "mocha": "~1.18.2",
+    "grunt-mocha-test": "~0.10.0",
+    "grunt-contrib-copy": "~0.5.0"
   },
   "bin": {
     "zjs": "./bin/zjs"
   },
   "dependencies": {
     "commander": "~2.1.0",
-    "uglify-js": "~2.4.12"
+    "uglify-js": "~2.4.12",
+    "lodash": "~2.4.1"
   }
 }
