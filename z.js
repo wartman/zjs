@@ -170,7 +170,7 @@ var z = function (name, factory) {
     if(factory.length < 2){
       this.export(factory);
     } else {
-      factory.call(this);
+      factory(this.import.bind(this), this.export.bind(this));
     }
   }
 }
