@@ -1,67 +1,32 @@
 (function(){
   
-  module('z module');
+  module('z mini');
 
-  test('Module alias', function(){
+  test('Get a dep', function(){
 
-    var TestModule = new z.Module();
+    stop();
 
-    TestModule.imports('foo.app.bar');
-
-    deepEqual(TestModule._deps[0], {
-      from: 'foo.app.bar',
-      alias: 'bar',
-      uses: false,
-      options: {
-        type: 'script'
-      }
-    }, 'Parsed dep object correctly.');
-
-    TestModule.imports('foo');
-
-    deepEqual(TestModule._deps[1], {
-      from: 'foo',
-      alias: 'foo',
-      uses: false,
-      options: {
-        type: 'script'
-      }
-    }, 'Parsed dep object correctly if no dots.');
+    z('moduleTest.exports').
+    import('resources.exports').
+    export(function(){
+      start();
+      equal(resources.exports.Foo, 'Foo', 'Modules imported');
+    });
 
   });
 
-  test('Module user-defined alias', function(){
+  // test('Stress test', function(){
 
-    var TestModule = new z.Module();
+  //   stop();
 
-    TestModule.imports('foo.app.bar @baz');
+  //   z('moduleTest.stress').
+  //   import('resources.mini.stress_one').
+  //   import('resources.mini.stress_two').
+  //   import('resources.mini.stress_three').
+  //   export(function(){
 
-    deepEqual(TestModule._deps[0], {
-      from: 'foo.app.bar',
-      alias: 'baz',
-      uses: false,
-      options: {
-        type: 'script'
-      }
-    }, 'Parsed dep object correctly.');
+  //   });
 
-  });
-
-  test('Module type', function(){
-
-    var TestModule = new z.Module();
-
-    TestModule.imports('ajax!foo.app.bar');
-
-    deepEqual(TestModule._deps[0], {
-      from: 'foo.app.bar',
-      alias: 'bar',
-      uses: false,
-      options: {
-        type: 'ajax'
-      }
-    }, 'Parsed dep object correctly.');
-
-  })
+  // });
 
 })();
