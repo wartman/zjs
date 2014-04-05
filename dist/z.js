@@ -6,7 +6,7 @@
  * Copyright 2014
  * Released under the MIT license
  *
- * Date: 2014-04-04T21:20Z
+ * Date: 2014-04-05T01:15Z
  */
 
 (function(global, factory){
@@ -172,7 +172,7 @@ var z = function (name, factory) {
     if(factory.length < 2){
       this.export(factory);
     } else {
-      factory.call(this);
+      factory(this.import.bind(this), this.export.bind(this));
     }
   }
 }
@@ -190,6 +190,7 @@ z.env = {
   namespaces: {},
   root: '',
   map: {},
+  shim: {},
   modules: {},
   environment: 'browser',
   MODULE_STATE: {
@@ -211,7 +212,7 @@ z.global = global;
  * @param {String} namespace
  */
 z.namespaceExists = function ( namespace ) {
-  return !z.env.namespaces[namespace] 
+  return !z.env.namespaces[namespace]
     && z.env.namespaces[namespace] !== undefined;
 }
 
@@ -234,6 +235,21 @@ z.map = function ( path, provides ) {
     z.env.map[path] = [];
   }
   z.env.map[path] = z.env.map[path].concat(provides);
+}
+
+/**
+ * Shim a module. This will work with any module that returns
+ * something in the global scope.
+ *
+ * @param {String} namespace
+ * @param {Object} options
+ */
+z.shim = function ( namespace, options ){
+  options = options || {}; 
+  if (options.map) {
+    z.map(options.map, [namespace]);
+  }
+  z.env.shim[namespace] = options;
 }
 
 /**
@@ -353,7 +369,7 @@ z.prototype.enable = function () {
   }
 
   if(this.isLoaded()){
-    this._define();
+    this.runFactory();
     return this;
   }
 
@@ -435,13 +451,14 @@ z.prototype.getDependencies = function () {
     , len = this._dependencies.length;
 
   each(this._dependencies, function(item){
-    if (!z.namespaceExists(item)) queue.push(item);
+    if (null === z.getObjectByName(item)) queue.push(item);
   });
 
   len = queue.length;
   var remaining = len;
 
   if(len > 0){
+
     each(queue, function(item){
       z.global.MODULE_LOADER(item, function(){
         remaining -= 1;
@@ -466,7 +483,7 @@ z.prototype.getDependencies = function () {
  *
  * @api private
  */
-z.prototype._define = function () {
+z.prototype.runFactory = function () {
   var state = true
     , self = this;
 
@@ -477,7 +494,12 @@ z.prototype._define = function () {
       return;
     }
 
-    if(!z.env.modules.hasOwnProperty(namespace)){
+    if ( z.env.shim.hasOwnProperty(namespace) ) {
+      z.env.namespaces[namespace] = true;
+      return;
+    }
+
+    if ( !z.env.modules.hasOwnProperty(namespace) ) {
       self.disable('A dependency was not loaded: '+ namespace);
       state = false;
       return;
@@ -564,10 +586,11 @@ each(['Enabled', 'Loaded', 'Pending', 'Failed'], function ( state ) {
  * The default loader and associated handlers.
  */
 if(!z.global.MODULE_LOADER){
+
+  var visited = {};
+
   z.global.MODULE_LOADER = function ( namespace, next, error ) {
-    var src = z.getMappedPath(namespace)
-      , node = document.createElement('script')
-      , head = document.getElementsByTagName('head')[0];
+    var src = z.getMappedPath(namespace);
 
     if(!src){
       src = namespace.replace(/\./g, '/') + '.js';
@@ -575,47 +598,82 @@ if(!z.global.MODULE_LOADER){
 
     src = z.env.root + src;
 
+    if(visited.hasOwnProperty(src)){
+      visited[src].done(next, error);
+      return;
+    }
+
+    var node = document.createElement('script')
+      , head = document.getElementsByTagName('head')[0];
+
     node.type = 'text/javascript';
     node.charset = 'utf-8';
     node.async = true;
     node.setAttribute('data-namespace', namespace);
 
-    z.global.MODULE_ON_LOAD_EVENT(node, function ( node ) {
-      next();
-    }, function(e){
-      error(e);
-    });
+    visited[src] = new moduleHandler();
+
+    visited[src].attachEvent(node, next, error);
 
     node.src = src;
     head.appendChild(node);
   }
 
-  z.global.MODULE_ON_LOAD_EVENT = (function () {
+  // This is a mess, even if it works. Kinda need the resolver again :P
+  // That, or a better 'onDone' system that can be used all over. Make a helper,
+  // something like 'queue.onDone(item, onDone, onFailed);' that binds the callbacks to 'item',
+  // then run with 'queue.dispatch(item, 'onDone');' and check with 'queue.isQueued(item)'
+  var moduleHandler = function(){
+    this._onReady = [];
+    this._onFailed = [];
+    this._state = 0;
+  }
+  moduleHandler.prototype.attachEvent = (function (){
     var testNode = document.createElement('script')
-      , loader = null;
-
     if (testNode.attachEvent){
-      loader = function(node, next, err){
+      return function(node, next, err){
+        var self = this;
+        this.done(next, err);
         node.attachEvent('onreadystatechange', function () {
           if(node.readyState === 'complete'){
-            next(node);
+            self.dispatch(self._onReady);
           }
         });
         // Can't handle errors with old browsers.
       }
-    } else {
-      loader = function(node, next, err){
-        node.addEventListener('load', function ( e ) {
-          next(node);
-        }, false);
-        node.addEventListener('error', function ( e ) {
-          err(e);
-        }, false);
-      }
     }
-
-    return loader;
+    return function(node, next, err){
+      var self = this;
+      this.done(next, err);
+      node.addEventListener('load', function ( e ) {
+        self.dispatch(self._onReady);
+      }, false);
+      node.addEventListener('error', function ( e ) {
+        self.dispatch(self._onFailed);
+      }, false);
+    }
   })();
+  moduleHandler.prototype.done = function(onReady, onFailed){
+    var self = this;
+    nextTick(function(){
+      if(onReady && ( "function" === typeof onReady)){
+        (self._state === 1)
+          ? onReady.call(self)
+          : self._onReady.push(onReady);
+      }
+      if(onFailed && ( "function" === typeof onFailed)){
+        (self._state === -1)
+          ? onFailed.call(self)
+          : self._onFailed.push(onFailed);
+      }
+    });
+    return this;
+  }
+  moduleHandler.prototype.dispatch = function(fns){
+    each(fns, function(fn){
+      fn();
+    });
+  }
 }
 
 /**
