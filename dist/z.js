@@ -6,7 +6,7 @@
  * Copyright 2014
  * Released under the MIT license
  *
- * Date: 2014-04-05T01:15Z
+ * Date: 2014-04-05T02:52Z
  */
 
 (function(global, factory){
@@ -124,6 +124,43 @@ var each = function (obj, callback, context) {
   return obj;
 }
 
+/**
+ * A super stripped down promise-like thing.
+ */
+var wait = function(){
+  this._state = 0;
+  this._onReady = [];
+  this._onFailed = [];
+}
+wait.prototype.done = function(onReady, onFailed){
+  var self = this;
+  nextTick(function(){
+    if(onReady && ( "function" === typeof onReady)){
+      (self._state === 1)
+        ? onReady.call(self)
+        : self._onReady.push(onReady);
+    }
+    if(onFailed && ( "function" === typeof onFailed)){
+      (self._state === -1)
+        ? onFailed.call(self)
+        : self._onFailed.push(onFailed);
+    }
+  });
+  return this;
+}
+wait.prototype.resolve = function(ctx){
+  this._state = 1;
+  ctx = (ctx || this);
+  each(this._onReady, function(fn){ fn.call( ctx, Array.prototype.slice.call(arguments, 1) ); });
+  this._onReady = [];
+}
+wait.prototype.reject = function(ctx){
+  this._state = -1;
+  ctx = (ctx || this);
+  each(this._onFailed, function(fn){ fn.call( ctx, Array.prototype.slice.call(arguments, 1) ); });
+  this._onFailed = [];
+}
+
 /*
  * ---
  * API
@@ -160,13 +197,12 @@ var z = function (name, factory) {
   // Register this loader
   z.env.modules[name] = this;
 
+  this._wait = new wait();
   this._state = z.env.MODULE_STATE.PENDING;
   this._namespaceString = name;
   this._namespace = z.createNamespace(name);
   this._dependencies = [];
   this._factory = null;
-  this._onFailed = [];
-  this._onReady = [];
 
   if(factory && ('function' === typeof factory) ){
     if(factory.length < 2){
@@ -374,14 +410,12 @@ z.prototype.enable = function () {
   }
 
   if(this.isFailed()){
-    this._dispatch(this._onFailed);
-    this._onFailed = [];
+    this._wait.reject();
     return this;
   }
 
   if(this.isEnabled()){
-    this._dispatch(this._onReady);
-    this._onReady = [];
+    this._wait.resolve();
   }
 
   return this;
@@ -395,19 +429,7 @@ z.prototype.enable = function () {
  * @return {z}
  */
 z.prototype.done = function ( onReady, onFailed ) {
-  var self = this;
-  nextTick(function(){
-    if(onReady && ( "function" === typeof onReady)){
-      (self.isEnabled())
-        ? onReady.call(self)
-        : self._onReady.push(onReady);
-    }
-    if(onFailed && ( "function" === typeof onFailed)){
-      (self.isFailed())
-        ? onFailed.call(self)
-        : self._onFailed.push(onFailed);
-    }
-  });
+  this._wait.done(onReady, onFailed);
   return this;
 }
 
@@ -548,18 +570,6 @@ z.prototype.runFactory = function () {
 }
 
 /**
- * Helper to dispatch a function queue.
- *
- * @param {Array} fns
- * @param {Object} ctx
- * @api private
- */
-z.prototype._dispatch = function(fns, ctx){
-  ctx = ctx || this;
-  each(fns, function(fn){ fn.call(ctx); });
-}
-
-/**
  * Set up methods for checking the module state.
  */
 each(['Enabled', 'Loaded', 'Pending', 'Failed'], function ( state ) {
@@ -587,7 +597,30 @@ each(['Enabled', 'Loaded', 'Pending', 'Failed'], function ( state ) {
  */
 if(!z.global.MODULE_LOADER){
 
-  var visited = {};
+  var visited = {}
+    , onLoadEvent = (function (){
+        var testNode = document.createElement('script')
+        if (testNode.attachEvent){
+          return function(node, wait){
+            var self = this;
+            this.done(next, err);
+            node.attachEvent('onreadystatechange', function () {
+              if(node.readyState === 'complete'){
+                wait.resolve();
+              }
+            });
+            // Can't handle errors with old browsers.
+          }
+        }
+        return function(node, wait){
+          node.addEventListener('load', function ( e ) {
+            wait.resolve();
+          }, false);
+          node.addEventListener('error', function ( e ) {
+            wait.reject();
+          }, false);
+        }
+      })();
 
   z.global.MODULE_LOADER = function ( namespace, next, error ) {
     var src = z.getMappedPath(namespace);
@@ -611,68 +644,13 @@ if(!z.global.MODULE_LOADER){
     node.async = true;
     node.setAttribute('data-namespace', namespace);
 
-    visited[src] = new moduleHandler();
+    visited[src] = new wait();
+    visited[src].done(next, error);
 
-    visited[src].attachEvent(node, next, error);
+    onLoadEvent(node, visited[src]);
 
     node.src = src;
     head.appendChild(node);
-  }
-
-  // This is a mess, even if it works. Kinda need the resolver again :P
-  // That, or a better 'onDone' system that can be used all over. Make a helper,
-  // something like 'queue.onDone(item, onDone, onFailed);' that binds the callbacks to 'item',
-  // then run with 'queue.dispatch(item, 'onDone');' and check with 'queue.isQueued(item)'
-  var moduleHandler = function(){
-    this._onReady = [];
-    this._onFailed = [];
-    this._state = 0;
-  }
-  moduleHandler.prototype.attachEvent = (function (){
-    var testNode = document.createElement('script')
-    if (testNode.attachEvent){
-      return function(node, next, err){
-        var self = this;
-        this.done(next, err);
-        node.attachEvent('onreadystatechange', function () {
-          if(node.readyState === 'complete'){
-            self.dispatch(self._onReady);
-          }
-        });
-        // Can't handle errors with old browsers.
-      }
-    }
-    return function(node, next, err){
-      var self = this;
-      this.done(next, err);
-      node.addEventListener('load', function ( e ) {
-        self.dispatch(self._onReady);
-      }, false);
-      node.addEventListener('error', function ( e ) {
-        self.dispatch(self._onFailed);
-      }, false);
-    }
-  })();
-  moduleHandler.prototype.done = function(onReady, onFailed){
-    var self = this;
-    nextTick(function(){
-      if(onReady && ( "function" === typeof onReady)){
-        (self._state === 1)
-          ? onReady.call(self)
-          : self._onReady.push(onReady);
-      }
-      if(onFailed && ( "function" === typeof onFailed)){
-        (self._state === -1)
-          ? onFailed.call(self)
-          : self._onFailed.push(onFailed);
-      }
-    });
-    return this;
-  }
-  moduleHandler.prototype.dispatch = function(fns){
-    each(fns, function(fn){
-      fn();
-    });
   }
 }
 
