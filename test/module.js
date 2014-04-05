@@ -64,11 +64,30 @@
 
     stop();
 
-    z('moduleTest').
+    z('moduleTest.mapped').
     import('foo.mapped').
     export(function(){
       start();
       equal(foo.mapped, 'mapped', 'Module was mapped');
+    });
+
+  });
+
+  test('shim', function(){
+
+    z.shim('shim', {
+      map: 'resources/shim.js',
+      imports: false
+    });
+
+    stop();
+
+    z('moduleTest.shimmed').
+    import('shim').
+    export(function(){
+      start();
+      equal(shim, 'shimmed', 'Shimmed file loaded');
+      ok(z.env.namespaces['shim'], 'Shim namespace saved.');
     });
 
   });
