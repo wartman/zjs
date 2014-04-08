@@ -1,6 +1,6 @@
 z('foo.bin').
-import('foo.bax').
-export(function(){
+imports('foo.bax').
+exports(function(){
   this.Bax = foo.bax;
   this.Bin = "Bin";
 });

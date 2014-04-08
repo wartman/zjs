@@ -1,4 +1,4 @@
 z('resources.foo').
-export(function(){
+exports(function(){
   this.exports = "Foo";
 })

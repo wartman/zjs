@@ -7,8 +7,8 @@
     stop();
 
     z('moduleTest.exports').
-    import('resources.exports').
-    export(function(){
+    imports('resources.exports').
+    exports(function(){
       start();
       equal(resources.exports.Foo, 'Foo', 'Modules imported');
     });
@@ -20,10 +20,10 @@
     stop();
 
     z('moduleTest.stress').
-    import('resources.stress.one').
-    import('resources.stress.two').
-    import('resources.stress.three').
-    export(function(){
+    imports('resources.stress.one').
+    imports('resources.stress.two').
+    imports('resources.stress.three').
+    exports(function(){
       start();
       var stress = resources.stress;
       equal(stress.one.One, 'one');
@@ -65,8 +65,8 @@
     stop();
 
     z('moduleTest.mapped').
-    import('foo.mapped').
-    export(function(){
+    imports('foo.mapped').
+    exports(function(){
       start();
       equal(foo.mapped, 'mapped', 'Module was mapped');
     });
@@ -83,13 +83,66 @@
     stop();
 
     z('moduleTest.shimmed').
-    import('shim').
-    export(function(){
+    imports('shim').
+    exports(function(){
       start();
       equal(shim, 'shimmed', 'Shimmed file loaded');
       ok(z.env.namespaces['shim'], 'Shim namespace saved.');
     });
 
   });
+
+  test('Don\'t load modules if already defined', function () {
+
+    z('foo.bar').exports(function(){
+      this.Bin = 'Loaded Once';
+    });
+
+    stop();
+
+    z('moduleTest.loadOnce').
+    imports('foo.bar').
+    exports(function () {
+      start();
+      equal(foo.bar.Bin, 'Loaded Once', 'Didn\'t look for another module');
+    });
+
+  });
+
+  test('alertnate API', function () {
+
+    stop();
+
+    z('moduleTest.callbackApi', function (imports, exports) {
+
+      imports('resources.exports');
+
+      exports(function(){
+        start();
+        equal(resources.exports.Foo, 'Foo', 'Modules imported, alternate API works.');
+      });
+
+    });
+
+  });
+
+  test('Plugins', function () {
+    stop();
+
+    z.plugin('test', function (module, next, error) {
+      z(module).exports(function(){ this.exports = "plugin"; }).done(next);
+    });
+
+    z('moduleTest.plugin', function (imports, exports) {
+
+      imports( 'test!plugin.test' );
+      exports(function () {
+        start();
+        equal( plugin.test, 'plugin', 'Plugin ran.' );
+      })
+
+    });
+
+  })
 
 })();

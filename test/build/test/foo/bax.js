@@ -1,4 +1,4 @@
 z('foo.bax').
-export(function(){
+exports(function(){
   this.exports = "bax";
 })

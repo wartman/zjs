@@ -1,4 +1,4 @@
 z('resources.stress.two').
-export(function(){
+exports(function(){
   this.Two = "two";
 });

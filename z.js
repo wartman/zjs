@@ -186,8 +186,8 @@ var z = function (name, factory) {
 
   var namespace = name;
   while ( (namespace = namespace.substring(0, namespace.lastIndexOf('.') ) ) ) {
-    if(z.getObjectByName(namespace)){
-      break;
+    if(z.namespaceExists(namespace)){
+      continue;
     }
     z.env.namespaces[namespace] = true;
   }
@@ -200,13 +200,14 @@ var z = function (name, factory) {
   this._namespaceString = name;
   this._namespace = z.createNamespace(name);
   this._dependencies = [];
+  this._plugins = {};
   this._factory = null;
 
   if(factory && ('function' === typeof factory) ){
     if(factory.length < 2){
-      this.export(factory);
+      this.exports(factory);
     } else {
-      factory(this.import.bind(this), this.export.bind(this));
+      factory(this.imports.bind(this), this.exports.bind(this));
     }
   }
 }
@@ -226,6 +227,8 @@ z.env = {
   map: {},
   shim: {},
   modules: {},
+  plugins: {},
+  pluginPattern: /([\s\S]+?)\!/,
   environment: 'browser',
   MODULE_STATE: {
     PENDING: 0,
@@ -236,18 +239,41 @@ z.env = {
 };
 
 /**
- * A holder for the global var.
- */
-z.global = global;
-
-/**
  * Check if a namespace has been defined.
  *
  * @param {String} namespace
  */
 z.namespaceExists = function ( namespace ) {
-  return !z.env.namespaces[namespace]
-    && z.env.namespaces[namespace] !== undefined;
+  return ( z.env.namespaces.hasOwnProperty(namespace)
+    && z.env.namespaces[namespace] !== undefined );
+}
+
+/**
+ * Set a config item/items
+ *
+ * @param {String | Object} key
+ * @param {Mixed} val
+ */
+z.config = function ( key, val ) {
+  if ( "object" === typeof key ) {
+    for ( var item in key ) {
+      z.config(item, key[item]);
+    }
+    return;
+  }
+
+  if ( 'map' === key ) {
+    return z.map(key, val);
+  } else if ( 'shim' === key ) {
+    return z.shim(key, val);
+  }
+
+  if(arguments.length < 2){
+    return ( z.env[key] || false );
+  }
+
+  z.env[key] = val;
+  return z.env[key];
 }
 
 /**
@@ -278,12 +304,19 @@ z.map = function ( path, provides ) {
  * @param {String} namespace
  * @param {Object} options
  */
-z.shim = function ( namespace, options ){
+z.shim = function ( namespace, options ) {
   options = options || {}; 
   if (options.map) {
     z.map(options.map, [namespace]);
   }
   z.env.shim[namespace] = options;
+}
+
+/**
+ * Register a plugin.
+ */
+z.plugin = function ( name, callback ) {
+  z.env.plugins[name] = callback.bind(z);
 }
 
 /**
@@ -321,7 +354,7 @@ z.getMappedPath = function ( namespace ) {
  * @param {String} namespace
  */
 z.createNamespace = function ( namespace, exports, env ) {
-  var cur = env || z.global
+  var cur = env || global
     , parts = namespace.split('.');
   for (var part; parts.length && (part = parts.shift()); ) {
     if(!parts.length && exports !== undefined){
@@ -344,7 +377,7 @@ z.createNamespace = function ( namespace, exports, env ) {
  * @param {Object} env (optional)
  */
 z.getObjectByName = function ( name, env ) {
-  var cur = env || z.global
+  var cur = env || global
     , parts = name.split('.');
   for (var part; part = parts.shift(); ) {
     if(typeof cur[part] !== "undefined"){
@@ -363,23 +396,28 @@ z.getObjectByName = function ( name, env ) {
  */
 
 /**
- * Import a namespace
+ * Import a module
  *
- * @param {String} namespace
+ * @param {String} module
  * @return {z}
  */
-z.prototype.import = function ( namespace ) {
-  this._dependencies.push(namespace);
+z.prototype.imports = function ( module ) {
+  if ( z.env.pluginPattern.test(module) ) {
+    var parts = module.match(z.env.pluginPattern);
+    module = module.replace(parts[0], '');
+    this._plugins[module] = parts[1];
+  }
+  this._dependencies.push(module);
   return this;
 }
 
 /**
- * Define this namespace when all dependencies are ready.
+ * Define this module when all dependencies are ready.
  *
  * @param {Function} factory
  * @return {z}
  */
-z.prototype.export = function ( factory ) {
+z.prototype.exports = function ( factory ) {
   var self = this;
 
   this._factory = factory;
@@ -471,16 +509,22 @@ z.prototype.getDependencies = function () {
     , len = this._dependencies.length;
 
   each(this._dependencies, function(item){
-    if (null === z.getObjectByName(item)) queue.push(item);
+    if (!z.getObjectByName(item)) queue.push(item);
   });
 
   len = queue.length;
   var remaining = len;
 
   if(len > 0){
-
     each(queue, function(item){
-      z.global.MODULE_LOADER(item, function(){
+
+      var loader = global.Z_MODULE_LOADER;
+
+      if ( self._plugins[item] ) {
+        loader = z.env.plugins[self._plugins[item]];
+      }
+
+      loader(item, function(){
         remaining -= 1;
         if(remaining <=0 ){
           self.isLoaded(true);
@@ -593,7 +637,7 @@ each(['Enabled', 'Loaded', 'Pending', 'Failed'], function ( state ) {
 /**
  * The default loader and associated handlers.
  */
-if(!z.global.MODULE_LOADER){
+if(!global.Z_MODULE_LOADER){
 
   var visited = {}
     , onLoadEvent = (function (){
@@ -620,11 +664,11 @@ if(!z.global.MODULE_LOADER){
         }
       })();
 
-  z.global.MODULE_LOADER = function ( namespace, next, error ) {
-    var src = z.getMappedPath(namespace);
+  global.Z_MODULE_LOADER = function ( module, next, error ) {
+    var src = z.getMappedPath(module);
 
     if(!src){
-      src = namespace.replace(/\./g, '/') + '.js';
+      src = module.replace(/\./g, '/') + '.js';
     }
 
     src = z.env.root + src;
@@ -640,7 +684,7 @@ if(!z.global.MODULE_LOADER){
     node.type = 'text/javascript';
     node.charset = 'utf-8';
     node.async = true;
-    node.setAttribute('data-namespace', namespace);
+    node.setAttribute('data-module', module);
 
     visited[src] = new wait();
     visited[src].done(next, error);
@@ -650,20 +694,6 @@ if(!z.global.MODULE_LOADER){
     node.src = src;
     head.appendChild(node);
   }
-}
-
-/**
- * `z` is aliased as `module` to allow for more readable code.
- * Run z.noConflict() to return `module` to its original owner.
- */
-var _lastModule = z.global.module;
-z.global.module = z;
-
-/**
- * Return `module` to its original owner.
- */
-z.noConflict = function () {
-  z.global.module = _lastModule;
 }
 
 // Return z.

@@ -1,4 +1,4 @@
-module('foo.bar').
-export(function () {
+z('foo.bar').
+exports(function () {
   this.Bar = "FooBar";
 });
