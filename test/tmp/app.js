@@ -3,6 +3,7 @@
 var app = global.app = {};
 var fixtures = global.fixtures = {};
 global.fixtures.stress = {};
+var foo = global.foo = {};
 global.fixtures.file = {};
 global.fixtures.stress.item = {};
 
@@ -16,6 +17,10 @@ global.fixtures.stress.item.foo = exporter.exports;
   this.exports = 'loaded'
 }).call( exporter = {} );
 global.fixtures.file.txt = exporter.exports;
+;(function () {
+  this.exports = "mapped";
+}).call( exporter = {} );
+global.foo.mapped = exporter.exports;
 ;(function (){
   this.Three = "three";
 }).call( global.fixtures.stress.three = {} );
@@ -27,8 +32,8 @@ global.fixtures.file.txt = exporter.exports;
   this.Foo = fixtures.stress.item.foo;
 }).call( global.fixtures.stress.one = {} );
 ;(function (){
-  this.exports = "the main file";
-}).call( exporter = {} );
+    this.exports = "the main file";
+  }).call( exporter = {} );
 global.app.main = exporter.exports;
 
 })(this);

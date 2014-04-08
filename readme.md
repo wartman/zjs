@@ -13,29 +13,55 @@ How does it work?
 zjs uses a simple API to manage dependencies. A module is written as follows:
 
     
-    module('app.module')
-    .import('app.my.dependency')
-    .export(function(){
-        
-        this.Foo = function(){
-            // code
-        }
+    z('app.module')
+        .imports('app.my.dependency')
+        .imports('app.my.other.dependency')
+        .exports(function(){
+            
+            this.Foo = function(){    
+                return "foo";
+            }
 
-        this.Bar = app.my.dependency;
+            this.Bar = app.my.dependency;
 
-    });
-
-
-Compiled, it looks like this:
+        });
 
 
-    (function(global){
+You can also define modules using a callback-style, if you'd prefer:
+
+    
+    z('app.module', function (imports, exports) {
+
+        imports('app.my.dependency');
+        imports('app.my.other.dependency');
+
+        exports(function(){
+            
+            this.Foo = function(){
+                return "foo";
+            }
+
+            this.Bar = app.my.dependency;
+
+        });
+
+    })
+
+
+Zjs projects can be compiled using the command line.
+
+    
+    $ zjs build <path/to/main.js> <path/to/compiledApp.js>
+
+
+No dependencies are needed to run a compiled zjs project, not even zjs.
+Here's a (contrived) example of what a compiled project looks like:
+
+
+    (function (global) {
 
     /* namespaces */
     var app = global.app = {};
-    global.app.module = {};
-    global.app.my = {};
-    global.app.my.dependency = {};
     
     /* modules */
     var exporter = {};
@@ -44,25 +70,19 @@ Compiled, it looks like this:
         // 'this.exports' works much like 'module.exports' does in node.js.
         this.exports = "dep";
 
-    }).call( exporter );
+    }).call( exporter = {} );
     global.app.my.dependency = exporter.exports;
     ;(function(){
         
         this.Foo = function(){
-            // code
+            return "foo";
         }
 
         this.Bar = app.my.dependency;
 
-    }).call( global.app.module );
+    }).call( global.app.module = {} );
 
-    }).call(this);
+    })(this);
 
 
-The zjs library isn't even refered to.
-
-AMD?
-----
-Zjs doesn't currently load AMD, although it might soon. Really though, you
-should use something like requirejs for bigger projects - zjs works well
-for smaller things.
+More detailed instructions coming soon.

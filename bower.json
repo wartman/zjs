@@ -4,7 +4,7 @@
   "authors": [
     "Peter Wartman"
   ],
-  "description": "A module manager for the web",
+  "description": "A lightweight module loader",
   "main": "dist/z.js",
   "keywords": [
     "module",

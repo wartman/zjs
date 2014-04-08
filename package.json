@@ -6,7 +6,7 @@
     "loader",
     "amd"
   ],
-  "description": "A module loader (with a little oop)",
+  "description": "A lightweight module loader",
   "repository": {
     "type": "git",
     "url": "https://wartman@bitbucket.org/wartman/zjs.git"
