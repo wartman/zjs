@@ -78,6 +78,25 @@
 
   });
 
+  test('Flexable mapping', function () {
+
+    z.map('fixtures/fake/*.js', [
+      'fid.*'
+    ]);
+
+    equal(z.getMappedPath('fid.bin'), 'fixtures/fake/bin.js', 'Mapped');
+    notEqual(z.getMappedPath('fid.bin.bar'), 'fixtures/fake/bin.bar.js', '* matches only one');
+
+
+    z.map('fixtures/fake/many/*.js', [
+      'fid.**'
+    ]);
+
+    equal(z.getMappedPath('fid.bin'), 'fixtures/fake/many/bin.js', 'Mapped');
+    equal(z.getMappedPath('fid.bin.bar'), 'fixtures/fake/many/bin/bar.js', '** matches many');
+
+  });
+
   test('Load mapped module', function () {
 
     z.map('fixtures/map/mapped.js', [

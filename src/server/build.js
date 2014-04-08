@@ -26,7 +26,7 @@ var Build = function (options) {
   // Mock a global env for z.
   this._global = {};
   this._global.Z_MODULE_LOADER = this.loader.bind(this);
-  this._global.Z_FILE_LOADER = this.loader.bind(this);
+  this._global.Z_FILE_LOADER = this.fileLoader.bind(this);
 
   // Bind a copy of z to the mocked up env.
   zFactory(this._global);
@@ -75,6 +75,7 @@ Build.prototype.options = {
  */
 Build.prototype.render = function () {
   var modules = this._z.env.modules
+    , moduleList = []
     , sortedModules = []
     , compiled = ''
     , self = this;
@@ -89,13 +90,25 @@ Build.prototype.render = function () {
   // Ensure that modules dependent on other modules are always defined
   // lower down in the compiled script.
   for (item in modules) {
-    sortedModules.push(item);
+    moduleList.push(item);
   }
-  sortedModules = sortedModules.sort( function moduleSorter (a, b) {
-    if(modules[a]._dependencies.hasOwnProperty(b)){
-      return -1;
-    }
-    return 1;
+  var map = moduleList.map(function (item, index) {
+    return {index: index, value: item};
+  })
+  _.each(moduleList, function(item){
+    // Not 100% sure about this. Not yet sure WHY it works.
+    map.sort( function moduleSorter (a, b) {
+      if(modules[item]._dependencies.indexOf(b.value) >= 0){
+        return 1;
+      }
+      if(modules[b.value]._dependencies.indexOf(item) >= 0){
+        return -1;
+      }
+      return 0;
+    });
+  });
+  sortedModules = map.map(function (item) {
+    return moduleList[item.index];
   });
 
   _.each(sortedModules, function(ns){
@@ -186,13 +199,38 @@ Build.prototype.loader = function (module, next, error) {
   if (this._z.env.shim[module]) {
     var shimmed = this._z(module);
     shimmed._factory = file;
+    next();
     return;
   }
 
   var zModule = Function('z', file);
   zModule(this._z);
 
-  this._z.env.modules[module].done(next, error);
+  if (this._z.getObjectByName(module)) {
+    this._z.env.modules[module].done(next, error);
+  }
+}
+
+Build.prototype.fileLoader = function (module, type, next, error) {
+
+  if (arguments.length < 4) {
+    error = next;
+    next = type;
+    type = 'txt'; 
+  }
+
+  var src = this._z.getMappedPath(module);
+
+  if(!src){
+    src = module.replace(/\./g, '/') + '.' + type;
+  }
+  
+  src = process.cwd() + '/' + this._z.env.root + src;
+
+  var file = fs.readFileSync(src, 'utf-8');
+
+  next(file);
+
 }
 
 /**

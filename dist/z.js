@@ -4,7 +4,7 @@
  * Copyright 2014
  * Released under the MIT license
  *
- * Date: 2014-04-08T19:24Z
+ * Date: 2014-04-08T23:04Z
  */
 
 (function (global, factory) {
@@ -267,9 +267,9 @@ z.config = function (key, val) {
   }
 
   if ( 'map' === key ) {
-    return z.map(key, val);
+    return z.map(val);
   } else if ( 'shim' === key ) {
-    return z.shim(key, val);
+    return z.shim(val);
   }
 
   if(arguments.length < 2){
@@ -295,6 +295,12 @@ z.config = function (key, val) {
  * @param {Array} provides A list of modules this path provides.
  */
 z.map = function (path, provides) {
+  if ("object" === typeof path){
+    for ( var item in path ) {
+      z.map(item, path[item]);
+    }
+    return;
+  }
   if (!z.env.map[path]) {
     z.env.map[path] = [];
   }
@@ -305,10 +311,13 @@ z.map = function (path, provides) {
     return;
   }
   provides = new RegExp ( 
+    '^' +
     provides
       .replace(/\*\*/g, "([\\s\\S]+?)") // ** matches any number of segments.
       .replace(/\*/g, "([^\\.|^$]+?)")  // * matches a single segment.
       .replace(/\./g, "\\.")            // escape '.'
+      .replace(/\$/g, '\\$')
+      + '$'
   );
   z.env.map[path].push(provides);
 }
@@ -321,6 +330,12 @@ z.map = function (path, provides) {
  * @param {Object} options
  */
 z.shim = function (module, options) {
+  if ("object" === typeof module){
+    for ( var item in module ) {
+      z.shim(item, module[item]);
+    }
+    return;
+  }
   options = options || {}; 
   if (options.map) {
     z.map(options.map, module);
@@ -348,7 +363,13 @@ z.getMappedPath = function (module) {
 
   each(z.env.map, function (maps, path) {
     each(maps, function (map) {
-      if (map.test(module)) mappedPath = path;
+      if (map.test(module)){
+        mappedPath = path;
+        var matches = module.match(map);
+        if(matches[1]) {
+          mappedPath = mappedPath.replace('*', matches[1].replace(/\./g, '/'));
+        }
+      }
     });
   });
 
@@ -754,5 +775,6 @@ if(!global.Z_MODULE_LOADER){
 }
 
 // Return z.
+z.global = global;
 global.z = global.z || z;
 }));
