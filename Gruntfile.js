@@ -1,7 +1,7 @@
 module.exports = function(grunt){
 
   function process( code ) {
-    return "\n\n" + code
+    return code
       // Embed version
       .replace( /@VERSION/g, grunt.config( "pkg" ).version )
       // Embed date (yyyy-mm-ddThh:mmZ)
@@ -10,13 +10,15 @@ module.exports = function(grunt){
 
   grunt.initConfig({
     pkg: grunt.file.readJSON('package.json'),
-    copy: {
-      main: {
-        src: 'z.js',
-        dest: 'dist/z.js',
-        options: {
-          process: process
-        }
+    concat: {
+      dist: {
+        options: { process: process },
+        src: [
+          'src/intro.js',
+          'src/core.js',
+          'src/outro.js'
+        ],
+        dest: "dist/z.js"
       },
     },
     uglify: {
@@ -24,25 +26,41 @@ module.exports = function(grunt){
         options: {
           banner: '/*! z | <%= grunt.template.today("yyyy-mm-dd") %> */\n'
         },
-        src: 'z.js',
+        src: 'dist/z.js',
         dest: 'dist/z-min.js'
       }
     },
-    mochaTest: {
-      test: {
+    // Unit tests.
+    nodeunit: {
+      tests: ['test/build_test.js'],
+    },
+    qunit: {
+      all: {
         options: {
-          reporter: 'spec'
-        },
-        src: ['test/build/*.js']
+          urls: [
+            'http://localhost:8000/test/test-runner.html'
+          ]
+        }
+      }
+    },
+    connect: {
+      server: {
+        options: {
+          port: 8000,
+          base: '.'
+        }
       }
     }
   });
 
+  grunt.loadNpmTasks('grunt-contrib-concat');
   grunt.loadNpmTasks('grunt-contrib-uglify');
-  grunt.loadNpmTasks('grunt-mocha-test');
-  grunt.loadNpmTasks('grunt-contrib-copy');
+  grunt.loadNpmTasks('grunt-contrib-nodeunit')
+  grunt.loadNpmTasks('grunt-contrib-connect');
+  grunt.loadNpmTasks('grunt-contrib-qunit');
 
-  grunt.registerTask('default', ['mochaTest', 'copy', 'uglify']);
-  grunt.registerTask('test', 'mochaTest');
+  grunt.registerTask('test', ['nodeunit', 'connect', 'qunit']);
+  grunt.registerTask('build', ['concat', 'uglify']);
+  grunt.registerTask('default', ['build', 'test']);
 
 }

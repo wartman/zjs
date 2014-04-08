@@ -1,15 +1,13 @@
-
-
 /**
- * zjs 0.2.5
+ * zjs 0.3.0
  *
  * Copyright 2014
  * Released under the MIT license
  *
- * Date: 2014-04-05T02:52Z
+ * Date: 2014-04-08T19:07Z
  */
 
-(function(global, factory){
+(function (global, factory) {
 
   if ( typeof module === "object" && typeof module.exports === "object" ) {
     // For CommonJS environments.
@@ -18,8 +16,7 @@
     factory(global);
   }
 
-}( typeof window !== "undefined" ? window : this, function ( global, undefined ) {
-
+}( typeof window !== "undefined" ? window : this, function (global, undefined) {
 /*
  * -------
  * Helpers
@@ -29,7 +26,7 @@
 /**
  * Ensure async loading.
  */
-var nextTick = (function () {
+var nextTick = ( function () {
   var fns = []
     , enqueueFn = function ( fn ) {
         return fns.push(fn) === 1;
@@ -148,17 +145,19 @@ wait.prototype.done = function(onReady, onFailed){
   });
   return this;
 }
-wait.prototype.resolve = function(ctx){
+wait.prototype.resolve = function(value, ctx){
   this._state = 1;
   ctx = (ctx || this);
-  each(this._onReady, function(fn){ fn.call( ctx, Array.prototype.slice.call(arguments, 1) ); });
+  var fns = this._onReady;
   this._onReady = [];
+  each(fns, function(fn){ fn.call(ctx, value); });
 }
-wait.prototype.reject = function(ctx){
+wait.prototype.reject = function(value, ctx){
   this._state = -1;
   ctx = (ctx || this);
-  each(this._onFailed, function(fn){ fn.call( ctx, Array.prototype.slice.call(arguments, 1) ); });
+  var fns = this._onFailed;
   this._onFailed = [];
+  each(fns, function(fn){ fn.call(ctx, value); });
 }
 
 /*
@@ -187,8 +186,11 @@ var z = function (name, factory) {
   delete z.env.namespaces[name];
 
   var namespace = name;
-  while ( (namespace = namespace.substring(0, namespace.lastIndexOf('.') ) ) ) {
-    if(z.getObjectByName(namespace)){
+  if(namespace.lastIndexOf('.') < 0){
+    z.env.namespaces[namespace] = true;
+  }
+  while ( (namespace = namespace.substring(0, namespace.lastIndexOf('.'))) ) {
+    if(z.namespaceExists(namespace)){
       break;
     }
     z.env.namespaces[namespace] = true;
@@ -202,13 +204,14 @@ var z = function (name, factory) {
   this._namespaceString = name;
   this._namespace = z.createNamespace(name);
   this._dependencies = [];
+  this._plugins = {};
   this._factory = null;
 
   if(factory && ('function' === typeof factory) ){
     if(factory.length < 2){
-      this.export(factory);
+      this.exports(factory);
     } else {
-      factory(this.import.bind(this), this.export.bind(this));
+      factory(this.imports.bind(this), this.exports.bind(this));
     }
   }
 }
@@ -228,6 +231,8 @@ z.env = {
   map: {},
   shim: {},
   modules: {},
+  plugins: {},
+  pluginPattern: /([\s\S]+?)\!/,
   environment: 'browser',
   MODULE_STATE: {
     PENDING: 0,
@@ -238,18 +243,41 @@ z.env = {
 };
 
 /**
- * A holder for the global var.
- */
-z.global = global;
-
-/**
  * Check if a namespace has been defined.
  *
  * @param {String} namespace
  */
-z.namespaceExists = function ( namespace ) {
-  return !z.env.namespaces[namespace]
-    && z.env.namespaces[namespace] !== undefined;
+z.namespaceExists = function (namespace) {
+  return ( z.env.namespaces.hasOwnProperty(namespace)
+    && z.env.namespaces[namespace] !== undefined );
+}
+
+/**
+ * Set a config item/items
+ *
+ * @param {String | Object} key
+ * @param {Mixed} val
+ */
+z.config = function (key, val) {
+  if ( "object" === typeof key ) {
+    for ( var item in key ) {
+      z.config(item, key[item]);
+    }
+    return;
+  }
+
+  if ( 'map' === key ) {
+    return z.map(key, val);
+  } else if ( 'shim' === key ) {
+    return z.shim(key, val);
+  }
+
+  if(arguments.length < 2){
+    return ( z.env[key] || false );
+  }
+
+  z.env[key] = val;
+  return z.env[key];
 }
 
 /**
@@ -266,52 +294,64 @@ z.namespaceExists = function ( namespace ) {
  * @param {String} path Should be a fully-qualified path.
  * @param {Array} provides A list of modules this path provides.
  */
-z.map = function ( path, provides ) {
-  if(!z.env.map[path]){
+z.map = function (path, provides) {
+  if (!z.env.map[path]) {
     z.env.map[path] = [];
   }
-  z.env.map[path] = z.env.map[path].concat(provides);
+  if (provides instanceof Array) {
+    each(provides, function (item) {
+      z.map(path, item);
+    });
+    return;
+  }
+  provides = new RegExp ( 
+    provides
+      .replace(/\*\*/g, "([\\s\\S]+?)") // ** matches any number of segments.
+      .replace(/\*/g, "([^\\.|^$]+?)")  // * matches a single segment.
+      .replace(/\./g, "\\.")            // escape '.'
+  );
+  z.env.map[path].push(provides);
 }
 
 /**
  * Shim a module. This will work with any module that returns
  * something in the global scope.
  *
- * @param {String} namespace
+ * @param {String} module
  * @param {Object} options
  */
-z.shim = function ( namespace, options ){
+z.shim = function (module, options) {
   options = options || {}; 
   if (options.map) {
-    z.map(options.map, [namespace]);
+    z.map(options.map, module);
   }
-  z.env.shim[namespace] = options;
+  z.env.shim[module] = options;
 }
 
 /**
- * Check if a namespace is mapped to a path.
+ * Register a plugin.
+ */
+z.plugin = function (name, callback) {
+  if ( "function" === typeof callback ) {
+    z.env.plugins[name] = callback.bind(z);
+  }
+}
+
+/**
+ * Check if a module is mapped to a path.
  *
- * @param {String} namespace
+ * @param {String} module
  * @return {String | Bool}
  */
-z.getMappedPath = function ( namespace ) {
-  var mappedPath = false
-    , base = namespace.substring(0, namespace.lastIndexOf('.') ) + '.*';
+z.getMappedPath = function (module) {
+  var mappedPath = false;
 
-  // Check for base paths first.
-  each(z.env.map, function(map, path){
-    if(map.indexOf(base) > -1){
-      mappedPath = path;
-    }
+  each(z.env.map, function (maps, path) {
+    each(maps, function (map) {
+      if (map.test(module)) mappedPath = path;
+    });
   });
 
-  if(mappedPath) return mappedPath;
-
-  each(z.env.map, function(map, path){
-    if(map.indexOf(namespace) > -1){
-      mappedPath = path;
-    }
-  });
   return mappedPath;
 }
 
@@ -322,8 +362,8 @@ z.getMappedPath = function ( namespace ) {
  *
  * @param {String} namespace
  */
-z.createNamespace = function ( namespace, exports, env ) {
-  var cur = env || z.global
+z.createNamespace = function (namespace, exports, env) {
+  var cur = env || global
     , parts = namespace.split('.');
   for (var part; parts.length && (part = parts.shift()); ) {
     if(!parts.length && exports !== undefined){
@@ -345,8 +385,8 @@ z.createNamespace = function ( namespace, exports, env ) {
  * @param {String} name
  * @param {Object} env (optional)
  */
-z.getObjectByName = function ( name, env ) {
-  var cur = env || z.global
+z.getObjectByName = function (name, env) {
+  var cur = env || global
     , parts = name.split('.');
   for (var part; part = parts.shift(); ) {
     if(typeof cur[part] !== "undefined"){
@@ -365,23 +405,28 @@ z.getObjectByName = function ( name, env ) {
  */
 
 /**
- * Import a namespace
+ * Import a module
  *
- * @param {String} namespace
+ * @param {String} module
  * @return {z}
  */
-z.prototype.import = function ( namespace ) {
-  this._dependencies.push(namespace);
+z.prototype.imports = function (module) {
+  if ( z.env.pluginPattern.test(module) ) {
+    var parts = module.match(z.env.pluginPattern);
+    module = module.replace(parts[0], '');
+    this._plugins[module] = parts[1];
+  }
+  this._dependencies.push(module);
   return this;
 }
 
 /**
- * Define this namespace when all dependencies are ready.
+ * Define this module when all dependencies are ready.
  *
  * @param {Function} factory
  * @return {z}
  */
-z.prototype.export = function ( factory ) {
+z.prototype.exports = function (factory) {
   var self = this;
 
   this._factory = factory;
@@ -428,7 +473,7 @@ z.prototype.enable = function () {
  * @param {Function} onFailed
  * @return {z}
  */
-z.prototype.done = function ( onReady, onFailed ) {
+z.prototype.done = function (onReady, onFailed) {
   this._wait.done(onReady, onFailed);
   return this;
 }
@@ -440,7 +485,7 @@ z.prototype.done = function ( onReady, onFailed ) {
  * @param {Function} onFailed
  * @return {z}
  */
-z.prototype.catch = function ( onFailed ) {
+z.prototype.catch = function (onFailed) {
   this.done(null, onFailed);
   return this;
 }
@@ -452,7 +497,7 @@ z.prototype.catch = function ( onFailed ) {
  * @throws {Error}
  * @return {z}
  */
-z.prototype.disable = function ( reason ) {
+z.prototype.disable = function (reason) {
   this.isFailed(true);
   this.catch(function(){
     nextTick(function(){
@@ -473,16 +518,22 @@ z.prototype.getDependencies = function () {
     , len = this._dependencies.length;
 
   each(this._dependencies, function(item){
-    if (null === z.getObjectByName(item)) queue.push(item);
+    if (!z.getObjectByName(item)) queue.push(item);
   });
 
   len = queue.length;
   var remaining = len;
 
   if(len > 0){
-
     each(queue, function(item){
-      z.global.MODULE_LOADER(item, function(){
+
+      var loader = global.Z_MODULE_LOADER;
+
+      if ( self._plugins[item] ) {
+        loader = z.env.plugins[self._plugins[item]];
+      }
+
+      loader(item, function(){
         remaining -= 1;
         if(remaining <=0 ){
           self.isLoaded(true);
@@ -511,7 +562,7 @@ z.prototype.runFactory = function () {
 
   // Make sure each of the deps has been enabled. If any need to be enabled, 
   // stop loading and enable them.
-  each(this._dependencies, function ensureDependency ( namespace ) {
+  each(this._dependencies, function ensureDependency (namespace) {
     if(!state){
       return;
     }
@@ -595,7 +646,7 @@ each(['Enabled', 'Loaded', 'Pending', 'Failed'], function ( state ) {
 /**
  * The default loader and associated handlers.
  */
-if(!z.global.MODULE_LOADER){
+if(!global.Z_MODULE_LOADER){
 
   var visited = {}
     , onLoadEvent = (function (){
@@ -622,14 +673,12 @@ if(!z.global.MODULE_LOADER){
         }
       })();
 
-  z.global.MODULE_LOADER = function ( namespace, next, error ) {
-    var src = z.getMappedPath(namespace);
+  global.Z_MODULE_LOADER = function (module, next, error) {
+    var src = z.getMappedPath(module);
 
     if(!src){
-      src = namespace.replace(/\./g, '/') + '.js';
+      src = z.env.root + module.replace(/\./g, '/') + '.js';
     }
-
-    src = z.env.root + src;
 
     if(visited.hasOwnProperty(src)){
       visited[src].done(next, error);
@@ -642,7 +691,7 @@ if(!z.global.MODULE_LOADER){
     node.type = 'text/javascript';
     node.charset = 'utf-8';
     node.async = true;
-    node.setAttribute('data-namespace', namespace);
+    node.setAttribute('data-module', module);
 
     visited[src] = new wait();
     visited[src].done(next, error);
@@ -652,23 +701,58 @@ if(!z.global.MODULE_LOADER){
     node.src = src;
     head.appendChild(node);
   }
-}
 
-/**
- * `z` is aliased as `module` to allow for more readable code.
- * Run z.noConflict() to return `module` to its original owner.
- */
-var _lastModule = z.global.module;
-z.global.module = z;
+  global.Z_FILE_LOADER = function (file, type, next, error) {
 
-/**
- * Return `module` to its original owner.
- */
-z.noConflict = function () {
-  z.global.module = _lastModule;
+    if (arguments.length < 4) {
+      error = next;
+      next = type;
+      type = 'txt'; 
+    }
+
+    var src = z.getMappedPath(file)
+      , request;
+
+    if(!src){
+      src = z.env.root + file.replace(/\./g, '/') + '.' + type;
+    }
+
+    if(visited.hasOwnProperty(src)){
+      visited[src].done(next, error);
+      return;
+    }
+
+    visited[src] = new wait();
+    visited[src].done(next, error);
+
+    if(global.XMLHttpRequest){
+      request = new XMLHttpRequest();
+    } else { // code for IE6, IE5
+      request = new ActiveXObject("Microsoft.XMLHTTP");
+    }
+
+    request.onreadystatechange = function(){
+      if(4 === this.readyState){
+        if(200 === this.status){
+          visited[src].resolve(this.responseText);
+        } else {
+          visited[src].reject(this.status);
+        }
+      }
+    }
+
+    request.open('GET', src, true);
+    request.send();
+  }
+
+  // Default file plugin.
+  z.plugin('txt', function (module, next, error) {
+    global.Z_FILE_LOADER(module, 'txt', function (data) {
+      z(module).exports( function () { this.exports = data; } ).done(next);
+    }, error);
+  });
 }
 
 // Return z.
 global.z = global.z || z;
-
 }));

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 var program = require('commander');
-var Build = require('../lib/build');
+var Build = require('../src/server/build');
 var fs = require('fs');
 
 program
@@ -24,7 +24,8 @@ program
       options.buildfile = true;
     }
 
-    var build = Build(src, dest, options);
+    var build = Build(options);
+    build.start(src, dest);
 
   }).on('--help', function(){
     console.log('   Examples:\n');
