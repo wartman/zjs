@@ -1,6 +1,6 @@
 {
   "name": "zjs",
-  "version": "0.2.5",
+  "version": "0.3.0",
   "authors": [
     "Peter Wartman"
   ],
@@ -15,7 +15,6 @@
   "ignore": [
     "**/.*",
     "node_modules",
-    "lib",
     "bin",
     "bower_components",
     "test",
