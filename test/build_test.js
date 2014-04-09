@@ -11,9 +11,12 @@ exports.build_test = {
       .done(done);
   },
   test_compile: function (test) {
+    // NOTE
+    // Fails on windows due to use of /r/n vs /n, so we strip em all out.
+    // May be a more elegent way to do this.
     var actual = grunt.file.read(__dirname + "/tmp/app.js");
     var expected = grunt.file.read(__dirname + "/fixtures/expected/app.js");
-    test.equal(actual, expected, 'Module compiled as expected');
+    test.equal(actual.replace(/\r|\n/g, ''), expected.replace(/\r|\n/g, ''), 'Module compiled as expected');
 
     test.done();
   },

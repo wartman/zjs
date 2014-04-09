@@ -35,17 +35,11 @@ var Build = function (options) {
   this._z.config('environment', 'node');
 
   this._z.plugin('txt', function (module, next, error) {
-    var src = self._z.getMappedPath(module);
-    if(!src){
-      src =  module.replace(/\./g, '/') + '.txt';
-    }
-    var file = fs.readFileSync( process.cwd() + '/' + self._z.env.root + src, 'utf-8');
-
-    var fileWrapper = self._z(module);
-    fileWrapper._factory = Function('', '  this.exports = \'' + file + '\'');
-
-    next();
-    return;
+    self._global.Z_FILE_LOADER(module, 'txt', function (file) {
+      var fileWrapper = self._z(module);
+      fileWrapper.exports(Function('', '  this.exports = \'' + file + '\''));
+      fileWrapper.done(next, error);
+    }, error);
   })
 
   this._exists = {};
@@ -186,11 +180,8 @@ Build.prototype.renderNamespace = function (namespace) {
  */
 Build.prototype.loader = function (module, next, error) {
 
-  var src = this._z.getMappedPath(module);
-
-  if(!src){
-    src = module.replace(/\./g, '/') + '.js';
-  }
+  var src = ( this._z.getMappedPath(module) 
+    || module.replace(/\./g, '/') + '.js' );
   
   src = process.cwd() + '/' + this._z.env.root + src;
 
@@ -219,11 +210,8 @@ Build.prototype.fileLoader = function (module, type, next, error) {
     type = 'txt'; 
   }
 
-  var src = this._z.getMappedPath(module);
-
-  if(!src){
-    src = module.replace(/\./g, '/') + '.' + type;
-  }
+  var src = ( this._z.getMappedPath(module)
+    || module.replace(/\./g, '/') + '.' + type );
   
   src = process.cwd() + '/' + this._z.env.root + src;
 

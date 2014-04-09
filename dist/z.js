@@ -4,7 +4,7 @@
  * Copyright 2014
  * Released under the MIT license
  *
- * Date: 2014-04-08T23:04Z
+ * Date: 2014-04-09T06:50Z
  */
 
 (function (global, factory) {
@@ -695,11 +695,8 @@ if(!global.Z_MODULE_LOADER){
       })();
 
   global.Z_MODULE_LOADER = function (module, next, error) {
-    var src = z.getMappedPath(module);
-
-    if(!src){
-      src = z.env.root + module.replace(/\./g, '/') + '.js';
-    }
+    var src = ( z.getMappedPath(module)
+      || z.env.root + module.replace(/\./g, '/') + '.js' );
 
     if(visited.hasOwnProperty(src)){
       visited[src].done(next, error);
@@ -731,12 +728,8 @@ if(!global.Z_MODULE_LOADER){
       type = 'txt'; 
     }
 
-    var src = z.getMappedPath(file)
-      , request;
-
-    if(!src){
-      src = z.env.root + file.replace(/\./g, '/') + '.' + type;
-    }
+    var src = ( z.getMappedPath(file)
+      || z.env.root + file.replace(/\./g, '/') + '.' + type )
 
     if(visited.hasOwnProperty(src)){
       visited[src].done(next, error);
@@ -747,9 +740,9 @@ if(!global.Z_MODULE_LOADER){
     visited[src].done(next, error);
 
     if(global.XMLHttpRequest){
-      request = new XMLHttpRequest();
+      var request = new XMLHttpRequest();
     } else { // code for IE6, IE5
-      request = new ActiveXObject("Microsoft.XMLHTTP");
+      var request = new ActiveXObject("Microsoft.XMLHTTP");
     }
 
     request.onreadystatechange = function(){
