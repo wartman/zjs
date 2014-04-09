@@ -4,7 +4,7 @@
  * Copyright 2014
  * Released under the MIT license
  *
- * Date: 2014-04-09T06:50Z
+ * Date: 2014-04-09T18:27Z
  */
 
 (function (global, factory) {
@@ -190,7 +190,7 @@ var z = function (name, factory) {
     z.env.namespaces[namespace] = true;
   }
   while ( (namespace = namespace.substring(0, namespace.lastIndexOf('.'))) ) {
-    if(z.namespaceExists(namespace)){
+    if(z.namespaceExists(namespace) || namespace.indexOf('@') >= 0){
       break;
     }
     z.env.namespaces[namespace] = true;
@@ -202,7 +202,12 @@ var z = function (name, factory) {
   this._wait = new wait();
   this._state = z.env.MODULE_STATE.PENDING;
   this._namespaceString = name;
-  this._namespace = z.createNamespace(name);
+  if (name.indexOf('@') >= 0){
+    // Don't export shim or annotated names.
+    this._namespace = {};
+  } else {
+    this._namespace = z.createNamespace(name);
+  }
   this._dependencies = [];
   this._plugins = {};
   this._factory = null;
@@ -340,6 +345,15 @@ z.shim = function (module, options) {
   if (options.map) {
     z.map(options.map, module);
   }
+  var mod = z('@shim.' + module);
+  if (options.imports) {
+    each(options.imports, function (item) {
+      mod.imports(item);
+    });
+  }
+  mod.exports(function () {
+    this.ref = '';
+  });
   z.env.shim[module] = options;
 }
 
@@ -583,26 +597,29 @@ z.prototype.runFactory = function () {
 
   // Make sure each of the deps has been enabled. If any need to be enabled, 
   // stop loading and enable them.
-  each(this._dependencies, function ensureDependency (namespace) {
+  each(this._dependencies, function ensureDependency (module) {
     if(!state){
       return;
     }
 
-    if ( z.env.shim.hasOwnProperty(namespace) ) {
-      z.env.namespaces[namespace] = true;
+    if ( z.env.shim.hasOwnProperty(module) ) {
+      if(!z.getObjectByName(module)){
+        state = false;
+        throw new Error('A shimmed module could not be loaded: [' + module + '] for module: ' + self._namespaceString);
+      }
       return;
     }
 
-    if ( !z.env.modules.hasOwnProperty(namespace) ) {
-      self.disable('A dependency was not loaded: '+ namespace);
+    if ( !z.env.modules.hasOwnProperty(module) ) {
+      self.disable('A dependency was not loaded: [' + module + '] for module: ' + self._namespaceString);
       state = false;
       return;
     }
 
-    var current = z.env.modules[namespace];
+    var current = z.env.modules[module];
 
     if(current.isFailed()){
-      self.disable('A dependency failed: '+ namespace);
+      self.disable('A dependency failed: ['+ module + '] for module: ' + self._namespaceString);
       state = false;
       return;
     }
@@ -695,10 +712,10 @@ if(!global.Z_MODULE_LOADER){
       })();
 
   global.Z_MODULE_LOADER = function (module, next, error) {
-    var src = ( z.getMappedPath(module)
-      || z.env.root + module.replace(/\./g, '/') + '.js' );
+    var src = z.env.root + ( z.getMappedPath(module)
+      || module.replace(/\./g, '/') + '.js' );
 
-    if(visited.hasOwnProperty(src)){
+    if (visited.hasOwnProperty(src)) {
       visited[src].done(next, error);
       return;
     }
@@ -728,8 +745,8 @@ if(!global.Z_MODULE_LOADER){
       type = 'txt'; 
     }
 
-    var src = ( z.getMappedPath(file)
-      || z.env.root + file.replace(/\./g, '/') + '.' + type )
+    var src = z.env.root + ( z.getMappedPath(file)
+      || file.replace(/\./g, '/') + '.' + type )
 
     if(visited.hasOwnProperty(src)){
       visited[src].done(next, error);

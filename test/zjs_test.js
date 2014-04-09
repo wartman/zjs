@@ -117,7 +117,7 @@
   test('shim', function(){
 
     z.shim('shim', {
-      map: 'fixtures/shim.js',
+      map: 'fixtures/shim/no-deps.js',
       imports: false
     });
 
@@ -128,7 +128,23 @@
     exports(function(){
       start();
       equal(shim, 'shimmed', 'Shimmed file loaded');
-      ok(z.env.namespaces['shim'], 'Shim namespace saved.');
+    });
+
+    z.shim('shimDeps', {
+      map: 'fixtures/shim/deps.js',
+      imports: [
+        'fixtures.shim.dep'
+      ]
+    });
+
+    stop();
+
+    z('moduleTest.shimmedDeps').
+    imports('shimDeps').
+    exports(function(){
+      start();
+      equal(shimDeps.test, 'shimmed', 'Shimmed file loaded');
+      equal(shimDeps.dep, 'dep', 'Dependency loaded');
     });
 
   });

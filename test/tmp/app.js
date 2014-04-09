@@ -9,10 +9,6 @@ global.fixtures.stress.item = {};
 
 /* modules */
 var exporter;
-;(function (){
-  this.exports = "Foo";
-}).call( exporter = {} );
-global.fixtures.stress.item.foo = exporter.exports;
 ;(function anonymous() {
   this.exports = 'loaded'
 }).call( exporter = {} );
@@ -27,6 +23,10 @@ global.foo.mapped = exporter.exports;
 ;(function (){
   this.Two = "two";
 }).call( global.fixtures.stress.two = {} );
+;(function (){
+  this.exports = "Foo";
+}).call( exporter = {} );
+global.fixtures.stress.item.foo = exporter.exports;
 ;(function (){
   this.One = "one";
   this.Foo = fixtures.stress.item.foo;

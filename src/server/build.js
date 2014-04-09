@@ -6,6 +6,7 @@
  */
 
 var zFactory = require('../../dist/z');
+var sorter = require('./sorter');
 var fs       = require('fs');
 var UglifyJS = require("uglify-js");
 var _        = require('lodash');
@@ -22,6 +23,8 @@ var Build = function (options) {
   var self = this;
 
   this.setup(options);
+
+  this._shimmed = {};
 
   // Mock a global env for z.
   this._global = {};
@@ -69,7 +72,7 @@ Build.prototype.options = {
  */
 Build.prototype.render = function () {
   var modules = this._z.env.modules
-    , moduleList = []
+    , moduleList = {}
     , sortedModules = []
     , compiled = ''
     , self = this;
@@ -84,29 +87,25 @@ Build.prototype.render = function () {
   // Ensure that modules dependent on other modules are always defined
   // lower down in the compiled script.
   for (item in modules) {
-    moduleList.push(item);
+    if(item.indexOf('@') >= 0){
+      continue;
+    }
+    moduleList[item] = modules[item]._dependencies;
   }
-  var map = moduleList.map(function (item, index) {
-    return {index: index, value: item};
-  })
-  _.each(moduleList, function(item){
-    // Not 100% sure about this. Not yet sure WHY it works.
-    map.sort( function moduleSorter (a, b) {
-      if(modules[item]._dependencies.indexOf(b.value) >= 0){
-        return 1;
-      }
-      if(modules[b.value]._dependencies.indexOf(item) >= 0){
-        return -1;
-      }
-      return 0;
-    });
-  });
-  sortedModules = map.map(function (item) {
-    return moduleList[item.index];
-  });
+
+  // Sort the modules with the topological sorter.
+  sortedModules = sorter(moduleList, this.options.main);
 
   _.each(sortedModules, function(ns){
+    if(ns.indexOf('@') >= 0){
+      return;
+    }
     compiled += self.renderModule( modules[ns]._factory, ns );
+  });
+
+  // Add shimmed modules.
+  _.each(this._shimmed, function (module, name) {
+    compiled = module + '\n' + compiled;
   });
 
   compiled = "(function (global) {\n" + compiled + "\n})(this);"
@@ -188,9 +187,8 @@ Build.prototype.loader = function (module, next, error) {
   var file = fs.readFileSync(src, 'utf-8');
 
   if (this._z.env.shim[module]) {
-    var shimmed = this._z(module);
-    shimmed._factory = file;
-    next();
+    this._shimmed[module] = file;
+    this._z(module).exports(function(){}).done(next);
     return;
   }
 
