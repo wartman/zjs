@@ -167,9 +167,6 @@ var z = function (name, factory) {
   delete z.env.namespaces[name];
 
   var namespace = name;
-  if(namespace.lastIndexOf('.') < 0){
-    z.env.namespaces[namespace] = true;
-  }
   while ( (namespace = namespace.substring(0, namespace.lastIndexOf('.'))) ) {
     if(z.namespaceExists(namespace) || namespace.indexOf('@') >= 0){
       break;

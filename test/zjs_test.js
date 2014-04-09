@@ -5,7 +5,7 @@
   test('namespaces', function () {
 
     z('main');
-    ok(z.env.namespaces['main'], 'Top level namespaces are registered.');
+    ok(!z.env.namespaces['main'], 'Top level namespaces are not registered.');
 
     z('moduleTest.namespaces');
     ok(z.env.namespaces['moduleTest'], 'Registers namespace, not component.');

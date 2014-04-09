@@ -84,28 +84,25 @@ Build.prototype.render = function () {
 
   compiled += "\n/* modules */\n";
 
+  // Add shimmed modules.
+  _.each(this._shimmed, function (module, name) {
+    compiled += module + '\n';
+  });
+
   // Ensure that modules dependent on other modules are always defined
   // lower down in the compiled script.
   for (item in modules) {
-    if(item.indexOf('@') >= 0){
-      continue;
-    }
+    if(item.indexOf('@') >= 0) continue; // Don't add shims.
     moduleList[item] = modules[item]._dependencies;
   }
 
   // Sort the modules with the topological sorter.
   sortedModules = sorter(moduleList, this.options.main);
 
+  // Compile
   _.each(sortedModules, function(ns){
-    if(ns.indexOf('@') >= 0){
-      return;
-    }
+    if(ns.indexOf('@') >= 0) return; // Don't add shims.
     compiled += self.renderModule( modules[ns]._factory, ns );
-  });
-
-  // Add shimmed modules.
-  _.each(this._shimmed, function (module, name) {
-    compiled = module + '\n' + compiled;
   });
 
   compiled = "(function (global) {\n" + compiled + "\n})(this);"
@@ -140,7 +137,7 @@ Build.prototype.renderModule = function (factory, namespace) {
     return render;
   }
   if (this._z.env.shim[namespace]) {
-    return factory + '\n';
+    return '';
   }
   return ";(" + factory + ').call( global.' + namespace + ' = {} );\n';
 }

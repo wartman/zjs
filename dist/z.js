@@ -4,7 +4,7 @@
  * Copyright 2014
  * Released under the MIT license
  *
- * Date: 2014-04-09T18:27Z
+ * Date: 2014-04-09T19:18Z
  */
 
 (function (global, factory) {
@@ -186,9 +186,6 @@ var z = function (name, factory) {
   delete z.env.namespaces[name];
 
   var namespace = name;
-  if(namespace.lastIndexOf('.') < 0){
-    z.env.namespaces[namespace] = true;
-  }
   while ( (namespace = namespace.substring(0, namespace.lastIndexOf('.'))) ) {
     if(z.namespaceExists(namespace) || namespace.indexOf('@') >= 0){
       break;

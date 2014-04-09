@@ -32,7 +32,10 @@ module.exports = function(grunt){
     },
     // Unit tests.
     nodeunit: {
-      tests: ['test/build_test.js'],
+      tests: [
+        'test/build_test.js',
+        'test/sorter_test.js'
+      ],
     },
     qunit: {
       all: {
