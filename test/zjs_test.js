@@ -49,7 +49,7 @@
 
   });
 
-  test('mapping', function () {
+  test('Test mapping in namespaces', function () {
 
     z.map('fixtures/map/mapped.js', [
       'foo.mapped'
@@ -78,22 +78,19 @@
 
   });
 
-  test('Flexable mapping', function () {
+  test('Test mapping in urls', function () {
 
     z.map('fixtures/fake/*.js', [
       'fid.*'
     ]);
-
     equal(z.getMappedPath('fid.bin'), 'fixtures/fake/bin.js', 'Mapped');
-    notEqual(z.getMappedPath('fid.bin.bar'), 'fixtures/fake/bin.bar.js', '* matches only one');
+    notEqual(z.getMappedPath('fid.bin.bar'), 'fixtures/fake/bin/bar.js', '* matches only one');
 
-
-    z.map('fixtures/fake/many/*.js', [
-      'fid.**'
+    z.map('fixtures/fake/many/**/*.js', [
+      'fid.**.*'
     ]);
-
-    equal(z.getMappedPath('fid.bin'), 'fixtures/fake/many/bin.js', 'Mapped');
     equal(z.getMappedPath('fid.bin.bar'), 'fixtures/fake/many/bin/bar.js', '** matches many');
+    equal(z.getMappedPath('fid.bin.baz.bar'), 'fixtures/fake/many/bin/baz/bar.js', '** matches many');
 
   });
 

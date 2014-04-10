@@ -294,11 +294,10 @@ z.map = function (path, provides) {
     return;
   }
   provides = new RegExp ( 
-    '^' +
     provides
-      .replace(/\*\*/g, "([\\s\\S]+?)") // ** matches any number of segments.
-      .replace(/\*/g, "([^\\.|^$]+?)")  // * matches a single segment.
-      .replace(/\./g, "\\.")            // escape '.'
+      .replace('**', "([\\s\\S]+?)") // ** matches any number of segments (will only use the first)
+      .replace('*', "([^\\.|^$]+?)") // * matches a single segment (will only use the first)
+      .replace(/\./g, "\\.")         // escape '.'
       .replace(/\$/g, '\\$')
       + '$'
   );
@@ -357,9 +356,18 @@ z.getMappedPath = function (module) {
     each(maps, function (map) {
       if (map.test(module)){
         mappedPath = path;
-        var matches = module.match(map);
-        if(matches[1]) {
-          mappedPath = mappedPath.replace('*', matches[1].replace(/\./g, '/'));
+        var matches = map.exec(module);
+
+        // NOTE: The following doesn't take ordering into account.
+        // Could pose an issue for paths like: 'foo/*/**.js'
+        // Think more on this. Could be fine as is! Not sure what the use cases are like.
+        if (matches.length > 2) {
+          mappedPath = mappedPath
+            .replace('**', matches[1].replace(/\./g, '/'))
+            .replace('*', matches[2]);
+        } else if (matches.length === 2) {
+          mappedPath = mappedPath
+            .replace('*', matches[1]);
         }
       }
     });
