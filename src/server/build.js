@@ -46,6 +46,7 @@ var Build = function (options) {
   })
 
   this._exists = {};
+  this._state = '';
   this._compiled = '';
   this._onDone = function(){};
 }
@@ -134,12 +135,19 @@ Build.prototype.renderModule = function (factory, namespace) {
     }
     render += ';(' + factory + ').call( exporter = {} );\n';
     render += 'global.' + namespace + ' = exporter.exports;\n'
+    this.state(true);
     return render;
   }
   if (this._z.env.shim[namespace]) {
+    this.state(true);
     return '';
   }
+  this.state(true);
   return ";(" + factory + ').call( global.' + namespace + ' = {} );\n';
+}
+
+Build.prototype.state = function (good){
+  this._state += (good)? '.' : 'x';
 }
 
 /**
@@ -189,8 +197,12 @@ Build.prototype.loader = function (module, next, error) {
     return;
   }
 
-  var zModule = Function('z', file);
-  zModule(this._z);
+  try {
+    var zModule = Function('z', file);
+    zModule(this._z);
+  } catch (e) {
+    this.state(false);
+  }
 
   if (this._z.getObjectByName(module)) {
     this._z.env.modules[module].done(next, error);
@@ -243,6 +255,7 @@ Build.prototype.start = function (src, dest) {
 
   this._z.env.modules[this.options.main].done( function renderModule () {
     self.render();
+    console.log(self._state, 'Ok');
     self._onDone();
   });
 

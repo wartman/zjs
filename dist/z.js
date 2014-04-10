@@ -4,7 +4,7 @@
  * Copyright 2014
  * Released under the MIT license
  *
- * Date: 2014-04-10T15:20Z
+ * Date: 2014-04-10T21:49Z
  */
 
 (function (global, factory) {
@@ -388,7 +388,6 @@ z.getMappedPath = function (module) {
           mappedPath = mappedPath
             .replace('*', matches[1]);
         }
-
       }
     });
   });
