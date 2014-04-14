@@ -4,7 +4,7 @@
  * Copyright 2014
  * Released under the MIT license
  *
- * Date: 2014-04-10T21:49Z
+ * Date: 2014-04-14T19:31Z
  */
 
 (function (global, factory) {
@@ -25,6 +25,9 @@
 
 /**
  * Ensure async loading.
+ *
+ * @param {Function} fn Run this function async
+ * @param {Object} ctx Set 'this'
  */
 var nextTick = ( function () {
   var fns = []
@@ -123,41 +126,77 @@ var each = function (obj, callback, context) {
 
 /**
  * A super stripped down promise-like thing.
+ *
+ * @constructor
  */
 var wait = function(){
   this._state = 0;
   this._onReady = [];
   this._onFailed = [];
+  this._value = null;
 }
+
+/**
+ * Run when done waiting.
+ *
+ * @param {Function} onReady Add to the onReady queue
+ * @param {Function} onFailled Add to the onFailed queue
+ * @return {wait} 
+ */
 wait.prototype.done = function(onReady, onFailed){
   var self = this;
   nextTick(function(){
     if(onReady && ( "function" === typeof onReady)){
       (self._state === 1)
-        ? onReady.call(self)
+        ? onReady.call(self, self._value)
         : self._onReady.push(onReady);
     }
     if(onFailed && ( "function" === typeof onFailed)){
       (self._state === -1)
-        ? onFailed.call(self)
+        ? onFailed.call(self, self._value)
         : self._onFailed.push(onFailed);
     }
   });
   return this;
 }
+
+/**
+ * Resolve the wait.
+ *
+ * @param {*} value Value to pass to callbacks
+ * @param {Object} ctx Set 'this'
+ */
 wait.prototype.resolve = function(value, ctx){
   this._state = 1;
-  ctx = (ctx || this);
-  var fns = this._onReady;
+  this._dispatch(this._onReady, value, ctx);
   this._onReady = [];
-  each(fns, function(fn){ fn.call(ctx, value); });
 }
+
+/**
+ * Reject the wait.
+ *
+ * @param {*} value Value to pass to callbacks
+ * @param {Object} ctx Set 'this'
+ */
 wait.prototype.reject = function(value, ctx){
   this._state = -1;
-  ctx = (ctx || this);
-  var fns = this._onFailed;
+  this._dispatch(this._onFailed, value, ctx);
   this._onFailed = [];
-  each(fns, function(fn){ fn.call(ctx, value); });
+}
+
+/**
+ * Helper to run callbacks
+ *
+ * @param {Array} fns
+ * @param {*} value
+ * @param {Object} ctx
+ * @api private
+ */
+wait.prototype._dispatch = function (fns, value, ctx) {
+  this._value = (value || this._value);
+  ctx = (ctx || this);
+  var self = this;
+  each(fns, function(fn){ fn.call(ctx, self._value); });
 }
 
 /*
@@ -169,10 +208,13 @@ wait.prototype.reject = function(value, ctx){
 /**
  * The module factory.
  *
- * @param {String} name Assign a namespace to this module.
- * @param {Function} factory Define a namespace via callback.
+ * @example
+ *   z('app.main').imports('app.foo').exports(function () { this.exports = app.foo; });
+ *
  * @constructor
- * @return {z instance}
+ * @param {String} name - Assign a namespace to this module.
+ * @param {Function} factory - Define a namespace via callback.
+ * @return {Object}
  */
 var z = function (name, factory) {
   if( !(this instanceof z) ){
@@ -257,7 +299,7 @@ z.namespaceExists = function (namespace) {
 /**
  * Set a config item/items
  *
- * @param {String | Object} key
+ * @param {String|Object} key
  * @param {Mixed} val
  */
 z.config = function (key, val) {
@@ -686,7 +728,7 @@ each(['Enabled', 'Loaded', 'Pending', 'Failed'], function ( state ) {
  * -------
  */
 
-/**
+/*!
  * The default loader and associated handlers.
  */
 if(!global.Z_MODULE_LOADER){
@@ -716,6 +758,14 @@ if(!global.Z_MODULE_LOADER){
         }
       })();
 
+  /**
+   * The default module loader.
+   *
+   * @param {String} module The module to load. This should be the
+   *    module name, not a filepath (e.g., 'app.foo.bar')
+   * @param {Function} next Run on success
+   * @param {Funtion} error Run on error
+   */
   global.Z_MODULE_LOADER = function (module, next, error) {
     var src = z.env.root + ( z.getMappedPath(module)
       || module.replace(/\./g, '/') + '.js' );
@@ -742,6 +792,15 @@ if(!global.Z_MODULE_LOADER){
     head.appendChild(node);
   }
 
+  /**
+   * The default file loader (uses AJAX)
+   *
+   * @param {String} file The file to load
+   * @param {String} type The type of file to load (eg, 'txt' or 'json')
+   *    Defaults to 'json'.
+   * @param {Function} next Run on success
+   * @param {Funtion} error Run on error
+   */
   global.Z_FILE_LOADER = function (file, type, next, error) {
 
     if (arguments.length < 4) {
@@ -781,7 +840,9 @@ if(!global.Z_MODULE_LOADER){
     request.send();
   }
 
-  // Default file plugin.
+  /*! 
+   * Default file plugin.
+   */
   z.plugin('txt', function (module, next, error) {
     global.Z_FILE_LOADER(module, 'txt', function (data) {
       z(module).exports( function () { this.exports = data; } ).done(next);

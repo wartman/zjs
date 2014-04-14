@@ -9,7 +9,9 @@ module.exports = function(grunt){
   }
 
   grunt.initConfig({
+
     pkg: grunt.file.readJSON('package.json'),
+
     concat: {
       dist: {
         options: { process: process },
@@ -21,6 +23,7 @@ module.exports = function(grunt){
         dest: "dist/z.js"
       },
     },
+
     uglify: {
       z: {
         options: {
@@ -30,6 +33,7 @@ module.exports = function(grunt){
         dest: 'dist/z-min.js'
       }
     },
+
     // Unit tests.
     nodeunit: {
       tests: [
@@ -37,6 +41,7 @@ module.exports = function(grunt){
         'test/sorter_test.js'
       ],
     },
+
     qunit: {
       all: {
         options: {
@@ -46,6 +51,7 @@ module.exports = function(grunt){
         }
       }
     },
+
     connect: {
       server: {
         options: {
@@ -54,6 +60,7 @@ module.exports = function(grunt){
         }
       }
     }
+
   });
 
   grunt.loadNpmTasks('grunt-contrib-concat');
