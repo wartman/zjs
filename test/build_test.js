@@ -72,4 +72,4 @@ exports.build_test_opt = {
     test.done();
   }
 
-}
+};

@@ -147,12 +147,12 @@ Build.prototype.state = function (good){
 Build.prototype.renderNamespace = function (namespace) {
   var cur = ''
     , render = ''
-    , exists = this._exists
-    , parts = namespace.split('.');
+    , parts = namespace.split('.')
+    , exists = this._exists[parts[0]];
 
-  if (!exists[parts[0]]) {
+  if (!exists) {
     render += "var " + parts[0] + ' = this.' + parts[0] + ' = {};\n';
-    exists[parts[0]] = ( exists[parts[0]] || {} );
+    exists = this._exists[parts[0]] = {};
   }
 
   cur = parts.shift();

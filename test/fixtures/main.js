@@ -10,7 +10,7 @@ z.config({
   map: {
     'fixtures/map/mapped.js': ['foo.*']
   }
-})
+});
 
 z('app.main')
   .imports('fixtures.stress.one')
