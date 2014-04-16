@@ -1,4 +1,6 @@
-z('fixtures.stress.two').
-exports(function(){
-  this.Two = "two";
-});
+z('fixtures.stress.two')
+  .exports(function(){
+    return {
+      Two: "two"
+    };
+  });

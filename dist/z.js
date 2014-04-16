@@ -4,7 +4,7 @@
  * Copyright 2014
  * Released under the MIT license
  *
- * Date: 2014-04-14T19:31Z
+ * Date: 2014-04-16T16:37Z
  */
 
 (function (global, factory) {
@@ -209,7 +209,7 @@ wait.prototype._dispatch = function (fns, value, ctx) {
  * The module factory.
  *
  * @example
- *   z('app.main').imports('app.foo').exports(function () { this.exports = app.foo; });
+ *   z('app.main').imports('app.foo').exports(function () { return app.foo; });
  *
  * @constructor
  * @param {String} name - Assign a namespace to this module.
@@ -241,15 +241,16 @@ var z = function (name, factory) {
   this._wait = new wait();
   this._state = z.env.MODULE_STATE.PENDING;
   this._namespaceString = name;
+  this._dependencies = [];
+  this._plugins = {};
+  this._factory = null;
+
   if (name.indexOf('@') >= 0){
     // Don't export shim or annotated names.
     this._namespace = {};
   } else {
-    this._namespace = z.createNamespace(name);
+    this._namespace = z.createObjectByName(name);
   }
-  this._dependencies = [];
-  this._plugins = {};
-  this._factory = null;
 
   if(factory && ('function' === typeof factory) ){
     if(factory.length < 2){
@@ -390,7 +391,7 @@ z.shim = function (module, options) {
     });
   }
   mod.exports(function () {
-    this.ref = '';
+    return '';
   });
   z.env.shim[module] = options;
 }
@@ -444,7 +445,7 @@ z.getMappedPath = function (module) {
  *
  * @param {String} namespace
  */
-z.createNamespace = function (namespace, exports, env) {
+z.createObjectByName = function (namespace, exports, env) {
   var cur = env || global
     , parts = namespace.split('.');
   for (var part; parts.length && (part = parts.shift()); ) {
@@ -689,16 +690,14 @@ z.prototype.runFactory = function () {
   }
 
   if(z.env.environment !== 'node'){
-    this._factory.call(this._namespace);
+    if(this._namespaceString.indexOf('@') >= 0) {
+      this._factory();
+    } else {
+      z.createObjectByName(this._namespaceString, this._factory());
+      this._namespace = z.getObjectByName(this._namespaceString);
+    }
   } else {
     this._factory = this._factory.toString();
-  }
-
-  // If 'exports' is defined, make that the base export of the current namespace.
-  if(this._namespace.hasOwnProperty('exports')){
-    var exports = this._namespace.exports;
-    z.createNamespace(this._namespaceString, exports);
-    this._namespace = z.getObjectByName(this._namespaceString);
   }
 
   this.isEnabled(true);
@@ -728,35 +727,33 @@ each(['Enabled', 'Loaded', 'Pending', 'Failed'], function ( state ) {
  * -------
  */
 
-/*!
- * The default loader and associated handlers.
- */
 if(!global.Z_MODULE_LOADER){
 
-  var visited = {}
-    , onLoadEvent = (function (){
-        var testNode = document.createElement('script')
-        if (testNode.attachEvent){
-          return function(node, wait){
-            var self = this;
-            this.done(next, err);
-            node.attachEvent('onreadystatechange', function () {
-              if(node.readyState === 'complete'){
-                wait.resolve();
-              }
-            });
-            // Can't handle errors with old browsers.
-          }
-        }
-        return function(node, wait){
-          node.addEventListener('load', function ( e ) {
+  var visited = {};
+
+  var onLoadEvent = (function (){
+    var testNode = document.createElement('script')
+    if (testNode.attachEvent){
+      return function(node, wait){
+        var self = this;
+        this.done(next, err);
+        node.attachEvent('onreadystatechange', function () {
+          if(node.readyState === 'complete'){
             wait.resolve();
-          }, false);
-          node.addEventListener('error', function ( e ) {
-            wait.reject();
-          }, false);
-        }
-      })();
+          }
+        });
+        // Can't handle errors with old browsers.
+      }
+    }
+    return function(node, wait){
+      node.addEventListener('load', function ( e ) {
+        wait.resolve();
+      }, false);
+      node.addEventListener('error', function ( e ) {
+        wait.reject();
+      }, false);
+    }
+  })();
 
   /**
    * The default module loader.
@@ -845,7 +842,7 @@ if(!global.Z_MODULE_LOADER){
    */
   z.plugin('txt', function (module, next, error) {
     global.Z_FILE_LOADER(module, 'txt', function (data) {
-      z(module).exports( function () { this.exports = data; } ).done(next);
+      z(module).exports( function () { return data; } ).done(next);
     }, error);
   });
 }

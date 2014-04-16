@@ -1,8 +1,16 @@
-z.config('root', 'test/');
-z.config('main', 'app.main');
-z.map('fixtures/map/mapped.js', [
-  'foo.*'
-]);
+z.config({
+  root: 'test/',
+  main: 'app.main',
+  shim: {
+    'shim': {
+      map: 'fixtures/shim/no-deps.js',
+      imports: false
+    }
+  },
+  map: {
+    'fixtures/map/mapped.js': ['foo.*']
+  }
+})
 
 z('app.main')
   .imports('fixtures.stress.one')
@@ -10,6 +18,7 @@ z('app.main')
   .imports('fixtures.stress.three')
   .imports('foo.mapped')
   .imports('txt!fixtures.file.txt')
+  .imports('shim')
   .exports(function(){
-    this.exports = "the main file";
+    return "the main file";
   });

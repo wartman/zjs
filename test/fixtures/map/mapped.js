@@ -1,3 +1,3 @@
 z('foo.mapped', function () {
-  this.exports = "mapped";
+  return "mapped";
 });

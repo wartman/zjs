@@ -40,7 +40,7 @@ var Build = function (options) {
   this._z.plugin('txt', function (module, next, error) {
     self._global.Z_FILE_LOADER(module, 'txt', function (file) {
       var fileWrapper = self._z(module);
-      fileWrapper.exports(Function('', '  this.exports = \'' + file + '\''));
+      fileWrapper.exports(Function('', '  return \'' + file + '\''));
       fileWrapper.done(next, error);
     }, error);
   })
@@ -106,7 +106,7 @@ Build.prototype.render = function () {
     compiled += self.renderModule( modules[ns]._factory, ns );
   });
 
-  compiled = "(function (global) {\n" + compiled + "\n})(this);"
+  compiled = "(function () {\n" + compiled + "\n}).call(this);"
 
   if(this.options.optimize){
     compiled = UglifyJS.minify(compiled, {fromString: true}).code;
@@ -127,23 +127,12 @@ Build.prototype.render = function () {
  * @param {String} namespace
  */
 Build.prototype.renderModule = function (factory, namespace) {
-  if ( /this\.exports/.test(factory) ){
-    var render = '';
-    if (!this._exists['exporter'] ) {
-      render += 'var exporter;\n';
-      this._exists['exporter'] = true;
-    }
-    render += ';(' + factory + ').call( exporter = {} );\n';
-    render += 'global.' + namespace + ' = exporter.exports;\n'
-    this.state(true);
-    return render;
-  }
   if (this._z.env.shim[namespace]) {
     this.state(true);
     return '';
   }
   this.state(true);
-  return ";(" + factory + ').call( global.' + namespace + ' = {} );\n';
+  return namespace + ' = (' + factory + ')();\n';
 }
 
 Build.prototype.state = function (good){
@@ -156,15 +145,17 @@ Build.prototype.state = function (good){
  * @param {String} namespace
  */
 Build.prototype.renderNamespace = function (namespace) {
-  var cur = 'global'
+  var cur = ''
     , render = ''
     , exists = this._exists
     , parts = namespace.split('.');
 
   if (!exists[parts[0]]) {
-    render += "var " + parts[0] + ' = global.' + parts[0] + ' = {};\n';
+    render += "var " + parts[0] + ' = this.' + parts[0] + ' = {};\n';
     exists[parts[0]] = ( exists[parts[0]] || {} );
   }
+
+  cur = parts.shift();
 
   for (var part; parts.length && (part = parts.shift()); ) {
     cur = cur + '.' + part;

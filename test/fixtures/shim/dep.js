@@ -1,3 +1,3 @@
 z('fixtures.shim.dep', function(){
-  this.exports = 'dep';
+  return 'dep';
 });

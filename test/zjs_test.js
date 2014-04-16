@@ -96,9 +96,7 @@
 
   test('Load mapped module', function () {
 
-    z.map('fixtures/map/mapped.js', [
-      'foo.*'
-    ]);
+    z.map('fixtures/map/mapped.js', 'foo.*');
 
     stop();
 
@@ -149,7 +147,9 @@
   test('Don\'t load modules if already defined', function () {
 
     z('foo.bar').exports(function(){
-      this.Bin = 'Loaded Once';
+      return {
+        Bin: 'Loaded Once'
+      };
     });
 
     stop();
@@ -185,7 +185,7 @@
     stop();
 
     z.plugin('test', function (module, next, error) {
-      z(module).exports(function(){ this.exports = "plugin"; }).done(next);
+      z(module).exports(function(){ return "plugin"; }).done(next);
     });
 
     z('moduleTest.plugin', function (imports, exports) {

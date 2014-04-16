@@ -2,11 +2,18 @@ zjs
 ===
 A lightweight module loader for browsers.
 
-What makes zjs different?
--------------------------
-Zjs is designed to let you work with modules without loading you down
-with any extra code. In fact, compiled zjs projects don't use any extra code
-at all - they're just simple javascript.
+About zjs
+---------
+Zjs is a modular script loader and compiler for browsers. It can be compared to
+more robust options like requireJs, but differs in that it loads modules based on
+namespaces (which are just javascript objects, such as 'app.foo.bar'), not filepaths.
+The advantage of this is that a project can be compiled into a single file without
+needing any extra code (such as 'require' wrappers); in fact, a compiled zjs project
+won't have a single line of code from the zjs library.
+
+If you need lots of AMD stuff on your projects, zjs is likely not the way to go. However,
+it might be ideal for smaller apps. If you need to use popular libraries like Backbone, jQuery
+or Underscore you can import them into zjs with minimal trouble.
 
 How does it work?
 -----------------
@@ -15,74 +22,117 @@ zjs uses a simple API to manage dependencies. A module is written as follows:
     
     z('app.module')
         .imports('app.my.dependency')
-        .imports('app.my.other.dependency')
+        .imports('app.my.otherDependency')
         .exports(function(){
             
-            this.Foo = function(){    
+            var Foo = function(){
                 return "foo";
             }
 
-            this.Bar = app.my.dependency;
+            var Bar = app.my.dependency;
+
+            return {
+                Foo: Foo,
+                Bar: Bar
+            };
 
         });
 
 
-You can also define modules using a callback-style, if you'd prefer:
+Modules can also be defined via callbacks (which is the recommended method):
 
     
     z('app.module', function (imports, exports) {
 
-        imports('app.my.dependency');
-        imports('app.my.other.dependency');
+    imports('app.my.dependency');
+    imports('app.my.otherDependency');
 
-        exports(function(){
-            
-            this.Foo = function(){
-                return "foo";
-            }
+    exports(function(){
+        
+        var Foo = function(){
+            return "foo";
+        }
 
-            this.Bar = app.my.dependency;
+        var Bar = app.my.dependency;
 
-        });
+        return {
+            Foo: Foo,
+            Bar: Bar
+        };
 
-    })
+    });
+
+    });
 
 
-Zjs projects can be compiled using the command line.
+Zjs comes with a command-line tool that can be used to compile projects. First, install
+zjs globally:
+
+
+    $ npm install zjs -g
+
+
+You can then use zjs anywhere to compile projects:
 
     
     $ zjs build <path/to/main.js> <path/to/compiledApp.js>
 
 
-No dependencies are needed to run a compiled zjs project, not even zjs.
-Here's a (contrived) example of what a compiled project looks like:
-
-
-    (function (global) {
-
-    /* namespaces */
-    var app = global.app = {};
+The compiled file can be optimized by as well, just include the '-o' option
+when building a project:
     
-    /* modules */
-    var exporter = {};
-    ;(function(){
-        
-        // 'this.exports' works much like 'module.exports' does in node.js.
-        this.exports = "dep";
 
-    }).call( exporter = {} );
-    global.app.my.dependency = exporter.exports;
-    ;(function(){
-        
-        this.Foo = function(){
-            return "foo";
+    $ zjs build <path/to/main.js> <path/to/compiledApp.js> -o
+
+
+Zjs requires a 'main' file to properly compile a project. This is where you'll include
+all your configuration options and where you'll include your first modules. Here's an example:
+
+    
+    z.config({
+        root: '/scripts',
+        // You can name your main module anything you like, just include the following in the config.
+        // By default, zjs assumes the main module is called 'main'.
+        main: 'app.main',
+        // Use the shim to set up non-zjs modules.
+        shim: {
+            '$': {
+                map: 'libs/jquery.min.js'
+            },
+            '_': {
+                map: 'libs/underscore.js'
+            },
+            'Backbone': {
+                map: 'libs/backbone.js',
+                imports: ['_', '$'] // Including this option will ensure that backbone has underscore and jquery
+            }
+        },
+        map: {
+            // You can use patterns to map namespaces to filepaths.
+            // The following will, for example, match 'foo.bar' to 'libs/foo/bar.js'
+            'libs/foo/*.js': 'foo.*',
+            // If you want to map an entire directory, use '**'.
+            // The following will, for example, match 'baz.bif.bin.bar' to 'libs/baz/bif/bin/bar.js'
+            'libs/baz/**/*.js': 'baz.**.*',
+            // It's also possible to tell zjs that one file exports several modules.
+            // Patterns will work here!
+            'libs/bar.js': [
+                'bar.bin',
+                'bar.foo',
+                'bar.fid.*'
+            ]
         }
+    });
 
-        this.Bar = app.my.dependency;
+    z('app.main', function (imports, exports) {
 
-    }).call( global.app.module = {} );
+    imports('app.boot');
 
-    })(this);
+    exports(function () {
+        app.boot();
+    });
+
+    });
 
 
-More detailed instructions coming soon.
+More detailed instructions are coming, but the code is fairly well commented if you're curious. Give it a read!
