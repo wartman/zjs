@@ -6,8 +6,8 @@ var Build = require('../src/server/build');
 exports.build_test = {
   
   setUp: function(done) {
-    var build = new Build();
-    build
+    this.build = new Build();
+    this.build
       .start(__dirname + '/fixtures/main.js', __dirname + '/tmp/app.js')
       .done(done);
   },
@@ -40,7 +40,7 @@ exports.build_test = {
     test.equal(global.fixtures.file.txt, 'loaded');
 
     test.done();
-  }
+  },
 };
 
 exports.build_test_opt = {
@@ -52,6 +52,14 @@ exports.build_test_opt = {
     build
       .start(__dirname + '/fixtures/main.js', __dirname + '/tmp/app.min.js')
       .done(done);
+  },
+
+  test_compile_min: function (test) {
+    var actual = grunt.file.read(__dirname + "/tmp/app.min.js");
+    var expected = grunt.file.read(__dirname + "/fixtures/expected/app.min.js");
+
+    test.equal(actual.replace(/\r|\n/g, ''), expected.replace(/\r|\n/g, ''), 'Module compiled as expected');
+    test.done();
   },
 
   test_stress_min: function (test) {

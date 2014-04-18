@@ -1,10 +1,10 @@
-/**
- * zjs 0.3.0
+/*!
+ * zjs 0.3.1
  *
  * Copyright 2014
  * Released under the MIT license
  *
- * Date: 2014-04-16T16:37Z
+ * Date: 2014-04-18T19:04Z
  */
 
 (function (global, factory) {
@@ -244,12 +244,10 @@ var z = function (name, factory) {
   this._dependencies = [];
   this._plugins = {};
   this._factory = null;
+  this._namespace = false;
 
-  if (name.indexOf('@') >= 0){
-    // Don't export shim or annotated names.
-    this._namespace = {};
-  } else {
-    this._namespace = z.createObjectByName(name);
+  if (!name.indexOf('@') >= 0){
+    z.createObjectByName(name);
   }
 
   if(factory && ('function' === typeof factory) ){
@@ -643,6 +641,8 @@ z.prototype.runFactory = function () {
   var state = true
     , self = this;
 
+  if(this.isEnabled()) return;
+
   // Make sure each of the deps has been enabled. If any need to be enabled, 
   // stop loading and enable them.
   each(this._dependencies, function ensureDependency (module) {
@@ -685,6 +685,9 @@ z.prototype.runFactory = function () {
     return;
   }
 
+  this.isEnabled(true);
+  if(this._namespace) return;
+
   if(!this._factory){
     this.disable('No factory defined: ' + this._namespaceString);
   }
@@ -692,6 +695,7 @@ z.prototype.runFactory = function () {
   if(z.env.environment !== 'node'){
     if(this._namespaceString.indexOf('@') >= 0) {
       this._factory();
+      this._namespace = true;
     } else {
       z.createObjectByName(this._namespaceString, this._factory());
       this._namespace = z.getObjectByName(this._namespaceString);
@@ -700,7 +704,6 @@ z.prototype.runFactory = function () {
     this._factory = this._factory.toString();
   }
 
-  this.isEnabled(true);
   this.enable();
 }
 

@@ -214,4 +214,42 @@
 
   });
 
+  test('Modules exports only once.', function () {
+
+    var increment = 0;
+
+    z('moduleTest.increment', function () {
+      increment += 1;
+      return increment;
+    });
+
+    stop();
+    z('moduleTest.incrementOne', function (imports, exports) {
+      imports('moduleTest.increment');
+      exports(function () {
+        start();
+        equal(increment, 1);
+      })
+    });
+
+    stop();
+    z('moduleTest.incrementTwo', function (imports, exports) {
+      imports('moduleTest.increment');
+      exports(function () {
+        start();
+        equal(increment, 1, 'Module did not export twice');
+      })
+    });
+
+    stop();
+    z('moduleTest.incrementThree', function (imports, exports) {
+      imports('moduleTest.increment');
+      exports(function () {
+        start();
+        equal(increment, 1, 'Module did not export thrice');
+      })
+    });
+
+  });
+
 })();

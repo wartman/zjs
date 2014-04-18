@@ -6,7 +6,7 @@
  */
 
 var zFactory = require('../../dist/z');
-var sorter = require('./sorter');
+var sorter   = require('./sorter');
 var fs       = require('fs');
 var UglifyJS = require("uglify-js");
 var _        = require('lodash');
@@ -46,8 +46,9 @@ var Build = function (options) {
   })
 
   this._exists = {};
-  this._state = '';
+  this._progressLog = '';
   this._compiled = '';
+  this._header = '';
   this._onDone = function(){};
 }
 
@@ -110,6 +111,8 @@ Build.prototype.render = function () {
 
   if(this.options.optimize){
     compiled = UglifyJS.minify(compiled, {fromString: true}).code;
+    // Add license headers.
+    compiled = this._header + compiled;
   }
 
   if(this.options.dest){
@@ -128,15 +131,11 @@ Build.prototype.render = function () {
  */
 Build.prototype.renderModule = function (factory, namespace) {
   if (this._z.env.shim[namespace]) {
-    this.state(true);
+    this.logProgress(true);
     return '';
   }
-  this.state(true);
+  this.logProgress(true);
   return namespace + ' = (' + factory + ')();\n';
-}
-
-Build.prototype.state = function (good){
-  this._state += (good)? '.' : 'x';
 }
 
 /**
@@ -171,6 +170,25 @@ Build.prototype.renderNamespace = function (namespace) {
 }
 
 /**
+ * Try to extract license info from included modules.
+ */
+var licenseMatch = /\/\*\![\s\S]+?\*\//g;
+Build.prototype.extractLicenses = function (file) {
+  var matches = licenseMatch.exec(file);
+  if (!matches) return;
+  this._header += matches[0] + '\n\n';
+}
+
+/**
+ * Log the current state of the builder.
+ *
+ * @param {Boolean} good Set to true to log a good state.
+ */
+Build.prototype.logProgress = function (good){
+  this._progressLog += (good)? '.' : 'x';
+}
+
+/**
  * Loader that replaces the default.
  */
 Build.prototype.loader = function (module, next, error) {
@@ -182,6 +200,9 @@ Build.prototype.loader = function (module, next, error) {
 
   var file = fs.readFileSync(src, 'utf-8');
 
+  // Extract liscense info in case we're optimizing and want to add it back.
+  this.extractLicenses(file);
+
   if (this._z.env.shim[module]) {
     this._shimmed[module] = file;
     this._z(module).exports(function(){}).done(next);
@@ -192,7 +213,7 @@ Build.prototype.loader = function (module, next, error) {
     var zModule = Function('z', file);
     zModule(this._z);
   } catch (e) {
-    this.state(false);
+    this.logProgress(false);
   }
 
   if (this._z.getObjectByName(module)) {
@@ -234,9 +255,15 @@ Build.prototype.start = function (src, dest) {
 
   if (this.options.buildfile) {
     var buildz = JSON.parse(fs.readFileSync(src), 'utf-8');
-    src = buildz.main + '.js';
+    src = buildz.src + '.js';
     dest = buildz.dest;
     this.setup(buildz.options);
+  }
+
+  if (!dest) dest = this.options.dest || false;
+  if (!dest) {
+    throw Error ('No destination file specified.');
+    return;
   }
 
   var zModule = Function('z', file);
@@ -246,7 +273,7 @@ Build.prototype.start = function (src, dest) {
 
   this._z.env.modules[this.options.main].done( function renderModule () {
     self.render();
-    console.log(self._state, 'Ok');
+    console.log(self._progressLog, 'Ok');
     self._onDone();
   });
 

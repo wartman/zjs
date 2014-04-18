@@ -1,4 +1,4 @@
-/**
+/*!
  * zjs @VERSION
  *
  * Copyright 2014
