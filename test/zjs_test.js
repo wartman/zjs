@@ -252,4 +252,21 @@
 
   });
 
+  test('Modules exports only once in imported files.', function () {
+
+    window.increment = 0;
+
+    stop();
+    z('moduleTest.testExportsRunOnceExternal', function (imports, exports) {
+      imports('fixtures.increment.incrementOne');
+      imports('fixtures.increment.incrementTwo');
+      imports('fixtures.increment.incrementThree');
+      exports(function () {
+        start();
+        equal(window.increment, 1);
+      })
+    });
+
+  });
+
 })();
