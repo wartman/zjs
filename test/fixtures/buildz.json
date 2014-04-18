@@ -1,0 +1,9 @@
+{
+  "name": "Test app",
+  "description": "Just a test app",
+  "lisence": "MIT",
+  "author": "wartman",
+  "main": "app.main",
+  "src": "fixtures/main.js",
+  "dest": "fixtures/tmp/app.js"
+}
