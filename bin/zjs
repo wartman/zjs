@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 var program = require('commander');
-var Build = require('../src/server/build');
+var Build = require('../lib/build');
 var fs = require('fs');
 
 program

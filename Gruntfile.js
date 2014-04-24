@@ -1,6 +1,6 @@
 module.exports = function(grunt){
 
-  function process( code ) {
+  function process (code) {
     return code
       // Embed version
       .replace( /@VERSION/g, grunt.config( "pkg" ).version )
@@ -12,27 +12,27 @@ module.exports = function(grunt){
 
     pkg: grunt.file.readJSON('package.json'),
 
-    concat: {
-      dist: {
-        options: { process: process },
-        src: [
-          'src/intro.js',
-          'src/core.js',
-          'src/outro.js'
-        ],
-        dest: "dist/z.js"
-      },
-    },
+    // concat: {
+    //   dist: {
+    //     options: { process: process },
+    //     src: [
+    //       'src/intro.js',
+    //       'src/core.js',
+    //       'src/outro.js'
+    //     ],
+    //     dest: "dist/z.js"
+    //   },
+    // },
 
-    uglify: {
-      z: {
-        options: {
-          banner: '/*! z | <%= grunt.template.today("yyyy-mm-dd") %> */\n'
-        },
-        src: 'dist/z.js',
-        dest: 'dist/z-min.js'
-      }
-    },
+    // uglify: {
+    //   z: {
+    //     options: {
+    //       banner: '/*! z | <%= grunt.template.today("yyyy-mm-dd") %> */\n'
+    //     },
+    //     src: 'dist/z.js',
+    //     dest: 'dist/z-min.js'
+    //   }
+    // },
 
     // Unit tests.
     nodeunit: {
@@ -63,14 +63,22 @@ module.exports = function(grunt){
 
   });
 
-  grunt.loadNpmTasks('grunt-contrib-concat');
-  grunt.loadNpmTasks('grunt-contrib-uglify');
+  // grunt.loadNpmTasks('grunt-contrib-concat');
+  // grunt.loadNpmTasks('grunt-contrib-uglify');
   grunt.loadNpmTasks('grunt-contrib-nodeunit')
   grunt.loadNpmTasks('grunt-contrib-connect');
   grunt.loadNpmTasks('grunt-contrib-qunit');
 
+  grunt.registerTask('distribute', function () {
+    var code = grunt.file.read(__dirname + '/src/z.js');
+    var dest = __dirname + '/z.js';
+    code = process(code);
+    if(grunt.file.exists(dest)){
+      grunt.file.delete(dest);
+    }
+    grunt.file.write(dest, code);
+  });
   grunt.registerTask('test', ['nodeunit', 'connect', 'qunit']);
-  grunt.registerTask('build', ['concat', 'uglify']);
-  grunt.registerTask('default', ['build', 'test']);
+  grunt.registerTask('default', ['test', 'distribute']);
 
 }

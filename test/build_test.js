@@ -1,7 +1,7 @@
 'use strict';
 
 var grunt = require('grunt');
-var Build = require('../src/server/build');
+var Build = require('../src/build');
 
 exports.build_test = {
   

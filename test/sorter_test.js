@@ -1,7 +1,7 @@
 'use strict';
 
 var grunt = require('grunt');
-var sorter = require('../src/server/sorter');
+var sorter = require('../src/sorter');
 
 exports.sorter_test = {
   test_sort: function (test) {

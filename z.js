@@ -1,3 +1,23 @@
+/*!
+ * zjs 0.3.3
+ *
+ * Copyright 2014
+ * Released under the MIT license
+ *
+ * Date: 2014-04-24T17:17Z
+ */
+
+(function (global, factory) {
+
+  if ( typeof module === "object" && typeof module.exports === "object" ) {
+    // For CommonJS environments.
+    module.exports = factory;
+  } else {
+    factory(global);
+  }
+
+}( typeof window !== "undefined" ? window : this, function (global, undefined) {
+
 /*
  * -------
  * Helpers
@@ -11,70 +31,43 @@
  * @param {Object} ctx Set 'this'
  */
 var nextTick = ( function () {
-  var fns = []
-    , enqueueFn = function ( fn ) {
-        return fns.push(fn) === 1;
-      }
-    , dispatchFns = function ( ctx ) {
-        var toCall = fns
-          , i = 0
-          , len = fns.length;
-        fns = [];
-        while(i < len){
-          toCall[i++]();
-        }
-      };
-
-  if ( typeof setImmediate !== "undefined" && ( "function" === typeof setImmediate) ) { // ie10, node < 0.10
-    return function ( fn, ctx ) {
-      enqueueFn(fn) && setImmediate(dispatchFns);
-    };
-  }
-
-  if ( typeof process === "object" && process.nextTick ) { // node > 0.10
-    return function(fn, ctx){
-      enqueueFn(fn) && process.nextTick(dispatchFns);
-    }
-  }
-
-  if ( global.postMessage ) { // modern browsers
-    var isAsync = true;
-    if ( global.attachEvent ) {
-      var checkAsync = function(){
-        isAsync = false;
-      }
-      global.attachEvent('onmessage', checkAsync);
-      global.postMessage('__checkAsync', '*');
-      global.detachEvent('onmessage', checkAsync);
-    }
-
-    if ( isAsync ) {
-      var msg = "__promise" + new Date
-        , onMessage = function(e){
-            if(e.data === msg){
-              e.stopPropagation && e.stopPropagation();
-              dispatchFns();
-            }
-          };
-
-      global.addEventListener?
-        global.addEventListener('message', onMessage, true) :
-        global.attachEvent('onmessage', onMessage);
-
-      return function(fn, ctx){
-        enqueueFn(fn) && global.postMessage(msg, '*');
-      }
-
-    }
-  }
-
-  return function (fn, ctx) { // old browsers.
-    enqueueFn(fn) && setTimeout(dispatchFns, 0);
+  var fns = [];
+  var enqueueFn = function (fn, ctx) {
+    if (ctx) fn.bind(ctx);
+    return fns.push(fn);
   };
+  var dispatchFns = function () {
+    var toCall = fns
+      , i = 0
+      , len = fns.length;
+    fns = [];
+    while (i < len) { toCall[i++](); }
+  };
+  if (typeof setImmediate == 'function') {
+    return function (fn, ctx) { enqueueFn(fn, ctx) && setImmediate(dispatchFns) }
+  }
+  // legacy node.js
+  else if (typeof process != 'undefined' && typeof process.nextTick == 'function') {
+    return function (fn, ctx) { enqueueFn(fn, ctx) && process.nextTick(dispatchFns); };
+  }
+  // fallback for other environments / postMessage behaves badly on IE8
+  else if (typeof window == 'undefined' || window.ActiveXObject || !window.postMessage) {
+    return function (fn, ctx) { enqueueFn(fn, ctx) && setTimeout(dispatchFns); };
+  } else {
+    var msg = "tic!" + new Date
+    var onMessage = function(e){
+      if(e.data === msg){
+        e.stopPropagation && e.stopPropagation();
+        dispatchFns();
+      }
+    };
+    global.addEventListener('message', onMessage, true);
+    return function (fn, ctx) { enqueueFn(fn, ctx) && global.postMessage(msg, '*'); };
+  }
 })();
 
 /**
- * Iterate over arrays OR objects.
+ * Iterate over arrays or objects.
  *
  * @param {*} obj
  * @param {Function} callback
@@ -221,11 +214,11 @@ var z = function (name, factory) {
 
   this._wait = new wait();
   this._state = z.env.MODULE_STATE.PENDING;
-  this._namespaceString = name;
+  this._moduleName = name;
+  this._definition = false;
   this._dependencies = [];
   this._plugins = {};
   this._factory = null;
-  this._namespace = false;
 
   if (!name.indexOf('@') >= 0){
     z.createObjectByName(name);
@@ -257,24 +250,15 @@ z.env = {
   modules: {},
   plugins: {},
   pluginPattern: /([\s\S]+?)\!/,
-  environment: 'browser',
+  environment: false,
   MODULE_STATE: {
     PENDING: 0,
     LOADED: 1,
-    ENABLED: 2,
+    ENABLING: 2,
+    ENABLED: 3,
     FAILED: -1
   }
 };
-
-/**
- * Check if a namespace has been defined.
- *
- * @param {String} namespace
- */
-z.namespaceExists = function (namespace) {
-  return ( z.env.namespaces.hasOwnProperty(namespace)
-    && z.env.namespaces[namespace] !== undefined );
-}
 
 /**
  * Set a config item/items
@@ -289,28 +273,24 @@ z.config = function (key, val) {
     }
     return;
   }
-
+  if(arguments.length < 2){
+    return ( z.env[key] || false );
+  }
   if ( 'map' === key ) {
     return z.map(val);
   } else if ( 'shim' === key ) {
     return z.shim(val);
   }
-
-  if(arguments.length < 2){
-    return ( z.env[key] || false );
-  }
-
   z.env[key] = val;
   return z.env[key];
 }
 
 /**
- * Map imports to a given path.
+ * Map modules to a given path.
+ *
  * @example
  *    z.map('lib/foo.js', ['foo.bar', 'foo.bin']);
- *
- * You can also map a file to a base namespace
- * @example
+ *    // You can also map a file to a base namespace
  *    z.map('lib/foo.js', ['foo.*']);
  *    // The following will now load lib/foo.js:
  *    z('myModule').import('foo.bar').export(function(){ });
@@ -385,6 +365,16 @@ z.plugin = function (name, callback) {
 }
 
 /**
+ * Check if a namespace has been defined.
+ *
+ * @param {String} namespace
+ */
+z.namespaceExists = function (namespace) {
+  return ( z.env.namespaces.hasOwnProperty(namespace)
+    && z.env.namespaces[namespace] !== undefined );
+}
+
+/**
  * Check if a module is mapped to a path.
  *
  * @param {String} module
@@ -392,7 +382,6 @@ z.plugin = function (name, callback) {
  */
 z.getMappedPath = function (module) {
   var mappedPath = false;
-
   each(z.env.map, function (maps, path) {
     each(maps, function (map) {
       if (map.test(module)){
@@ -413,7 +402,6 @@ z.getMappedPath = function (module) {
       }
     });
   });
-
   return mappedPath;
 }
 
@@ -437,7 +425,6 @@ z.createObjectByName = function (namespace, exports, env) {
       cur = cur[part] = {};
     }
   }
-
   return cur;
 }
 
@@ -458,7 +445,33 @@ z.getObjectByName = function (name, env) {
     }
   }
   return cur;  
-}
+};
+
+z.checkEnv = function () {
+  if (typeof module === "object" && module.exports) {
+    z.config('environment', 'node');
+  } else {
+    z.config('environment', 'client');
+  }
+};
+
+/**
+ * Are we running z on a server?
+ */
+z.isServer = function () {
+  if (!z.config('environment')) z.checkEnv();
+  return z.env.environment === 'node'
+    || z.env.environment === 'server';
+};
+
+/**
+ * Are we running z on a client?
+ */
+z.isClient = function () {
+  if (!z.config('environment')) z.checkEnv();
+  return z.env.environment != 'node'
+    && z.env.environment != 'server';
+};
 
 /* 
  * ----------------
@@ -490,9 +503,7 @@ z.prototype.imports = function (module) {
  */
 z.prototype.exports = function (factory) {
   var self = this;
-
   this._factory = factory;
-
   nextTick(function(){
     self.enable();
   });
@@ -505,26 +516,15 @@ z.prototype.exports = function (factory) {
  * @return {z}
  */
 z.prototype.enable = function () {
-
-  if(this.isPending()){
+  if (this.isPending()) {
     this.getDependencies();
-    return this;
-  }
-
-  if(this.isLoaded()){
+  } else if (this.isLoaded()) {
     this.runFactory();
-    return this;
-  }
-
-  if(this.isFailed()){
+  } else if (this.isFailed()) {
     this._wait.reject();
-    return this;
-  }
-
-  if(this.isEnabled()){
+  } else if (this.isEnabled()) {
     this._wait.resolve();
   }
-
   return this;
 }
 
@@ -588,13 +588,10 @@ z.prototype.getDependencies = function () {
 
   if(len > 0){
     each(queue, function(item){
-
       var loader = global.Z_MODULE_LOADER;
-
       if ( self._plugins[item] ) {
         loader = z.env.plugins[self._plugins[item]];
       }
-
       loader(item, function(){
         remaining -= 1;
         if(remaining <=0 ){
@@ -619,70 +616,62 @@ z.prototype.getDependencies = function () {
  * @api private
  */
 z.prototype.runFactory = function () {
-  var state = true
-    , self = this;
+  var self = this;
 
-  if(this.isEnabled()) return;
+  if (this.isEnabled() || this.isEnabling()) return;
 
-  // Make sure each of the deps has been enabled. If any need to be enabled, 
-  // stop loading and enable them.
+  this.isEnabling(true);
+
   each(this._dependencies, function ensureDependency (module) {
-    if(!state){
-      return;
-    }
-
-    if ( z.env.shim.hasOwnProperty(module) ) {
-      if(!z.getObjectByName(module)){
-        state = false;
-        throw new Error('A shimmed module could not be loaded: [' + module + '] for module: ' + self._namespaceString);
-      }
-      return;
-    }
-
-    if ( !z.env.modules.hasOwnProperty(module) ) {
-      self.disable('A dependency was not loaded: [' + module + '] for module: ' + self._namespaceString);
-      state = false;
-      return;
-    }
+    if (!self.isEnabling()) return;
 
     var current = z.env.modules[module];
 
-    if(current.isFailed()){
-      self.disable('A dependency failed: ['+ module + '] for module: ' + self._namespaceString);
-      state = false;
-      return;
-    }
-
-    if(!current.isEnabled()){
-      current.enable().done(function enableWhenReady () {
-        self.enable();
-      });
-      state = false;
-      return;
+    if (z.env.shim.hasOwnProperty(module)){
+      if(!z.getObjectByName(module)) {
+        self.disable('A shimmed module could not be loaded: [' + module + '] for module: ' + self._moduleName);
+      }
+    } else if (!z.env.modules.hasOwnProperty(module)) {
+      console.log(module, current);
+      self.disable('A dependency was not loaded: [' + module + '] for module: ' + self._moduleName);
+    } else if (current.isFailed()) {
+      self.disable('A dependency failed: ['+ module + '] for module: ' + self._moduleName);
+    } else if (!current.isEnabled()) {
+      // Set this module as loaded, but not enabling.
+      self.isLoaded(true);
+      // Wait for the dependency to enable, then try again.
+      current.enable().done(function () { self.enable(); });
     }
   });
 
-  if(!state){
+  if (!this.isEnabling()) return;
+
+  this.isEnabled(true);
+
+  // Don't define the namespace twice.
+  if (this._definition) return;
+
+  if (!this._factory) {
+    this.disable('No factory defined: ' + this._moduleName);
     return;
   }
 
-  this.isEnabled(true);
-  if(this._namespace) return;
-
-  if(!this._factory){
-    this.disable('No factory defined: ' + this._namespaceString);
+  if (z.isClient()) {
+    // Don't export modules prefixed by '@' to a global var. This is mostly used by 
+    // shimmed modules, as they'll typically define their own global variable.
+    if(this._moduleName.indexOf('@') >= 0) {
+      this._factory();
+      this._definition = true;
+    } else {
+      z.createObjectByName(this._moduleName, this._factory());
+      this._definition = z.getObjectByName(this._moduleName);
+    }
   }
 
-  if(z.env.environment !== 'node'){
-    if(this._namespaceString.indexOf('@') >= 0) {
-      this._factory();
-      this._namespace = true;
-    } else {
-      z.createObjectByName(this._namespaceString, this._factory());
-      this._namespace = z.getObjectByName(this._namespaceString);
-    }
-  } else {
+  if (z.isServer()) {
+    // Don't run factories in a node env.
     this._factory = this._factory.toString();
+    this._definition = true;
   }
 
   this.enable();
@@ -691,7 +680,7 @@ z.prototype.runFactory = function () {
 /**
  * Set up methods for checking the module state.
  */
-each(['Enabled', 'Loaded', 'Pending', 'Failed'], function ( state ) {
+each(['Enabled', 'Enabling', 'Loaded', 'Pending', 'Failed'], function ( state ) {
   var modState = z.env.MODULE_STATE[state.toUpperCase()];
   /**
    * Check module state.
@@ -711,7 +700,7 @@ each(['Enabled', 'Loaded', 'Pending', 'Failed'], function ( state ) {
  * -------
  */
 
-if(!global.Z_MODULE_LOADER){
+if(!global.Z_MODULE_LOADER && z.isClient()){
 
   var visited = {};
 
@@ -730,10 +719,10 @@ if(!global.Z_MODULE_LOADER){
       }
     }
     return function(node, wait){
-      node.addEventListener('load', function ( e ) {
+      node.addEventListener('load', function (e) {
         wait.resolve();
       }, false);
-      node.addEventListener('error', function ( e ) {
+      node.addEventListener('error', function (e) {
         wait.reject();
       }, false);
     }
@@ -821,7 +810,7 @@ if(!global.Z_MODULE_LOADER){
     request.send();
   }
 
-  /*! 
+  /**
    * Default file plugin.
    */
   z.plugin('txt', function (module, next, error) {
@@ -829,8 +818,11 @@ if(!global.Z_MODULE_LOADER){
       z(module).exports( function () { return data; } ).done(next);
     }, error);
   });
+
 }
 
-// Return z.
+// Export z.
 z.global = global;
 global.z = global.z || z;
+
+}));

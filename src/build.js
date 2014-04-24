@@ -5,7 +5,7 @@
  * Released under the MIT license
  */
 
-var zFactory = require('../../dist/z');
+var zFactory = require('./z');
 var sorter   = require('./sorter');
 var fs       = require('fs');
 var UglifyJS = require("uglify-js");
@@ -35,7 +35,7 @@ var Build = function (options) {
   zFactory(this._global);
   this._z = this._global.z;
 
-  this._z.config('environment', 'node');
+  // this._z.config('environment', 'node');
 
   this._z.plugin('txt', function (module, next, error) {
     self._global.Z_FILE_LOADER(module, 'txt', function (file) {
@@ -186,6 +186,13 @@ Build.prototype.extractLicenses = function (file) {
  */
 Build.prototype.logProgress = function (good){
   this._progressLog += (good)? '.' : 'x';
+  var stream = process.stdout
+    , str = this._progressLog;
+  process.nextTick(function () {
+    stream.clearLine();
+    stream.cursorTo(0);
+    stream.write(str);
+  });
 }
 
 /**
@@ -222,22 +229,16 @@ Build.prototype.loader = function (module, next, error) {
 }
 
 Build.prototype.fileLoader = function (module, type, next, error) {
-
   if (arguments.length < 4) {
     error = next;
     next = type;
     type = 'txt'; 
   }
-
   var src = ( this._z.getMappedPath(module)
     || module.replace(/\./g, '/') + '.' + type );
-  
   src = process.cwd() + '/' + this._z.env.root + src;
-
   var file = fs.readFileSync(src, 'utf-8');
-
   next(file);
-
 }
 
 /**
@@ -273,7 +274,7 @@ Build.prototype.start = function (src, dest) {
 
   this._z.env.modules[this.options.main].done( function renderModule () {
     self.render();
-    console.log(self._progressLog, 'Ok');
+    console.log(self._progressLog);
     self._onDone();
   });
 

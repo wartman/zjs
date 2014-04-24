@@ -1,6 +1,6 @@
 {
   "name": "zjs",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "authors": [
     "Peter Wartman"
   ],
@@ -17,6 +17,8 @@
     "node_modules",
     "bin",
     "src",
+    "Gruntfile.js",
+    "package.json",
     "bower_components",
     "test",
     "tests"

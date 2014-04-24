@@ -12,13 +12,14 @@ z.config({
   }
 });
 
-z('app.main')
-  .imports('fixtures.stress.one')
-  .imports('fixtures.stress.two')
-  .imports('fixtures.stress.three')
-  .imports('foo.mapped')
-  .imports('txt!fixtures.file.txt')
-  .imports('shim')
-  .exports(function(){
+z('app.main', function (imports, exports) {
+  imports('fixtures.stress.one');
+  imports('fixtures.stress.two');
+  imports('fixtures.stress.three');
+  imports('foo.mapped');
+  imports('txt!fixtures.file.txt');
+  imports('shim');
+  exports(function(){
     return "the main file";
   });
+});
