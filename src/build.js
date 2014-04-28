@@ -50,7 +50,7 @@ var Build = function (options) {
   this._compiled = '';
   this._header = '';
   this._onDone = function(){};
-}
+};
 
 /**
  * Setup Build.
@@ -59,7 +59,7 @@ var Build = function (options) {
  */
 Build.prototype.setup = function(options){
   this.options = _.defaults(this.options, options);
-}
+};
 
 /**
  * Default options.
@@ -121,7 +121,7 @@ Build.prototype.render = function () {
 
   this._compiled = compiled;
   return compiled;
-}
+};
 
 /**
  * Render a module.
@@ -136,7 +136,7 @@ Build.prototype.renderModule = function (factory, namespace) {
   }
   this.logProgress(true);
   return namespace + ' = (' + factory + ')();\n';
-}
+};
 
 /**
  * Render a namespace, ensuring all namespaces are defined.
@@ -167,7 +167,7 @@ Build.prototype.renderNamespace = function (namespace) {
   }
 
   return render;
-}
+};
 
 /**
  * Try to extract license info from included modules.
@@ -177,7 +177,7 @@ Build.prototype.extractLicenses = function (file) {
   var matches = licenseMatch.exec(file);
   if (!matches) return;
   this._header += matches[0] + '\n\n';
-}
+};
 
 /**
  * Log the current state of the builder.
@@ -193,7 +193,7 @@ Build.prototype.logProgress = function (good){
     stream.cursorTo(0);
     stream.write(str);
   });
-}
+};
 
 /**
  * Loader that replaces the default.
@@ -226,7 +226,7 @@ Build.prototype.loader = function (module, next, error) {
   if (this._z.getObjectByName(module)) {
     this._z.env.modules[module].done(next, error);
   }
-}
+};
 
 Build.prototype.fileLoader = function (module, type, next, error) {
   if (arguments.length < 4) {
@@ -239,7 +239,7 @@ Build.prototype.fileLoader = function (module, type, next, error) {
   src = process.cwd() + '/' + this._z.env.root + src;
   var file = fs.readFileSync(src, 'utf-8');
   next(file);
-}
+};
 
 /**
  * Start compiling the project.
@@ -267,6 +267,7 @@ Build.prototype.start = function (src, dest) {
     return;
   }
 
+  this.extractLicenses(file);
   var zModule = Function('z', file);
   zModule(this._z);
 
@@ -274,12 +275,14 @@ Build.prototype.start = function (src, dest) {
 
   this._z.env.modules[this.options.main].done( function renderModule () {
     self.render();
-    console.log(self._progressLog);
     self._onDone();
+    process.nextTick(function () {
+      console.log('\n');
+    })
   });
 
   return this;
-}
+};
 
 /**
  * Run when compiling is done.
@@ -291,6 +294,6 @@ Build.prototype.done = function (next) {
   }
 
   return this;
-}
+};
 
 module.exports = Build;

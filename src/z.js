@@ -191,25 +191,12 @@ wait.prototype._dispatch = function (fns, value, ctx) {
  * @return {Object}
  */
 var z = function (name, factory) {
-  if( !(this instanceof z) ){
-    return new z(name, factory);
-  }
+  // Allows the use of z without 'new'
+  if( !(this instanceof z) ) return new z(name, factory);
 
-  // Raise an error if a namespace is redefined
-  if(z.namespaceExists(name)){
-    throw Error('Namespace was already defined: ' + name);
-  }
-  delete z.env.namespaces[name];
-
-  var namespace = name;
-  while ( (namespace = namespace.substring(0, namespace.lastIndexOf('.'))) ) {
-    if(z.namespaceExists(namespace) || namespace.indexOf('@') >= 0){
-      break;
-    }
-    z.env.namespaces[namespace] = true;
-  }
-
-  // Register this loader
+  // Register the namespace (or throw an error if already defined)
+  z.ensureNamespace(name);  
+  // Register this module
   z.env.modules[name] = this;
 
   this._wait = new wait();
@@ -220,9 +207,8 @@ var z = function (name, factory) {
   this._plugins = {};
   this._factory = null;
 
-  if (!name.indexOf('@') >= 0){
-    z.createObjectByName(name);
-  }
+  // Export the namespace if the name isn't prefixed by '@'
+  if (!name.indexOf('@') >= 0) z.createObjectByName(name);
 
   if(factory && ('function' === typeof factory) ){
     if(factory.length < 2){
@@ -251,6 +237,7 @@ z.env = {
   plugins: {},
   pluginPattern: /([\s\S]+?)\!/,
   environment: false,
+  VERSION: '@VERSION',
   MODULE_STATE: {
     PENDING: 0,
     LOADED: 1,
@@ -372,6 +359,28 @@ z.plugin = function (name, callback) {
 z.namespaceExists = function (namespace) {
   return ( z.env.namespaces.hasOwnProperty(namespace)
     && z.env.namespaces[namespace] !== undefined );
+}
+
+/**
+ * Register a namespace. This won't actually create a javascript object --
+ * use createObjectFromName for this. This is just used to ensure overwrites
+ * are caught.
+ *
+ * @param {String} namespace
+ */
+z.ensureNamespace = function (namespace) {
+  // Raise an error if a namespace is redefined
+  if(z.namespaceExists(namespace)){
+    throw Error('Namespace was already defined: ' + namespace);
+  }
+  delete z.env.namespaces[namespace];
+
+  while ( (namespace = namespace.substring(0, namespace.lastIndexOf('.'))) ) {
+    if(z.namespaceExists(namespace) || namespace.indexOf('@') >= 0){
+      break;
+    }
+    z.env.namespaces[namespace] = true;
+  }
 }
 
 /**

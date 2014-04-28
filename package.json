@@ -1,6 +1,6 @@
 {
   "name": "zjs",
-  "version": "0.3.3",
+  "version": "1.0.0",
   "keywords": [
     "module",
     "loader"
@@ -11,7 +11,7 @@
     "url": "https://wartman@bitbucket.org/wartman/zjs.git"
   },
   "license": "MIT",
-  "main": "dist/z.js",
+  "main": "z.js",
   "author": {
     "name": "Peter Wartman",
     "email": "pwartman@wartfolio.com"

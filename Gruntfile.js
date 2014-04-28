@@ -1,47 +1,13 @@
 module.exports = function(grunt){
 
-  function process (code) {
-    return code
-      // Embed version
-      .replace( /@VERSION/g, grunt.config( "pkg" ).version )
-      // Embed date (yyyy-mm-ddThh:mmZ)
-      .replace( /@DATE/g, ( new Date() ).toISOString().replace( /:\d+\.\d+Z$/, "Z" ) );
-  }
-
   grunt.initConfig({
-
     pkg: grunt.file.readJSON('package.json'),
-
-    // concat: {
-    //   dist: {
-    //     options: { process: process },
-    //     src: [
-    //       'src/intro.js',
-    //       'src/core.js',
-    //       'src/outro.js'
-    //     ],
-    //     dest: "dist/z.js"
-    //   },
-    // },
-
-    // uglify: {
-    //   z: {
-    //     options: {
-    //       banner: '/*! z | <%= grunt.template.today("yyyy-mm-dd") %> */\n'
-    //     },
-    //     src: 'dist/z.js',
-    //     dest: 'dist/z-min.js'
-    //   }
-    // },
-
-    // Unit tests.
     nodeunit: {
       tests: [
         'test/build_test.js',
         'test/sorter_test.js'
       ],
     },
-
     qunit: {
       all: {
         options: {
@@ -51,7 +17,6 @@ module.exports = function(grunt){
         }
       }
     },
-
     connect: {
       server: {
         options: {
@@ -60,11 +25,8 @@ module.exports = function(grunt){
         }
       }
     }
-
   });
-
-  // grunt.loadNpmTasks('grunt-contrib-concat');
-  // grunt.loadNpmTasks('grunt-contrib-uglify');
+  
   grunt.loadNpmTasks('grunt-contrib-nodeunit')
   grunt.loadNpmTasks('grunt-contrib-connect');
   grunt.loadNpmTasks('grunt-contrib-qunit');
@@ -72,7 +34,11 @@ module.exports = function(grunt){
   grunt.registerTask('distribute', function () {
     var code = grunt.file.read(__dirname + '/src/z.js');
     var dest = __dirname + '/z.js';
-    code = process(code);
+    code = code
+      // Embed version
+      .replace( /@VERSION/g, grunt.config( "pkg" ).version )
+      // Embed date (yyyy-mm-ddThh:mmZ)
+      .replace( /@DATE/g, ( new Date() ).toISOString().replace( /:\d+\.\d+Z$/, "Z" ) );
     if(grunt.file.exists(dest)){
       grunt.file.delete(dest);
     }
