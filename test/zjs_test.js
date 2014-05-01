@@ -269,6 +269,30 @@
       start();
       ok(false, reason);
     });
-  })
+  });
+
+  test('Module definition entirely by callback', function () {
+    stop();
+    z(function (module) {
+      module.provides('moduleTest.byCallback');
+      module.exports('foo', 'foo');
+      module.done(function () {
+        start();
+        equal(moduleTest.byCallback.foo, 'foo', 'Exported.');
+      });
+    });
+  });
+
+  test('Unnamed modules pass `this` to the callback, regardless of number of args', function () {
+    stop();
+    z(function (module, foo, bar) {
+      module.provides('moduleTest.byCallbackManyArgs');
+      module.exports('foo', 'foo');
+      module.done(function () {
+        start();
+        equal(moduleTest.byCallbackManyArgs.foo, 'foo', 'Exported.');
+      });
+    });
+  });
 
 })();

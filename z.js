@@ -1,10 +1,10 @@
 /*!
- * zjs 1.0.0
+ * zjs 1.0.1
  *
  * Copyright 2014
  * Released under the MIT license
  *
- * Date: 2014-05-01T17:47Z
+ * Date: 2014-05-01T19:05Z
  */
 
 (function (factory) {
@@ -207,17 +207,19 @@ wait.prototype._dispatch = function (fns, value, ctx) {
  * @return {Object}
  */
 var z = function (name, factory) {
+  if ("function" === typeof name) {
+    factory = name;
+    name = false;
+  }
+
   // Allows the use of z without 'new'
   if( !(this instanceof z) ) return new z(name, factory);
 
-  // Register the namespace (or throw an error if already defined)
-  z.ensureNamespace(name);  
-  // Register this module
-  z.env.modules[name] = this;
+  this._moduleName = null;
+  if (name) this.provides(name);
 
   this._wait = new wait();
   this._state = z.env.MODULE_STATE.PENDING;
-  this._moduleName = name;
   this._defined = false;
   this._imports = [];
   this._exports = [];
@@ -225,10 +227,9 @@ var z = function (name, factory) {
   this._plugins = {};
   this._factory = null;
 
-  // Export the namespace if the name isn't prefixed by '@'
-  if (!name.indexOf('@') >= 0) z.createObjectByName(name);
-
-  if(factory && ('function' === typeof factory) ){
+  if (!name && factory) {
+    factory(this);
+  } else if(factory && ('function' === typeof factory) ){
     if(factory.length === 2){
       factory(this.imports.bind(this), this.exports.bind(this));
     } else if (factory.length === 1) {
@@ -257,7 +258,7 @@ z.env = {
   plugins: {},
   pluginPattern: /([\s\S]+?)\!/,
   environment: false,
-  VERSION: '1.0.0',
+  VERSION: '1.0.1',
   MODULE_STATE: {
     PENDING: 0,
     LOADED: 1,
@@ -508,6 +509,24 @@ z.isClient = function () {
  * Instance Methods
  * ----------------
  */
+
+/**
+ * Set the namespace this module will be defining.
+ *
+ * @param {Type} name descrip
+ * @param {Type} name descrip
+ * @return {Type} 
+ */
+z.prototype.provides = function (name) {
+  this._moduleName = name;
+  // Register the namespace (or throw an error if already defined)
+  z.ensureNamespace(name);  
+  // Register this module
+  z.env.modules[name] = this;
+  // Export the namespace if the name isn't prefixed by '@'
+  if (!name.indexOf('@') >= 0) z.createObjectByName(name);
+  return this;
+};
 
 /**
  * Import a module
