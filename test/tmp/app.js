@@ -18,33 +18,54 @@ fixtures.stress.item = {};
 (function(global){
   global.shim = "shimmed";
 })(this);
-fixtures.file.txt = (function anonymous() {
+fixtures.file.txt = (function () {
+var exports = (function anonymous() {
   return 'loaded'
 })();
+return exports;
+})();
 foo.mapped = (function () {
+var exports = (function () {
   return "mapped";
 })();
-fixtures.stress.three = (function (){
+return exports;
+})();
+fixtures.stress.three = (function () {
+var exports = (function (){
     return {
       Three: "three"
     };
   })();
-fixtures.stress.two = (function (){
+return exports;
+})();
+fixtures.stress.two = (function () {
+var exports = (function (){
     return {
       Two: "two"
     };
   })();
-fixtures.stress.item.foo = (function (){
+return exports;
+})();
+fixtures.stress.item.foo = (function () {
+var exports = (function (){
   return "Foo";
 })();
-fixtures.stress.one = (function (){
+return exports;
+})();
+fixtures.stress.one = (function () {
+var exports = (function (){
     return {
       One: "one",
       Foo: fixtures.stress.item.foo
     };
   })();
-app.main = (function (){
+return exports;
+})();
+app.main = (function () {
+var exports = (function (){
     return "the main file";
   })();
+return exports;
+})();
 
 }).call(this);

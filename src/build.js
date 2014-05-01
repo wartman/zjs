@@ -5,7 +5,7 @@
  * Released under the MIT license
  */
 
-var zFactory = require('./z');
+var z        = require('./z').z;
 var sorter   = require('./sorter');
 var fs       = require('fs');
 var UglifyJS = require("uglify-js");
@@ -26,24 +26,17 @@ var Build = function (options) {
 
   this._shimmed = {};
 
-  // Mock a global env for z.
-  this._global = {};
-  this._global.Z_MODULE_LOADER = this.loader.bind(this);
-  this._global.Z_FILE_LOADER = this.fileLoader.bind(this);
+  // Register loaders.
+  this.loaders();
 
-  // Bind a copy of z to the mocked up env.
-  zFactory(this._global);
-  this._z = this._global.z;
-
-  // this._z.config('environment', 'node');
-
-  this._z.plugin('txt', function (module, next, error) {
-    self._global.Z_FILE_LOADER(module, 'txt', function (file) {
-      var fileWrapper = self._z(module);
+  // Overwrite plugin
+  z.plugin('txt', function (module, next, error) {
+    z.global.Z_FILE_LOADER(module, 'txt', function (file) {
+      var fileWrapper = z(module);
       fileWrapper.exports(Function('', '  return \'' + file + '\''));
       fileWrapper.done(next, error);
     }, error);
-  })
+  });
 
   this._exists = {};
   this._progressLog = '';
@@ -73,29 +66,25 @@ Build.prototype.options = {
  * Compile the project and output.
  */
 Build.prototype.render = function () {
-  var modules = this._z.env.modules
+
+  var modules = z.env.modules
     , moduleList = {}
     , sortedModules = []
     , compiled = ''
     , self = this;
 
   compiled += "/* namespaces */\n";
-  _.each(this._z.env.namespaces, function(val, ns){
+  _.each(z.env.namespaces, function(val, ns){
     compiled += self.renderNamespace(ns);
   });
 
   compiled += "\n/* modules */\n";
 
-  // Add shimmed modules.
-  _.each(this._shimmed, function (module, name) {
-    compiled += module + '\n';
-  });
-
   // Ensure that modules dependent on other modules are always defined
   // lower down in the compiled script.
   for (item in modules) {
     if(item.indexOf('@') >= 0) continue; // Don't add shims.
-    moduleList[item] = modules[item]._dependencies;
+    moduleList[item] = modules[item]._imports;
   }
 
   // Sort the modules with the topological sorter.
@@ -104,10 +93,10 @@ Build.prototype.render = function () {
   // Compile
   _.each(sortedModules, function(ns){
     if(ns.indexOf('@') >= 0) return; // Don't add shims.
-    compiled += self.renderModule( modules[ns]._factory, ns );
+    compiled += self.renderModule( modules[ns], ns );
   });
 
-  compiled = "(function () {\n" + compiled + "\n}).call(this);"
+  compiled = "(function () {\n" + compiled + "\n}).call(this);";
 
   if(this.options.optimize){
     compiled = UglifyJS.minify(compiled, {fromString: true}).code;
@@ -129,13 +118,34 @@ Build.prototype.render = function () {
  * @param {Function} factory
  * @param {String} namespace
  */
-Build.prototype.renderModule = function (factory, namespace) {
-  if (this._z.env.shim[namespace]) {
+Build.prototype.renderModule = function (module, namespace) {
+  if (z.env.shim[namespace]) {
     this.logProgress(true);
-    return '';
+    this.extractLicenses(z.getObjectByName(namespace, z.global));
+    return z.getObjectByName(namespace, z.global) + '\n';
+  }
+  var header = 'var exports = {};\n';
+  var body = '';
+  _.each(module._exports, function (item) {
+    if (item.id) {
+      if (_.isFunction(item.definition)) {
+        body += 'exports.' + item.id + ' = (' + item.definition.toString() + ')();\n';
+      } else {
+        body += 'exports.' + item.id + ' = ' + item.definition + '\n';
+      }
+    } else {
+      if (_.isFunction(item.definition)) {
+        header = 'var exports = (' + item.definition + ')();\n';
+      } else {
+        header = 'exports.' + item.id + ' = ' + item.definition + '\n';
+      }
+    }
+  });
+  if (module._body) {
+    header = 'var exports = (' + module._body.toString() + ')();\n'
   }
   this.logProgress(true);
-  return namespace + ' = (' + factory + ')();\n';
+  return namespace + ' = (function () {\n' + header + body + 'return exports;\n})();\n';
 };
 
 /**
@@ -184,7 +194,7 @@ Build.prototype.extractLicenses = function (file) {
  *
  * @param {Boolean} good Set to true to log a good state.
  */
-Build.prototype.logProgress = function (good){
+Build.prototype.logProgress = function (good) {
   this._progressLog += (good)? '.' : 'x';
   var stream = process.stdout
     , str = this._progressLog;
@@ -195,50 +205,48 @@ Build.prototype.logProgress = function (good){
   });
 };
 
-/**
- * Loader that replaces the default.
- */
-Build.prototype.loader = function (module, next, error) {
+Build.prototype.loaders = function () {
+  var build = this;
 
-  var src = ( this._z.getMappedPath(module) 
-    || module.replace(/\./g, '/') + '.js' );
-  
-  src = process.cwd() + '/' + this._z.env.root + src;
+  /**
+   * Loader that replaces the default.
+   */
+  z.global.Z_MODULE_LOADER = function (module, next, error) {
 
-  var file = fs.readFileSync(src, 'utf-8');
+    var src = ( z.getMappedPath(module) 
+      || module.replace(/\./g, '/') + '.js' );
+    
+    src = process.cwd() + '/' + z.env.root + src;
 
-  // Extract liscense info in case we're optimizing and want to add it back.
-  this.extractLicenses(file);
+    var file = fs.readFileSync(src, 'utf-8');
 
-  if (this._z.env.shim[module]) {
-    this._shimmed[module] = file;
-    this._z(module).exports(function(){}).done(next);
-    return;
-  }
+    if (z.env.shim[module]) {
+      z.createObjectByName(module, file, z.global);
+      next();
+      return;
+    };
 
-  try {
     var zModule = Function('z', file);
-    zModule(this._z);
-  } catch (e) {
-    this.logProgress(false);
-  }
+    zModule(z);
 
-  if (this._z.getObjectByName(module)) {
-    this._z.env.modules[module].done(next, error);
-  }
-};
+    if (z.getObjectByName(module)) {
+      z.env.modules[module].done(next, error);
+    }
+  };
 
-Build.prototype.fileLoader = function (module, type, next, error) {
-  if (arguments.length < 4) {
-    error = next;
-    next = type;
-    type = 'txt'; 
-  }
-  var src = ( this._z.getMappedPath(module)
-    || module.replace(/\./g, '/') + '.' + type );
-  src = process.cwd() + '/' + this._z.env.root + src;
-  var file = fs.readFileSync(src, 'utf-8');
-  next(file);
+  z.global.Z_FILE_LOADER  = function (module, type, next, error) {
+    if (arguments.length < 4) {
+      error = next;
+      next = type;
+      type = 'txt'; 
+    }
+    var src = ( z.getMappedPath(module)
+      || module.replace(/\./g, '/') + '.' + type );
+    src = process.cwd() + '/' + z.env.root + src;
+    var file = fs.readFileSync(src, 'utf-8');
+    next(file);
+  };
+
 };
 
 /**
@@ -269,11 +277,11 @@ Build.prototype.start = function (src, dest) {
 
   this.extractLicenses(file);
   var zModule = Function('z', file);
-  zModule(this._z);
+  zModule(z);
 
-  this.options.main = (this._z.config('main') || this.options.main);
+  this.options.main = (z.config('main') || this.options.main);
 
-  this._z.env.modules[this.options.main].done( function renderModule () {
+  z.env.modules[this.options.main].done( function renderModule () {
     self.render();
     self._onDone();
     process.nextTick(function () {

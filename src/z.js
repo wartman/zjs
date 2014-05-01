@@ -7,16 +7,14 @@
  * Date: @DATE
  */
 
-(function (global, factory) {
-
+(function (factory) {
   if ( typeof module === "object" && typeof module.exports === "object" ) {
     // For CommonJS environments.
-    module.exports = factory;
+    factory(module.exports);
   } else {
-    factory(global);
+    factory(window);
   }
-
-}( typeof window !== "undefined" ? window : this, function (global, undefined) {
+}( function (root, undefined) {
 
 /*
  * -------
@@ -61,8 +59,8 @@ var nextTick = ( function () {
         dispatchFns();
       }
     };
-    global.addEventListener('message', onMessage, true);
-    return function (fn, ctx) { enqueueFn(fn, ctx) && global.postMessage(msg, '*'); };
+    root.addEventListener('message', onMessage, true);
+    return function (fn, ctx) { enqueueFn(fn, ctx) && root.postMessage(msg, '*'); };
   }
 })();
 
@@ -96,7 +94,25 @@ var each = function (obj, callback, context) {
     }
   }
   return obj;
-}
+};
+
+/**
+ * Extend an object
+ *
+ * @param {Object} obj The object to extend
+ * @param {Obejct} ... Any number of objects to mixin
+ * @return {Object}
+ */
+var extend = function(obj /*...*/){
+  each(Array.prototype.slice.call(arguments, 1), function(source){
+    if(source){
+      for(var prop in source){
+        if (source.hasOwnProperty(prop)) obj[prop] = source[prop];
+      }
+    }
+  });
+  return obj;
+};
 
 /**
  * A super stripped down promise-like thing.
@@ -202,8 +218,10 @@ var z = function (name, factory) {
   this._wait = new wait();
   this._state = z.env.MODULE_STATE.PENDING;
   this._moduleName = name;
-  this._definition = false;
-  this._dependencies = [];
+  this._defined = false;
+  this._imports = [];
+  this._exports = [];
+  this._body = false;
   this._plugins = {};
   this._factory = null;
 
@@ -211,10 +229,12 @@ var z = function (name, factory) {
   if (!name.indexOf('@') >= 0) z.createObjectByName(name);
 
   if(factory && ('function' === typeof factory) ){
-    if(factory.length < 2){
-      this.exports(factory);
-    } else {
+    if(factory.length === 2){
       factory(this.imports.bind(this), this.exports.bind(this));
+    } else if (factory.length === 1) {
+      factory(this);
+    } else {
+      this.exports(factory);
     }
   }
 }
@@ -241,8 +261,9 @@ z.env = {
   MODULE_STATE: {
     PENDING: 0,
     LOADED: 1,
-    ENABLING: 2,
-    ENABLED: 3,
+    WORKING: 2,
+    READY: 3,
+    ENABLED: 4,
     FAILED: -1
   }
 };
@@ -314,7 +335,7 @@ z.map = function (path, provides) {
 
 /**
  * Shim a module. This will work with any module that returns
- * something in the global scope.
+ * something in the root scope.
  *
  * @param {String} module
  * @param {Object} options
@@ -422,7 +443,7 @@ z.getMappedPath = function (module) {
  * @param {String} namespace
  */
 z.createObjectByName = function (namespace, exports, env) {
-  var cur = env || global
+  var cur = env || root
     , parts = namespace.split('.');
   for (var part; parts.length && (part = parts.shift()); ) {
     if(!parts.length && exports !== undefined){
@@ -444,7 +465,7 @@ z.createObjectByName = function (namespace, exports, env) {
  * @param {Object} env (optional)
  */
 z.getObjectByName = function (name, env) {
-  var cur = env || global
+  var cur = env || root
     , parts = name.split('.');
   for (var part; part = parts.shift(); ) {
     if(typeof cur[part] !== "undefined"){
@@ -500,24 +521,103 @@ z.prototype.imports = function (module) {
     module = module.replace(parts[0], '');
     this._plugins[module] = parts[1];
   }
-  this._dependencies.push(module);
+  this._imports.push(module);
   return this;
 }
 
 /**
- * Define this module when all dependencies are ready.
+ * Export an item or items for the current module. If
+ * [definition] is a function it will be called after
+ * the module finishes collecting all imports. Anything
+ * returned from [definition] will be used to define the
+ * current export.
  *
- * @param {Function} factory
+ * @example
+ *    z('app.foo', function (imports, exports) {
+ *      imports('app.bar');
+ *      exports('bin', 'bin');
+ *      exports('foo', {bar:'bar', baz:'baz'});
+ *      exports('baz', function () {
+ *        // Using a callback like this will allow
+ *        // you to use any imported modules.
+ *        var bar = app.bar;
+ *        // Will define `app.foo.baz.bar`
+ *        return {bar: bar};
+ *      });
+ *      exports(function () {
+ *        // [name] is optional.
+ *        // The following will define `app.foo.bix`
+ *        return {bix:'bix'};
+ *      });
+ *      exports(function () {
+ *        // You can define the root export of a
+ *        // module by ommiting [name] and returning a
+ *        // function.
+ *        // No matter where
+ *        // you call this, any previous exports WILL NOT
+ *        // be overwritten.
+ *        // The following defines `app.foo`
+ *        return function () { return 'foo'; };
+ *      });
+ *    });
+ *
+ * @param {String} name (optional) Name this export.
+ * @param {Mixed} definition
  * @return {z}
  */
-z.prototype.exports = function (factory) {
+z.prototype.exports = function (name, definition) {
+  if (arguments.length < 2) {
+    definition = name;
+    name = false;
+  }
   var self = this;
-  this._factory = factory;
+  this._exports.push({
+    id: name,
+    definition: definition
+  });
   nextTick(function(){
     self.enable();
   });
   return this;
 }
+
+/**
+ * Will run [factory] after the module is done
+ * loading all requested imports/exports. Returning a value 
+ * here won't do anything -- instead, define any exports you want
+ * the natural way, by setting properties for the current object.
+ *
+ * Body may only be called once per module.
+ *
+ * @example
+ *    z('app.foo', function (module) {
+ *      module.imports('app.bar');
+ *      module.body(function () {
+ *        app.bar; // Is useable.
+ *        app.foo.bin = 'bar'; // Just set properties.
+ *        // NOTE:
+ *        // The following will define nothing:
+ *        return {app:'bar'}
+ *        // Use `z#exports` if you want to return a value.
+ *      });
+ *    });
+ *
+ * @param {Type} name descrip
+ * @param {Type} name descrip
+ * @return {Type} 
+ */
+z.prototype.body = function (factory) {
+  var self = this;
+  if (this._body) {
+    this.disable('Cannot define body twice: ' + this._moduleName);
+    return;
+  }
+  this._body = factory;
+  nextTick(function(){
+    self.enable();
+  });
+  return this;
+};
 
 /**
  * Enable this module.
@@ -526,13 +626,15 @@ z.prototype.exports = function (factory) {
  */
 z.prototype.enable = function () {
   if (this.isPending()) {
-    this.getDependencies();
+    this._loadImports();
   } else if (this.isLoaded()) {
-    this.runFactory();
-  } else if (this.isFailed()) {
-    this._wait.reject();
+    this._ensureDependencies();
+  } else if (this.isReady()) {
+    this._enableExports();
   } else if (this.isEnabled()) {
     this._wait.resolve();
+  } else if (this.isFailed()) {
+    this._wait.reject();
   }
   return this;
 }
@@ -581,23 +683,22 @@ z.prototype.disable = function (reason) {
 /**
  * Iterate through deps and load them.
  *
+ * @api private
  * @return {z}
  */
-z.prototype.getDependencies = function () {
+z.prototype._loadImports = function () {
   var queue = []
     , self = this
-    , len = this._dependencies.length;
-
-  each(this._dependencies, function(item){
+    , len = this._imports.length;
+  this.isWorking(true);
+  each(this._imports, function(item){
     if (!z.getObjectByName(item)) queue.push(item);
   });
-
   len = queue.length;
   var remaining = len;
-
   if(len > 0){
     each(queue, function(item){
-      var loader = global.Z_MODULE_LOADER;
+      var loader = root.Z_MODULE_LOADER;
       if ( self._plugins[item] ) {
         loader = z.env.plugins[self._plugins[item]];
       }
@@ -615,27 +716,21 @@ z.prototype.getDependencies = function () {
     this.isLoaded(true);
     this.enable();
   }
-
   return this;
-}
+};
 
 /**
- * Run the factory, making sure dependncies have been enabled.
+ * Make sure dependncies have been enabled.
  *
  * @api private
  */
-z.prototype.runFactory = function () {
+z.prototype._ensureDependencies = function () {
   var self = this;
-
-  if (this.isEnabled() || this.isEnabling()) return;
-
-  this.isEnabling(true);
-
-  each(this._dependencies, function ensureDependency (module) {
-    if (!self.isEnabling()) return;
-
+  if (this.isEnabled() || this.isWorking()) return;
+  this.isWorking(true);
+  each(this._imports, function ensureDependency (module) {
+    if (!self.isWorking()) return;
     var current = z.env.modules[module];
-
     if (z.env.shim.hasOwnProperty(module)){
       if(!z.getObjectByName(module)) {
         self.disable('A shimmed module could not be loaded: [' + module + '] for module: ' + self._moduleName);
@@ -652,44 +747,48 @@ z.prototype.runFactory = function () {
       current.enable().done(function () { self.enable(); });
     }
   });
-
-  if (!this.isEnabling()) return;
-
-  this.isEnabled(true);
-
-  // Don't define the namespace twice.
-  if (this._definition) return;
-
-  if (!this._factory) {
-    this.disable('No factory defined: ' + this._moduleName);
-    return;
-  }
-
-  if (z.isClient()) {
-    // Don't export modules prefixed by '@' to a global var. This is mostly used by 
-    // shimmed modules, as they'll typically define their own global variable.
-    if(this._moduleName.indexOf('@') >= 0) {
-      this._factory();
-      this._definition = true;
-    } else {
-      z.createObjectByName(this._moduleName, this._factory());
-      this._definition = z.getObjectByName(this._moduleName);
-    }
-  }
-
-  if (z.isServer()) {
-    // Don't run factories in a node env.
-    this._factory = this._factory.toString();
-    this._definition = true;
-  }
-
+  if (!this.isWorking()) return;
+  this.isReady(true);
   this.enable();
-}
+};
+
+/**
+ * Enable exports
+ *
+ * @api private
+ */
+z.prototype._enableExports = function () {
+  if (this._defined) return;
+  this._defined = true;
+  this.isWorking(true);
+  var self = this;
+  each(this._exports, function (item) {
+    var definition = null;
+    if ("function" === typeof item.definition) {
+      if (z.isClient()) {
+        definition = item.definition();
+      } else {
+        definition = item.definition.toString();
+      }
+    } else {
+      definition = item.definition;
+    }
+    if (item.id) {
+      z.createObjectByName(self._moduleName + '.' + item.id, definition);
+    } else {
+      definition = extend(definition, z.getObjectByName(self._moduleName));
+      z.createObjectByName(self._moduleName, definition);
+    }
+  });
+  if (this._body) this._body();
+  this.isEnabled(true);
+  this.enable();
+};
 
 /**
  * Set up methods for checking the module state.
  */
-each(['Enabled', 'Enabling', 'Loaded', 'Pending', 'Failed'], function ( state ) {
+each(['Enabled', 'Ready', 'Working', 'Loaded', 'Pending', 'Failed'], function ( state ) {
   var modState = z.env.MODULE_STATE[state.toUpperCase()];
   /**
    * Check module state.
@@ -708,8 +807,7 @@ each(['Enabled', 'Enabling', 'Loaded', 'Pending', 'Failed'], function ( state ) 
  * Globals
  * -------
  */
-
-if(!global.Z_MODULE_LOADER && z.isClient()){
+if(!root.Z_MODULE_LOADER && z.isClient()){
 
   var visited = {};
 
@@ -745,7 +843,7 @@ if(!global.Z_MODULE_LOADER && z.isClient()){
    * @param {Function} next Run on success
    * @param {Funtion} error Run on error
    */
-  global.Z_MODULE_LOADER = function (module, next, error) {
+  root.Z_MODULE_LOADER = function (module, next, error) {
     var src = z.env.root + ( z.getMappedPath(module)
       || module.replace(/\./g, '/') + '.js' );
 
@@ -780,7 +878,7 @@ if(!global.Z_MODULE_LOADER && z.isClient()){
    * @param {Function} next Run on success
    * @param {Funtion} error Run on error
    */
-  global.Z_FILE_LOADER = function (file, type, next, error) {
+  root.Z_FILE_LOADER = function (file, type, next, error) {
 
     if (arguments.length < 4) {
       error = next;
@@ -799,7 +897,7 @@ if(!global.Z_MODULE_LOADER && z.isClient()){
     visited[src] = new wait();
     visited[src].done(next, error);
 
-    if(global.XMLHttpRequest){
+    if(root.XMLHttpRequest){
       var request = new XMLHttpRequest();
     } else { // code for IE6, IE5
       var request = new ActiveXObject("Microsoft.XMLHTTP");
@@ -819,19 +917,61 @@ if(!global.Z_MODULE_LOADER && z.isClient()){
     request.send();
   }
 
-  /**
-   * Default file plugin.
-   */
-  z.plugin('txt', function (module, next, error) {
-    global.Z_FILE_LOADER(module, 'txt', function (data) {
-      z(module).exports( function () { return data; } ).done(next);
-    }, error);
-  });
+} else if (z.isServer()) {
 
-}
+  // Make z global.
+  GLOBAL.z = z;
+
+  var visited = {};
+  var fs = require('fs');
+
+  root.Z_MODULE_LOADER = function (module, next, error) {
+    var src = z.env.root + ( z.getMappedPath(module)
+      || module.replace(/\./g, '/') );
+    if (visited.hasOwnProperty(src)) return next();
+    try {
+      require(src);
+    } catch (e) {
+      error(e);
+    }
+  };
+
+  root.Z_FILE_LOADER = function (file, type, next, error) {
+    if (arguments.length < 4) {
+      error = next;
+      next = type;
+      type = 'txt'; 
+    }
+    var src = z.env.root + ( z.getMappedPath(file)
+      || file.replace(/\./g, '/') + '.' + type );
+    if(visited.hasOwnProperty(src)){
+      visited[src].done(next, error);
+      return;
+    }
+    visited[src] = new wait();
+    visited[src].done(next, error);
+    fs.readFile(src, 'utf-8', function (err, data) {
+      if (err) {
+        visited[src].reject(err);
+        return;
+      }
+      visited[src].resolve(data);
+    });
+  };
+
+};
+
+/**
+ * Default file plugin.
+ */
+z.plugin('txt', function (module, next, error) {
+  root.Z_FILE_LOADER(module, 'txt', function (data) {
+    z(module).exports( function () { return data; } ).done(next);
+  }, error);
+});
 
 // Export z.
-z.global = global;
-global.z = global.z || z;
+z.global = root;
+root.z = root.z || z;
 
 }));

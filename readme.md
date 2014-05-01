@@ -126,13 +126,10 @@ all your configuration options and where you'll include your first modules. Here
 
     z('app.main', function (imports, exports) {
 
-    imports('app.boot');
+        imports('app.boot');
 
-    exports(function () {
-        app.boot();
+        exports(function () {
+            app.boot();
+        });
+
     });
-
-    });
-
-
-More detailed instructions are coming, but the code is fairly well commented if you're curious. Give it a read!
