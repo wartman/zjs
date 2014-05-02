@@ -216,21 +216,26 @@ var z = function (name, factory) {
   if( !(this instanceof z) ) return new z(name, factory);
 
   this._moduleName = null;
-  if (name) this.provides(name);
+  if (name) this.defines(name);
 
   this._wait = new wait();
   this._state = z.env.MODULE_STATE.PENDING;
   this._defined = false;
   this._imports = [];
   this._exports = [];
-  this._body = false;
   this._plugins = {};
   this._factory = null;
 
   if (!name && factory) {
-    factory(this);
+    if (factory.length === 3) {
+      factory(this.defines.bind(this), this.imports.bind(this), this.exports.bind(this));
+    } else {
+      factory(this);
+    }
   } else if(factory && ('function' === typeof factory) ){
-    if(factory.length === 2){
+    if (factory.length === 3) {
+      factory(this.defines.bind(this), this.imports.bind(this), this.exports.bind(this));
+    } else if (factory.length === 2) {
       factory(this.imports.bind(this), this.exports.bind(this));
     } else if (factory.length === 1) {
       factory(this);
@@ -517,7 +522,7 @@ z.isClient = function () {
  * @param {Type} name descrip
  * @return {Type} 
  */
-z.prototype.provides = function (name) {
+z.prototype.defines = function (name) {
   this._moduleName = name;
   // Register the namespace (or throw an error if already defined)
   z.ensureNamespace(name);  
@@ -599,44 +604,6 @@ z.prototype.exports = function (name, definition) {
   });
   return this;
 }
-
-/**
- * Will run [factory] after the module is done
- * loading all requested imports/exports. Returning a value 
- * here won't do anything -- instead, define any exports you want
- * the natural way, by setting properties for the current object.
- *
- * Body may only be called once per module.
- *
- * @example
- *    z('app.foo', function (module) {
- *      module.imports('app.bar');
- *      module.body(function () {
- *        app.bar; // Is useable.
- *        app.foo.bin = 'bar'; // Just set properties.
- *        // NOTE:
- *        // The following will define nothing:
- *        return {app:'bar'}
- *        // Use `z#exports` if you want to return a value.
- *      });
- *    });
- *
- * @param {Type} name descrip
- * @param {Type} name descrip
- * @return {Type} 
- */
-z.prototype.body = function (factory) {
-  var self = this;
-  if (this._body) {
-    this.disable('Cannot define body twice: ' + this._moduleName);
-    return;
-  }
-  this._body = factory;
-  nextTick(function(){
-    self.enable();
-  });
-  return this;
-};
 
 /**
  * Enable this module.
@@ -794,12 +761,11 @@ z.prototype._enableExports = function () {
     }
     if (item.id) {
       z.createObjectByName(self._moduleName + '.' + item.id, definition);
-    } else {
+    } else if (definition) {
       definition = extend(definition, z.getObjectByName(self._moduleName));
       z.createObjectByName(self._moduleName, definition);
     }
   });
-  if (this._body) this._body();
   this.isEnabled(true);
   this.enable();
 };

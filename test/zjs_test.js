@@ -17,7 +17,7 @@
     stop();
     z('moduleTest.exports').
     imports('fixtures.exports').
-    body(function(){
+    exports(function(){
       start();
       equal(fixtures.exports.Foo, 'Foo', 'Modules imported');
     });
@@ -29,7 +29,7 @@
     imports('fixtures.stress.one').
     imports('fixtures.stress.two').
     imports('fixtures.stress.three').
-    body(function(){
+    exports(function(){
       start();
       var stress = fixtures.stress;
       equal(stress.one.One, 'one');
@@ -256,25 +256,10 @@
     });
   });
 
-  test('Body', function () {
-    stop();
-    z('moduleTest.body', function (module) {
-      module.body(function () {
-        moduleTest.body.foo = 'foo';
-      });
-    }).done(function () {
-      start();
-      equal(moduleTest.body.foo, 'foo', 'Exported.');
-    }, function (reason) {
-      start();
-      ok(false, reason);
-    });
-  });
-
   test('Module definition entirely by callback', function () {
     stop();
     z(function (module) {
-      module.provides('moduleTest.byCallback');
+      module.defines('moduleTest.byCallback');
       module.exports('foo', 'foo');
       module.done(function () {
         start();
@@ -283,14 +268,14 @@
     });
   });
 
-  test('Unnamed modules pass `this` to the callback, regardless of number of args', function () {
+  test('Module definition entirely by callback with three args', function () {
     stop();
-    z(function (module, foo, bar) {
-      module.provides('moduleTest.byCallbackManyArgs');
-      module.exports('foo', 'foo');
-      module.done(function () {
+    z(function (defines, imports, exports) {
+      defines('moduleTest.byCallbackThree');
+      exports('foo', 'foo');
+      exports(function () {
         start();
-        equal(moduleTest.byCallbackManyArgs.foo, 'foo', 'Exported.');
+        equal(moduleTest.byCallbackThree.foo, 'foo', 'Exported.');
       });
     });
   });

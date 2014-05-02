@@ -60,22 +60,34 @@ the other ways you can define modules in Zjs:
     });
 
     // Callback with two arguments. These will be mapped to the current
-    // module's 'imports' and 'exports' methods, respectively. You should
-    // stick to the conventional names for these arguments.
+    // module's 'imports' and 'exports' methods, respectively.
     z('foo.baz', function (imports, exports) {
         imports('foo.bar');
         exports('bar', 'bar');
     });
 
-    // As a final option, you can skip naming the module in the 'z' constructor
-    // and define it in the callback using 'provides'. Just be sure to
-    // call 'provides' somewhere, or your module won't be accessable!
+    // You can skip naming the module in the 'z' constructor
+    // and define it in the callback using 'defines'. Just be sure to
+    // call 'defines' somewhere, or your module won't be accessable!
     z(function (module) {
-        module.provides('foo.bin');
+        module.defines('foo.bin');
 
         module.imports('foo.bar');
 
         module.exports({
+            bar: 'bar',
+            foo: 'foo'
+        });
+    });
+
+    // You can also provide three arguments and define your module
+    // as follows:
+    z(function (defines, imports, exports) {
+        defines('foo.bin');
+
+        imports('foo.bar');
+
+        exports({
             bar: 'bar',
             foo: 'foo'
         });
@@ -86,33 +98,6 @@ You should pick a style and stick to it for your entire project, but you can mix
 and match methods without breaking anything. Just, you know, don't do that.
 Be consitant.
 
-As you can tell, there aren't a lot of methods to cover in the zjs API. Typically,
-you'll just be using 'imports', 'exports' and maybe 'provides'. A fourth method
-you might consider is 'body'. `body` is similar to `exports` in that it waits
-to execute until all dependencies have loaded. The main difference is that
-returned values won't export anything -- instead, you export values
-to the module by defining properties directly. Here's an example:
-
-
-    z(function (module) {
-        module.provides('foo.bar');
-
-        module.imports('foo.bin');
-        module.imports('foo.baz');
-
-        module.exports('bar', 'bar');
-
-        module.body(function () {
-            // We have access to all imported modules here.
-            foo.bin;
-            // As well as previously exported items.
-            foo.bar.bar; // === 'bar'
-            // To export something, we just define a property.
-            foo.bar.baz = 'baz';
-        });
-    });
-
-
 Zjs can also use plugins to import modules. The syntax is similar to
 RequireJS:
 
@@ -120,7 +105,7 @@ RequireJS:
     z('app.bar', function (module) {
         // Import using the 'txt' plugin
         module.imports('txt!app.bar.templates', {ext:'myFileType'});
-        module.body(function () {
+        module.exports(function () {
             // Use in the same way as any other import.
             var foo = app.bar.templates;
         });
@@ -214,7 +199,7 @@ all your configuration options and where you'll include your first modules. Here
 
         module.imports('app.boot');
 
-        module.body(function () {
+        module.exports(function () {
             app.boot();
         });
 
