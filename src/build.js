@@ -119,7 +119,7 @@ Build.prototype.render = function () {
  * @param {String} namespace
  */
 Build.prototype.renderModule = function (module, namespace) {
-  if (z.env.shim[namespace]) {
+  if (z.settings.shim[namespace]) {
     this.logProgress(true);
     this.extractLicenses(z.getObjectByName(namespace, z.global));
     return z.getObjectByName(namespace, z.global) + '\n';
@@ -154,10 +154,10 @@ Build.prototype.renderModule = function (module, namespace) {
  * @param {String} namespace
  */
 Build.prototype.renderNamespace = function (namespace) {
-  var cur = ''
-    , render = ''
-    , parts = namespace.split('.')
-    , exists = this._exists[parts[0]];
+  var cur = '';
+  var render = '';
+  var parts = namespace.split('.');
+  var exists = this._exists[parts[0]];
 
   if (!exists) {
     render += "var " + parts[0] + ' = this.' + parts[0] + ' = {};\n';
@@ -196,8 +196,8 @@ Build.prototype.extractLicenses = function (file) {
  */
 Build.prototype.logProgress = function (good) {
   this._progressLog += (good)? '.' : 'x';
-  var stream = process.stdout
-    , str = this._progressLog;
+  var stream = process.stdout;
+  var str = this._progressLog;
   process.nextTick(function () {
     stream.clearLine();
     stream.cursorTo(0);
@@ -216,11 +216,11 @@ Build.prototype.loaders = function () {
     var src = ( z.getMappedPath(module) 
       || module.replace(/\./g, '/') + '.js' );
     
-    src = process.cwd() + '/' + z.env.root + src;
+    src = process.cwd() + '/' + z.config('root') + src;
 
     var file = fs.readFileSync(src, 'utf-8');
 
-    if (z.env.shim[module]) {
+    if (z.settings.shim[module]) {
       z.createObjectByName(module, file, z.global);
       next();
       return;
@@ -242,7 +242,7 @@ Build.prototype.loaders = function () {
     }
     var src = ( z.getMappedPath(module)
       || module.replace(/\./g, '/') + '.' + type );
-    src = process.cwd() + '/' + z.env.root + src;
+    src = process.cwd() + '/' + z.config('root') + src;
     var file = fs.readFileSync(src, 'utf-8');
     next(file);
   };
@@ -257,8 +257,8 @@ Build.prototype.loaders = function () {
  */
 Build.prototype.start = function (src, dest) {
 
-  var file = fs.readFileSync(src, 'utf-8')
-    , self = this;
+  var file = fs.readFileSync(src, 'utf-8');
+  var self = this;
 
   this.options.dest = (dest || false);
 

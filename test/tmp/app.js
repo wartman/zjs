@@ -3,9 +3,9 @@
 var app = this.app = {};
 var fixtures = this.fixtures = {};
 fixtures.stress = {};
+fixtures.stress.item = {};
 var foo = this.foo = {};
 fixtures.file = {};
-fixtures.stress.item = {};
 
 /* modules */
 /*!

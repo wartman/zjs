@@ -18,125 +18,131 @@ or Underscore you can import them into zjs with minimal trouble.
 How does it work?
 -----------------
 zjs uses a simple API to manage dependencies. Here is a simple way to write
-a module:
+a module (using the 'chaining' flavor):
 
-    
-    z('app.module')
-        .imports('app.my.dependency')
-        .imports('app.my.otherDependency')
-        .exports(function(){
-            
-            var Foo = function(){
-                return "foo";
-            }
+```JavaScript    
+z('app.module')
+    .imports('app.my.dependency')
+    .imports('app.my.otherDependency')
+    .exports(function(){
+        
+        var Foo = function(){
+            return "foo";
+        }
 
-            var Bar = app.my.dependency;
+        var Bar = app.my.dependency;
 
-            return {
-                Foo: Foo,
-                Bar: Bar
-            };
+        return {
+            Foo: Foo,
+            Bar: Bar
+        };
 
-        });
-
-
-If you don't like chaining, you can also define modules via callback. The 
-`z` constructor is highly context sensitive, and you can get a few different
-results depending on how you define your module. Here are, more or less, all
-the other ways you can define modules in Zjs:
-
-
-    // Callback with no args. The returned value of the callback
-    // defines the module.
-    // Good for modules that have no dependencies.
-    z('foo.bar', function () {return 'foo';});
-
-    // Callback with a single argument, which will point to the 
-    // current module. You can name it whatever you want; I usually just
-    // call it 'module'.
-    z('foo.bin', function (module) {
-        module.imports('foo.bar');
-        module.exports('bar', 'bar');
     });
+```
 
-    // Callback with two arguments. These will be mapped to the current
-    // module's 'imports' and 'exports' methods, respectively.
-    z('foo.baz', function (imports, exports) {
-        imports('foo.bar');
-        exports('bar', 'bar');
+If you don't like chaining, you can also define modules via a factory callback. You can
+define modules using several different "flavors" depending on the number of 
+arguments you pass to the `z` constructor and the `factory` callback. These
+are all purely asthetic, and function the same internally. Here are examples of each:
+
+```JavaScript 
+// The 'no-dependencies' flavor, where no args are passed
+// to the factory. This is good for modules with a single export.
+z('foo.bar', function () {return 'foo';});
+
+// The 'module-context' flavor, where a single arg is passed to the
+// factory. This arg points to the current module, and you can
+// call its imports and exports methods using chaining or individually.
+z('foo.bin', function (module) {
+    module
+        .imports('foo.bar')
+        .imports('foo.bar');
+    module.exports('bar', 'bar');
+});
+
+// The 'imports-exports' flavor, where two args are passed. These
+// are mapped to the current modules 'import' and 'export' methods,
+// respectively. If you're not compiling your ZJS project, this method
+// may result in marginally better minification.
+z('foo.baz', function (imports, exports) {
+    imports('foo.bar');
+    imports('foo.bin');
+    exports('bar', 'bar');
+});
+
+// The 'defines-module-context' flavor, similar to the 'module-context'
+// flavor, but which requires you to use the 'defines' method somewhere so
+// Zjs knows what to call this module. Use this if you find it asthetically
+// pleasing.
+z(function (module) {
+    module.defines('foo.bin');
+
+    module.imports('foo.bar');
+
+    module.exports({
+        bar: 'bar',
+        foo: 'foo'
     });
+});
 
-    // You can skip naming the module in the 'z' constructor
-    // and define it in the callback using 'defines'. Just be sure to
-    // call 'defines' somewhere, or your module won't be accessable!
-    z(function (module) {
-        module.defines('foo.bin');
+// The 'defines-imports-exports' flavor is an alternative to the above,
+// if you like using psuedo-keywords.
+z(function (defines, imports, exports) {
+    defines('foo.bin');
 
-        module.imports('foo.bar');
+    imports('foo.bar');
 
-        module.exports({
-            bar: 'bar',
-            foo: 'foo'
-        });
+    exports({
+        bar: 'bar',
+        foo: 'foo'
     });
+});
+```
 
-    // You can also provide three arguments and define your module
-    // as follows:
-    z(function (defines, imports, exports) {
-        defines('foo.bin');
-
-        imports('foo.bar');
-
-        exports({
-            bar: 'bar',
-            foo: 'foo'
-        });
-    });
-
-
-You should pick a style and stick to it for your entire project, but you can mix
-and match methods without breaking anything. Just, you know, don't do that.
-Be consitant.
+This readme will use the "module-context" flavor for the rest of the examples,
+but you can use whichever one you like the best. However, you should pick a style 
+and stick to it for your entire project. You CAN mix and match methods without 
+breaking anything, but, you know, don't do that. Be consitant.
 
 Zjs can also use plugins to import modules. The syntax is similar to
 RequireJS:
 
-
-    z('app.bar', function (module) {
-        // Import using the 'txt' plugin
-        module.imports('txt!app.bar.templates', {ext:'myFileType'});
-        module.exports(function () {
-            // Use in the same way as any other import.
-            var foo = app.bar.templates;
-        });
+```JavaScript 
+z('app.bar', function (module) {
+    // Import using the 'txt' plugin
+    module.imports('txt!app.bar.templates', {ext:'myFileType'});
+    module.exports(function () {
+        // Use in the same way as any other import.
+        var foo = app.bar.templates;
     });
-
-
-** THE FOLLOWING PLUGIN STUFF ISN'T IMPLMENTED YET **
+});
+```
 
 Zjs comes with a 'txt' plugin that lets you import files via AJAX. You can
 add your own plugins with 'z.plugin':
 
-    
-    z.plugin('myPlugin', function(moduleName, next, error, options) {
-        // Code
-    });
-
+```JavaScript 
+z.plugin('myPlugin', function(moduleName, next, error, options) {
+    // Code
+});
+```
 
 Take a look in the source to get an idea of how  the 'txt' plugin was implemented: 
 it's pretty simple. Also note that plugins can be placed in external Zjs modules:
 
-    z('app.bar', function(module) {
-        // Will look for the 'app.plugins.foo' module
-        module.imports('app.plugins.foo!app.templates.bar');
-    });
+```JavaScript 
+z('app.bar', function(module) {
+    // Will look for the 'app.plugins.foo' module
+    module.imports('app.plugins.foo!app.templates.bar');
+});
 
-    // in app/plugins/foo.js:
-    z('app.plugins.foo', function() {
-        return function (moduleName, next, error, options) {
-            // code
-        });
+// in app/plugins/foo.js:
+z('app.plugins.foo', function() {
+    return function (moduleName, next, error, options) {
+        // code
     });
+});
+```
 
 
 Compiling
@@ -152,55 +158,56 @@ everything before you deploy it. To do this, Zjs comes with a command-line tool:
 The compiled file can be optimized by as well, just include the '-o' option
 when building a project:
     
-
-    $ zjs build <path/to/main.js> <path/to/compiledApp.js> -o
-
+```bash
+$ zjs build <path/to/main.js> <path/to/compiledApp.js> -o
+```
 
 Zjs requires a 'main' file to properly compile a project. This is where you'll include
 all your configuration options and where you'll include your first modules. Here's an example:
 
-    
-    z.config({
-        root: '/scripts',
-        // You can name your main module anything you like, just include the following in the config.
-        // By default, zjs assumes the main module is called 'main'.
-        main: 'app.main',
-        // Use the shim to set up non-zjs modules.
-        shim: {
-            '$': {
-                map: 'libs/jquery.min.js'
-            },
-            '_': {
-                map: 'libs/underscore.js'
-            },
-            'Backbone': {
-                map: 'libs/backbone.js',
-                imports: ['_', '$'] // Including this option will ensure that backbone has underscore and jquery
-            }
+```JavaScript 
+z.config({
+    root: '/scripts',
+    // You can name your main module anything you like, just include the following in the config.
+    // By default, zjs assumes the main module is called 'main'.
+    main: 'app.main',
+    // Use the shim to set up non-zjs modules.
+    shim: {
+        '$': {
+            map: 'libs/jquery.min.js'
         },
-        map: {
-            // You can use patterns to map namespaces to filepaths.
-            // The following will, for example, match 'foo.bar' to 'libs/foo/bar.js'
-            'libs/foo/*.js': 'foo.*',
-            // If you want to map an entire directory, use '**'.
-            // The following will, for example, match 'baz.bif.bin.bar' to 'libs/baz/bif/bin/bar.js'
-            'libs/baz/**/*.js': 'baz.**.*',
-            // It's also possible to tell zjs that one file exports several modules.
-            // Patterns will work here!
-            'libs/bar.js': [
-                'bar.bin',
-                'bar.foo',
-                'bar.fid.*'
-            ]
+        '_': {
+            map: 'libs/underscore.js'
+        },
+        'Backbone': {
+            map: 'libs/backbone.js',
+            imports: ['_', '$'] // Including this option will ensure that backbone has underscore and jquery
         }
+    },
+    map: {
+        // You can use patterns to map namespaces to filepaths.
+        // The following will, for example, match 'foo.bar' to 'libs/foo/bar.js'
+        'libs/foo/*.js': 'foo.*',
+        // If you want to map an entire directory, use '**'.
+        // The following will, for example, match 'baz.bif.bin.bar' to 'libs/baz/bif/bin/bar.js'
+        'libs/baz/**/*.js': 'baz.**.*',
+        // It's also possible to tell zjs that one file exports several modules.
+        // Patterns will work here!
+        'libs/bar.js': [
+            'bar.bin',
+            'bar.foo',
+            'bar.fid.*'
+        ]
+    }
+});
+
+z('app.main', function (module) {
+
+    module.imports('app.boot');
+
+    module.exports(function () {
+        app.boot();
     });
 
-    z('app.main', function (module) {
-
-        module.imports('app.boot');
-
-        module.exports(function () {
-            app.boot();
-        });
-
-    });
+});
+```

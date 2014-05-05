@@ -4,7 +4,7 @@
  * Copyright 2014
  * Released under the MIT license
  *
- * Date: 2014-05-01T19:05Z
+ * Date: 2014-05-05T17:31Z
  */
 
 (function (factory) {
@@ -65,6 +65,31 @@ var nextTick = ( function () {
 })();
 
 /**
+ * Get all the keys in an object.
+ *
+ * @param {*} obj
+ * @return {Array} 
+ */
+var keys = function(obj) {
+  if ("object" !== typeof obj) return [];
+  if (Object.keys) return Object.keys(obj);
+  var keys = [];
+  for (var key in obj) if (_.has(obj, key)) keys.push(key);
+  return keys;
+};
+
+/** 
+ * Get the size of an object
+ * 
+ * @param {*} obj
+ * @return {Integer}
+ */
+var size = function (obj) {
+  if (obj == null) return 0;
+  return (obj.length === +obj.length) ? obj.length : keys(obj).length;
+};
+
+/**
  * Iterate over arrays or objects.
  *
  * @param {*} obj
@@ -94,6 +119,38 @@ var each = function (obj, callback, context) {
     }
   }
   return obj;
+};
+
+/**
+ * Run through each item in an array, then trigger a final callback.
+ * The next item in the queue won't be run till you call 'next', allowing
+ * for async iteration.
+ *
+ * @param {*} obj The item to iterate over
+ * @param {Function} callback Function to run for EVERY item in `obj`.
+ *    Should take `next` and `error` as its arguments. The next callback
+ *    will NOT be run until you call it manually.
+ * @param {Function} last Function to run after the last item in `obj`
+ *    has run.
+ * @param {Function} error Function to run if something goes wrong.
+ * @param {Mixed} context Set `this` for the callbacks.
+ * @return {Type} 
+ */
+var eachAsync = function (obj, callback, last, error, context) {
+  var len = size(obj);
+  var current = -1;
+  var currentItem;
+  context = context || obj;
+  var next = function () {
+    current += 1;
+    currentItem = obj[current];
+    if (!currentItem || current === len) {
+      last.call(context);
+    } else {
+      callback.call(context, currentItem, next, error);
+    }
+  };
+  return next();
 };
 
 /**
@@ -216,21 +273,26 @@ var z = function (name, factory) {
   if( !(this instanceof z) ) return new z(name, factory);
 
   this._moduleName = null;
-  if (name) this.provides(name);
+  if (name) this.defines(name);
 
   this._wait = new wait();
-  this._state = z.env.MODULE_STATE.PENDING;
+  this._state = MODULE_STATE.PENDING;
   this._defined = false;
   this._imports = [];
   this._exports = [];
-  this._body = false;
   this._plugins = {};
   this._factory = null;
 
   if (!name && factory) {
-    factory(this);
+    if (factory.length === 3) {
+      factory(this.defines.bind(this), this.imports.bind(this), this.exports.bind(this));
+    } else {
+      factory(this);
+    }
   } else if(factory && ('function' === typeof factory) ){
-    if(factory.length === 2){
+    if (factory.length === 3) {
+      factory(this.defines.bind(this), this.imports.bind(this), this.exports.bind(this));
+    } else if (factory.length === 2) {
       factory(this.imports.bind(this), this.exports.bind(this));
     } else if (factory.length === 1) {
       factory(this);
@@ -251,22 +313,32 @@ var z = function (name, factory) {
  */
 z.env = {
   namespaces: {},
+  modules: {},
+  plugins: {},
+};
+
+z.settings = {
   root: '',
   map: {},
   shim: {},
-  modules: {},
-  plugins: {},
-  pluginPattern: /([\s\S]+?)\!/,
-  environment: false,
-  VERSION: '1.0.1',
-  MODULE_STATE: {
-    PENDING: 0,
-    LOADED: 1,
-    WORKING: 2,
-    READY: 3,
-    ENABLED: 4,
-    FAILED: -1
-  }
+  environment: ''
+};
+
+/**
+ * The current version.
+ */
+z.VERSION = '1.0.1';
+
+/**
+ * Module states.
+ */
+var MODULE_STATE = {
+  PENDING: 0,
+  LOADED: 1,
+  WORKING: 2,
+  READY: 3,
+  ENABLED: 4,
+  FAILED: -1
 };
 
 /**
@@ -283,15 +355,15 @@ z.config = function (key, val) {
     return;
   }
   if(arguments.length < 2){
-    return ( z.env[key] || false );
+    return ('undefined' !== typeof z.settings[key])? z.settings[key] : false;
   }
   if ( 'map' === key ) {
     return z.map(val);
   } else if ( 'shim' === key ) {
     return z.shim(val);
   }
-  z.env[key] = val;
-  return z.env[key];
+  z.settings[key] = val;
+  return z.settings[key];
 }
 
 /**
@@ -314,8 +386,8 @@ z.map = function (path, provides) {
     }
     return;
   }
-  if (!z.env.map[path]) {
-    z.env.map[path] = [];
+  if (!z.settings.map[path]) {
+    z.settings.map[path] = [];
   }
   if (provides instanceof Array) {
     each(provides, function (item) {
@@ -331,7 +403,7 @@ z.map = function (path, provides) {
       .replace(/\$/g, '\\$')
       + '$'
   );
-  z.env.map[path].push(provides);
+  z.settings.map[path].push(provides);
 }
 
 /**
@@ -361,7 +433,7 @@ z.shim = function (module, options) {
   mod.exports(function () {
     return '';
   });
-  z.env.shim[module] = options;
+  z.settings.shim[module] = options;
 }
 
 /**
@@ -413,7 +485,7 @@ z.ensureNamespace = function (namespace) {
  */
 z.getMappedPath = function (module) {
   var mappedPath = false;
-  each(z.env.map, function (maps, path) {
+  each(z.settings.map, function (maps, path) {
     each(maps, function (map) {
       if (map.test(module)){
         mappedPath = path;
@@ -478,7 +550,10 @@ z.getObjectByName = function (name, env) {
   return cur;  
 };
 
-z.checkEnv = function () {
+/**
+ * Investigate the environment.
+ */
+var checkEnv = function () {
   if (typeof module === "object" && module.exports) {
     z.config('environment', 'node');
   } else {
@@ -490,18 +565,18 @@ z.checkEnv = function () {
  * Are we running z on a server?
  */
 z.isServer = function () {
-  if (!z.config('environment')) z.checkEnv();
-  return z.env.environment === 'node'
-    || z.env.environment === 'server';
+  if (!z.config('environment')) checkEnv();
+  return z.config('environment') === 'node'
+    || z.config('environment') === 'server';
 };
 
 /**
  * Are we running z on a client?
  */
 z.isClient = function () {
-  if (!z.config('environment')) z.checkEnv();
-  return z.env.environment != 'node'
-    && z.env.environment != 'server';
+  if (!z.config('environment')) checkEnv();
+  return z.config('environment') != 'node'
+    && z.config('environment') != 'server';
 };
 
 /* 
@@ -513,11 +588,27 @@ z.isClient = function () {
 /**
  * Set the namespace this module will be defining.
  *
+ * @example
+ *    // As an alternative to passing the module name
+ *    // as the first arg in the z constructor, you
+ *    // can use 'defines' internally.
+ *    z(function (module) {
+ *      module.defines('app.foo');
+ *      module.exports('foo', 'foo');
+ *    });
+ *
+ *    // This will work with chaining as well.
+ *    z().defines('app.foo').exports('foo', 'bar');
+ *
+ *    // The only reason to do things this way is if
+ *    // it appeals to you asthetically.
+ *    // Just stay consistant in your app!
+ *
  * @param {Type} name descrip
  * @param {Type} name descrip
  * @return {Type} 
  */
-z.prototype.provides = function (name) {
+z.prototype.defines = function (name) {
   this._moduleName = name;
   // Register the namespace (or throw an error if already defined)
   z.ensureNamespace(name);  
@@ -534,9 +625,10 @@ z.prototype.provides = function (name) {
  * @param {String} module
  * @return {z}
  */
+var pluginPattern = /([\s\S]+?)\!/;
 z.prototype.imports = function (module) {
-  if ( z.env.pluginPattern.test(module) ) {
-    var parts = module.match(z.env.pluginPattern);
+  if ( pluginPattern.test(module) ) {
+    var parts = module.match(pluginPattern);
     module = module.replace(parts[0], '');
     this._plugins[module] = parts[1];
   }
@@ -552,23 +644,23 @@ z.prototype.imports = function (module) {
  * current export.
  *
  * @example
- *    z('app.foo', function (imports, exports) {
- *      imports('app.bar');
- *      exports('bin', 'bin');
- *      exports('foo', {bar:'bar', baz:'baz'});
- *      exports('baz', function () {
+ *    z('app.foo', function (module) {
+ *      module.imports('app.bar');
+ *      module.exports('bin', 'bin');
+ *      module.exports('foo', {bar:'bar', baz:'baz'});
+ *      module.exports('baz', function () {
  *        // Using a callback like this will allow
  *        // you to use any imported modules.
  *        var bar = app.bar;
  *        // Will define `app.foo.baz.bar`
  *        return {bar: bar};
  *      });
- *      exports(function () {
+ *      module.exports(function () {
  *        // [name] is optional.
  *        // The following will define `app.foo.bix`
  *        return {bix:'bix'};
  *      });
- *      exports(function () {
+ *      module.exports(function () {
  *        // You can define the root export of a
  *        // module by ommiting [name] and returning a
  *        // function.
@@ -599,44 +691,6 @@ z.prototype.exports = function (name, definition) {
   });
   return this;
 }
-
-/**
- * Will run [factory] after the module is done
- * loading all requested imports/exports. Returning a value 
- * here won't do anything -- instead, define any exports you want
- * the natural way, by setting properties for the current object.
- *
- * Body may only be called once per module.
- *
- * @example
- *    z('app.foo', function (module) {
- *      module.imports('app.bar');
- *      module.body(function () {
- *        app.bar; // Is useable.
- *        app.foo.bin = 'bar'; // Just set properties.
- *        // NOTE:
- *        // The following will define nothing:
- *        return {app:'bar'}
- *        // Use `z#exports` if you want to return a value.
- *      });
- *    });
- *
- * @param {Type} name descrip
- * @param {Type} name descrip
- * @return {Type} 
- */
-z.prototype.body = function (factory) {
-  var self = this;
-  if (this._body) {
-    this.disable('Cannot define body twice: ' + this._moduleName);
-    return;
-  }
-  this._body = factory;
-  nextTick(function(){
-    self.enable();
-  });
-  return this;
-};
 
 /**
  * Enable this module.
@@ -706,34 +760,28 @@ z.prototype.disable = function (reason) {
  * @return {z}
  */
 z.prototype._loadImports = function () {
-  var queue = []
-    , self = this
-    , len = this._imports.length;
+  var queue = [];
+  var self = this;
   this.isWorking(true);
   each(this._imports, function(item){
     if (!z.getObjectByName(item)) queue.push(item);
   });
-  len = queue.length;
-  var remaining = len;
-  if(len > 0){
-    each(queue, function(item){
+  if (size(queue)) {
+    eachAsync(queue, function getImports (item, next, error) {
       var loader = root.Z_MODULE_LOADER;
       if ( self._plugins[item] ) {
         loader = z.env.plugins[self._plugins[item]];
       }
-      loader(item, function(){
-        remaining -= 1;
-        if(remaining <=0 ){
-          self.isLoaded(true);
-          self.enable();
-        }
-      }, function(reason){
-        self.disable('Could not load dependency: ' + item);
-      });
+      loader(item, next, error);
+    }, function () {
+      self.isLoaded(true);
+      self.enable();
+    }, function (reason) {
+      self.disable('Could not load dependency: ' + item);
     });
   } else {
     this.isLoaded(true);
-    this.enable();
+    this._ensureDependencies();
   }
   return this;
 };
@@ -746,29 +794,36 @@ z.prototype._loadImports = function () {
 z.prototype._ensureDependencies = function () {
   var self = this;
   if (this.isEnabled() || this.isWorking()) return;
+  if (!this._imports.length) {
+    this.isReady(true);
+    this._enableExports();
+  }
   this.isWorking(true);
-  each(this._imports, function ensureDependency (module) {
+  eachAsync(this._imports, function ensureDependency (module, next, error) {
     if (!self.isWorking()) return;
     var current = z.env.modules[module];
-    if (z.env.shim.hasOwnProperty(module)){
+    if (z.settings.shim.hasOwnProperty(module)){
       if(!z.getObjectByName(module)) {
-        self.disable('A shimmed module could not be loaded: [' + module + '] for module: ' + self._moduleName);
+        error('A shimmed module could not be loaded: [' + module + '] for module: ' + self._moduleName);
+      } else {
+        next();
       }
     } else if (!z.env.modules.hasOwnProperty(module)) {
-      console.log(module, current);
-      self.disable('A dependency was not loaded: [' + module + '] for module: ' + self._moduleName);
+      error('A dependency was not loaded: [' + module + '] for module: ' + self._moduleName);
     } else if (current.isFailed()) {
-      self.disable('A dependency failed: ['+ module + '] for module: ' + self._moduleName);
+      error('A dependency failed: ['+ module + '] for module: ' + self._moduleName);
     } else if (!current.isEnabled()) {
-      // Set this module as loaded, but not enabling.
-      self.isLoaded(true);
       // Wait for the dependency to enable, then try again.
-      current.enable().done(function () { self.enable(); });
+      current.enable().done(next, error);
+    } else {
+      next();
     }
+  }, function () {
+    self.isReady(true);
+    self._enableExports();
+  }, function (reason) {
+    self.disable(reason);
   });
-  if (!this.isWorking()) return;
-  this.isReady(true);
-  this.enable();
 };
 
 /**
@@ -794,12 +849,11 @@ z.prototype._enableExports = function () {
     }
     if (item.id) {
       z.createObjectByName(self._moduleName + '.' + item.id, definition);
-    } else {
+    } else if (definition) {
       definition = extend(definition, z.getObjectByName(self._moduleName));
       z.createObjectByName(self._moduleName, definition);
     }
   });
-  if (this._body) this._body();
   this.isEnabled(true);
   this.enable();
 };
@@ -808,7 +862,7 @@ z.prototype._enableExports = function () {
  * Set up methods for checking the module state.
  */
 each(['Enabled', 'Ready', 'Working', 'Loaded', 'Pending', 'Failed'], function ( state ) {
-  var modState = z.env.MODULE_STATE[state.toUpperCase()];
+  var modState = MODULE_STATE[state.toUpperCase()];
   /**
    * Check module state.
    *
@@ -863,7 +917,7 @@ if(!root.Z_MODULE_LOADER && z.isClient()){
    * @param {Funtion} error Run on error
    */
   root.Z_MODULE_LOADER = function (module, next, error) {
-    var src = z.env.root + ( z.getMappedPath(module)
+    var src = z.config('root') + ( z.getMappedPath(module)
       || module.replace(/\./g, '/') + '.js' );
 
     if (visited.hasOwnProperty(src)) {
@@ -905,7 +959,7 @@ if(!root.Z_MODULE_LOADER && z.isClient()){
       type = 'txt'; 
     }
 
-    var src = z.env.root + ( z.getMappedPath(file)
+    var src = z.config('root') + ( z.getMappedPath(file)
       || file.replace(/\./g, '/') + '.' + type )
 
     if(visited.hasOwnProperty(src)){
@@ -945,7 +999,7 @@ if(!root.Z_MODULE_LOADER && z.isClient()){
   var fs = require('fs');
 
   root.Z_MODULE_LOADER = function (module, next, error) {
-    var src = z.env.root + ( z.getMappedPath(module)
+    var src = z.config('root') + ( z.getMappedPath(module)
       || module.replace(/\./g, '/') );
     if (visited.hasOwnProperty(src)) return next();
     try {
@@ -961,7 +1015,7 @@ if(!root.Z_MODULE_LOADER && z.isClient()){
       next = type;
       type = 'txt'; 
     }
-    var src = z.env.root + ( z.getMappedPath(file)
+    var src = z.config('root') + ( z.getMappedPath(file)
       || file.replace(/\./g, '/') + '.' + type );
     if(visited.hasOwnProperty(src)){
       visited[src].done(next, error);
