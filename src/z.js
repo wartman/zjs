@@ -769,6 +769,10 @@ z.prototype._loadImports = function () {
   if (size(queue)) {
     eachAsync(queue, function getImports (item, next, error) {
       var loader = root.Z_MODULE_LOADER;
+      if (z.settings.shim[item]) {
+        self._loadShimmedImport(item, next, error);
+        return;
+      }
       if ( self._plugins[item] ) {
         loader = z.env.plugins[self._plugins[item]];
       }
@@ -784,6 +788,21 @@ z.prototype._loadImports = function () {
     this._ensureDependencies();
   }
   return this;
+};
+
+/**
+ * Load a shimmed import, ensuring each dependency is loaded.
+ */
+z.prototype._loadShimmedImport = function (item, next, error) {
+  var shim = z.env.modules['@shim.' + item];
+  var loader = root.Z_MODULE_LOADER;
+  if (shim._dependencies) {
+    eachAsync(shim._dependencies, function (dep, next, error) {
+      loader(dep, next, error)
+    }, next, error);
+  } else {
+    loader(item, next, error);
+  }
 };
 
 /**

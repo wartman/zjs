@@ -32,6 +32,8 @@ z('app.module')
 
         var Bar = app.my.dependency;
 
+        // Define what this module exports by returning
+        // something.
         return {
             Foo: Foo,
             Bar: Bar
@@ -61,7 +63,7 @@ z('foo.bin', function (module) {
 });
 
 // The 'imports-exports' flavor, where two args are passed. These
-// are mapped to the current modules 'import' and 'export' methods,
+// are mapped to the current module's 'import' and 'export' methods,
 // respectively. If you're not compiling your ZJS project, this method
 // may result in marginally better minification.
 z('foo.baz', function (imports, exports) {
@@ -144,21 +146,20 @@ z('app.plugins.foo', function() {
 });
 ```
 
-
 Compiling
-----------
+---------
 While you can use Zjs to load modules on a browser, you'll likely want to compile
 everything before you deploy it. To do this, Zjs comes with a command-line tool:
 
-
-    $ npm install zjs -g
-    $ zjs build <path/to/main.js> <path/to/compiledApp.js>
-
+```
+$ npm install zjs -g
+$ zjs build <path/to/main.js> <path/to/compiledApp.js>
+```
 
 The compiled file can be optimized by as well, just include the '-o' option
 when building a project:
     
-```bash
+```
 $ zjs build <path/to/main.js> <path/to/compiledApp.js> -o
 ```
 
@@ -168,7 +169,8 @@ all your configuration options and where you'll include your first modules. Here
 ```JavaScript 
 z.config({
     root: '/scripts',
-    // You can name your main module anything you like, just include the following in the config.
+    // You can name your main module anything you like, 
+    // just include the following in the config.
     // By default, zjs assumes the main module is called 'main'.
     main: 'app.main',
     // Use the shim to set up non-zjs modules.
@@ -211,3 +213,5 @@ z('app.main', function (module) {
 
 });
 ```
+
+That covers the entire API! 
