@@ -45,7 +45,7 @@ z('app.module')
 If you don't like chaining, you can also define modules via a factory callback. You can
 define modules using several different "flavors" depending on the number of 
 arguments you pass to the `z` constructor and the `factory` callback. These
-are all purely asthetic, and function the same internally. Here are examples of each:
+are all purely aesthetic, and function the same internally. Here are examples of each:
 
 ```JavaScript 
 // The 'no-dependencies' flavor, where no args are passed
@@ -101,10 +101,10 @@ z(function (defines, imports, exports) {
 });
 ```
 
-This readme will use the "module-context" flavor for the rest of the examples,
+This read-me will use the "module-context" flavor for the rest of the examples,
 but you can use whichever one you like the best. However, you should pick a style 
 and stick to it for your entire project. You CAN mix and match methods without 
-breaking anything, but, you know, don't do that. Be consitant.
+breaking anything, but, you know, don't do that. Be consistent.
 
 Zjs can also use plugins to import modules. The syntax is similar to
 RequireJS:
@@ -129,22 +129,7 @@ z.plugin('myPlugin', function(moduleName, next, error, options) {
 });
 ```
 
-Take a look in the source to get an idea of how  the 'txt' plugin was implemented: 
-it's pretty simple. Also note that plugins can be placed in external Zjs modules:
-
-```JavaScript 
-z('app.bar', function(module) {
-    // Will look for the 'app.plugins.foo' module
-    module.imports('app.plugins.foo!app.templates.bar');
-});
-
-// in app/plugins/foo.js:
-z('app.plugins.foo', function() {
-    return function (moduleName, next, error, options) {
-        // code
-    });
-});
-```
+Take a look in the source to get an idea of how  the 'txt' plugin was implemented, it's pretty simple. 
 
 Compiling
 ---------
@@ -188,12 +173,14 @@ z.config({
     },
     map: {
         // You can use patterns to map namespaces to filepaths.
-        // The following will, for example, match 'foo.bar' to 'libs/foo/bar.js'
+        // The following will, for example, match 'foo.bar' 
+        // to 'libs/foo/bar.js'
         'libs/foo/*.js': 'foo.*',
         // If you want to map an entire directory, use '**'.
         // The following will, for example, match 'baz.bif.bin.bar' to 'libs/baz/bif/bin/bar.js'
         'libs/baz/**/*.js': 'baz.**.*',
-        // It's also possible to tell zjs that one file exports several modules.
+        // It's also possible to tell zjs that one file 
+        // exports several modules.
         // Patterns will work here!
         'libs/bar.js': [
             'bar.bin',
@@ -213,5 +200,3 @@ z('app.main', function (module) {
 
 });
 ```
-
-That covers the entire API! 
