@@ -20,10 +20,18 @@ describe('sorter', function () {
 
 describe('Build', function () {
 
-  var build = new Build();
-
   describe('#start', function () {
+
+    beforeEach(function () {
+      z.env = {
+        namespaces: {},
+        modules: {},
+        plugins: {},
+      };
+    });
+
     it('compiles modules', function (done) {
+      var build = new Build();
       build.start(__dirname + '/fixtures/main.js', __dirname + '/fixtures/tmp/app.js');
       build.done(function () {
         var actual = grunt.file.read(__dirname + "/fixtures/tmp/app.js");
@@ -47,6 +55,28 @@ describe('Build', function () {
         done();
       });
     });
+
+    it('compiles shimmed items correctly', function (done) {
+      z.env.modules = {};
+      var build = new Build();
+      build.start(__dirname + '/fixtures/shimMain.js', __dirname + '/fixtures/tmp/shimApp.js');
+      build.done(function (){
+        var actual = grunt.file.read(__dirname + "/fixtures/tmp/shimApp.js");
+        var root = {};
+        var module = Function('', actual);
+
+        module.call(root);
+
+        expect(root.fixtures.shim.needsShim()).to.equal('underscore, jquery');
+        expect(root._).to.equal('underscore');
+        expect(root.$).to.equal('jquery');
+        expect(root.hasDeps._).to.equal('underscore');
+        expect(root.hasDeps.$).to.equal('jquery');
+
+        done();
+      });
+    });
+
   });
 
 });

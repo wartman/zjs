@@ -1,1 +1,1 @@
-window._ = 'underscore'; 
+(function () { this._ = 'underscore'; }).call(this);

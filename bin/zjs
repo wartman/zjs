@@ -24,7 +24,7 @@ program
       options.buildfile = true;
     }
 
-    var build = Build(options);
+    var build = new Build(options);
     build.start(src, dest);
 
   }).on('--help', function(){

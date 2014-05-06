@@ -15,30 +15,15 @@ var _        = require('lodash');
  * The zjs builder.
  */
 var Build = function (options) {
-
-  if ( !(this instanceof Build) ){
-    return new Build(options);
-  }
-
-  var self = this;
+  this.options = {
+    dest: false,
+    main: 'main'
+  };
 
   this.setup(options);
+  this.loaders(); // Register loaders.
 
   this._shimmed = {};
-
-  // Register loaders.
-  this.loaders();
-
-  // Overwrite default plugin
-  z.plugin('txt', function (module, next, error) {
-    var moduleName = z.getMappedObj(module);
-    z.file(module, function (file) {
-      var fileWrapper = z(moduleName);
-      fileWrapper.exports(Function('', '  return \'' + file + '\''));
-      fileWrapper.done(next, error);
-    }, error);
-  });
-
   this._exists = {};
   this._progressLog = '';
   this._compiled = '';
@@ -56,23 +41,15 @@ Build.prototype.setup = function(options){
 };
 
 /**
- * Default options.
- */
-Build.prototype.options = {
-  dest: false,
-  main: 'main'
-};
-
-/**
  * Compile the project and output.
  */
 Build.prototype.render = function () {
 
-  var modules = z.env.modules
-    , moduleList = {}
-    , sortedModules = []
-    , compiled = ''
-    , self = this;
+  var modules = z.env.modules;
+  var moduleList = {};
+  var sortedModules = [];
+  var compiled = '';
+  var self = this;
 
   compiled += "/* namespaces */\n";
   _.each(z.env.namespaces, function(val, ns){
@@ -84,7 +61,14 @@ Build.prototype.render = function () {
   // Ensure that modules dependent on other modules are always defined
   // lower down in the compiled script.
   for (item in modules) {
-    if(item.indexOf('@') >= 0) continue; // Don't add shims.
+    if (item.indexOf('@') >= 0) {
+      var item = item.replace(/@shim\./g, '');
+      if (z.settings.shim[item]) {
+        var shim = z.settings.shim[item]
+        moduleList[item] = shim.imports || [];
+      }
+      continue;
+    }
     moduleList[item] = modules[item]._imports;
   }
 
@@ -98,7 +82,8 @@ Build.prototype.render = function () {
     compiled += self.renderModule( modules[ns], ns );
   });
 
-  compiled = "(function () {\n" + compiled + "\n}).call(this);";
+  // Wrap the compiled item, replacing 'z.global' with 'root'.
+  compiled = "(function () {\nvar root = this;\n" + compiled.replace(/z\.global/g, 'root') + "\n}).call(this);";
 
   if(this.options.optimize){
     compiled = UglifyJS.minify(compiled, {fromString: true}).code;
@@ -208,7 +193,6 @@ Build.prototype.logProgress = function (good) {
 };
 
 Build.prototype.loaders = function () {
-  var build = this;
 
   /**
    * Loader that replaces the default.
@@ -232,11 +216,21 @@ Build.prototype.loaders = function () {
     }
   };
 
-  z.file  = function (module, next, error) {
+  z.file = function (module, next, error) {
     var src = z.getMappedPath(module, process.cwd() + '/' + z.config('root'));
     var file = fs.readFileSync(src, 'utf-8');
     next(file);
   };
+
+  // Overwrite default plugin
+  z.plugin('txt', function (module, next, error) {
+    var moduleName = z.getMappedObj(module);
+    z.file(module, function (file) {
+      var fileWrapper = z(moduleName);
+      fileWrapper.exports(Function('', '  return \'' + file + '\''));
+      fileWrapper.done(next, error);
+    }, error);
+  });
 
 };
 

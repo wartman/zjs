@@ -1,4 +1,7 @@
-window.hasDeps = {
-  $: $,
-  _: _
-};
+(function () {
+  var self = this;
+  this.hasDeps = {
+    $: self.$,
+    _: self._
+  };
+}).call(this);

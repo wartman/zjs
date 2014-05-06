@@ -1,1 +1,1 @@
-window.$ = 'jquery'; 
+(function () { this.$ = 'jquery'; }).call(this);
