@@ -28,7 +28,7 @@ var sorter = function (dependencies, root) {
   if (root) {
     add(root);
   } else {
-    for (element in dependencies) {
+    for (var element in dependencies) {
       if (!nodes[element]) add(element);
     }
   }

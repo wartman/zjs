@@ -8,11 +8,21 @@ module.exports = function(grunt){
         'test/sorter_test.js'
       ],
     },
-    qunit: {
+    simplemocha: {
+      options: {
+        globals: ['expect'],
+        timeout: 3000,
+        ignoreLeaks: true,
+        ui: 'bdd',
+        reporter: 'spec'
+      },
+      all: { src: ['tests/server_test.js'] }
+    },
+    mocha_phantomjs: {
       all: {
         options: {
           urls: [
-            'http://localhost:8000/test/test-runner.html'
+            'http://localhost:8000/tests/runner.html'
           ]
         }
       }
@@ -29,7 +39,8 @@ module.exports = function(grunt){
   
   grunt.loadNpmTasks('grunt-contrib-nodeunit')
   grunt.loadNpmTasks('grunt-contrib-connect');
-  grunt.loadNpmTasks('grunt-contrib-qunit');
+  grunt.loadNpmTasks('grunt-simple-mocha');
+  grunt.loadNpmTasks('grunt-mocha-phantomjs');
 
   grunt.registerTask('distribute', function () {
     var code = grunt.file.read(__dirname + '/src/z.js');
@@ -44,7 +55,8 @@ module.exports = function(grunt){
     }
     grunt.file.write(dest, code);
   });
-  grunt.registerTask('test', ['nodeunit', 'connect', 'qunit']);
+  grunt.registerTask('test', ['simplemocha', 'connect', 'mocha_phantomjs']);
+  // grunt.registerTask('test', ['connect', 'mocha_phantomjs']);
   grunt.registerTask('default', ['test', 'distribute']);
 
 }

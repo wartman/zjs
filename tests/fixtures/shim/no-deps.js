@@ -1,0 +1,1 @@
+(function () { this.noDeps = 'noDeps'; }).call(this);

@@ -10,7 +10,9 @@
 (function (factory) {
   if ( typeof module === "object" && typeof module.exports === "object" ) {
     // For CommonJS environments.
-    factory(module.exports);
+    root = {};
+    factory(root);
+    module.exports = root.z;
   } else {
     factory(window);
   }
@@ -31,7 +33,7 @@
 var nextTick = ( function () {
   var fns = [];
   var enqueueFn = function (fn, ctx) {
-    if (ctx) fn.bind(ctx);
+    if (ctx) bind(fn, ctx);
     return fns.push(fn);
   };
   var dispatchFns = function () {
@@ -176,7 +178,7 @@ var extend = function(obj /*...*/){
  *
  * @constructor
  */
-var wait = function(){
+var Wait = function(){
   this._state = 0;
   this._onReady = [];
   this._onFailed = [];
@@ -188,9 +190,9 @@ var wait = function(){
  *
  * @param {Function} onReady Add to the onReady queue
  * @param {Function} onFailled Add to the onFailed queue
- * @return {wait} 
+ * @return {Wait} 
  */
-wait.prototype.done = function(onReady, onFailed){
+Wait.prototype.done = function(onReady, onFailed){
   var self = this;
   nextTick(function(){
     if(onReady && ( "function" === typeof onReady)){
@@ -208,24 +210,24 @@ wait.prototype.done = function(onReady, onFailed){
 }
 
 /**
- * Resolve the wait.
+ * Resolve the Wait.
  *
  * @param {*} value Value to pass to callbacks
  * @param {Object} ctx Set 'this'
  */
-wait.prototype.resolve = function(value, ctx){
+Wait.prototype.resolve = function(value, ctx){
   this._state = 1;
   this._dispatch(this._onReady, value, ctx);
   this._onReady = [];
 }
 
 /**
- * Reject the wait.
+ * Reject the Wait.
  *
  * @param {*} value Value to pass to callbacks
  * @param {Object} ctx Set 'this'
  */
-wait.prototype.reject = function(value, ctx){
+Wait.prototype.reject = function(value, ctx){
   this._state = -1;
   this._dispatch(this._onFailed, value, ctx);
   this._onFailed = [];
@@ -239,12 +241,67 @@ wait.prototype.reject = function(value, ctx){
  * @param {Object} ctx
  * @api private
  */
-wait.prototype._dispatch = function (fns, value, ctx) {
+Wait.prototype._dispatch = function (fns, value, ctx) {
   this._value = (value || this._value);
   ctx = (ctx || this);
   var self = this;
   each(fns, function(fn){ fn.call(ctx, self._value); });
 }
+
+/**
+ * Check if the passed item is a path
+ *
+ * @param {String} obj
+ * @return {String}
+ */
+var isPath = function (obj) {
+  return obj.indexOf('/') >= 0;
+};
+
+/**
+ * Convert a path into an object name
+ *
+ * @param {String} obj
+ * @return {String}
+ */
+var getObjectByPath = function (path, options) {
+  options = options || {};
+  if (isPath(path)
+    && (path.indexOf('.') >= 0) 
+    && options.stripExt) {
+    // Strip extensions.
+    path = path.substring(0, path.lastIndexOf('.'));
+  }
+  path = path.replace(/\//g, '.');
+  return path;
+};
+
+/**
+ * Convert an object name to a path
+ *
+ * @param {String} obj
+ * @return {String}
+ */
+var getPathByObject = function (obj) {
+  if (isPath(obj)) {
+    // This is probably already a path.
+    return obj;
+  }
+  obj = obj.replace(/\./g, '/');
+  return obj;
+};
+
+/**
+ * A simple shim for Function.bind
+ *
+ * @param {Function} func
+ * @param {*} ctx
+ * @return {Function} 
+ */
+var bind = function (func, ctx) {
+  if (Function.prototype.bind && func.bind) return func.bind(ctx);
+  return function () { func.apply(ctx, arguments); };
+};
 
 /*
  * ---
@@ -264,43 +321,38 @@ wait.prototype._dispatch = function (fns, value, ctx) {
  * @return {Object}
  */
 var z = function (name, factory) {
+  if( !(this instanceof z) ) return new z(name, factory);
   if ("function" === typeof name) {
     factory = name;
     name = false;
   }
-
-  // Allows the use of z without 'new'
-  if( !(this instanceof z) ) return new z(name, factory);
-
   this._moduleName = null;
   if (name) this.defines(name);
-
-  this._wait = new wait();
+  this._wait = new Wait();
   this._state = MODULE_STATE.PENDING;
   this._defined = false;
   this._imports = [];
   this._exports = [];
   this._plugins = {};
   this._factory = null;
-
   if (!name && factory) {
     if (factory.length === 3) {
-      factory(this.defines.bind(this), this.imports.bind(this), this.exports.bind(this));
+      factory(bind(this.defines, this), bind(this.imports, this), bind(this.exports, this));
     } else {
       factory(this);
     }
   } else if(factory && ('function' === typeof factory) ){
     if (factory.length === 3) {
-      factory(this.defines.bind(this), this.imports.bind(this), this.exports.bind(this));
+      factory(bind(this.defines, this), bind(this.imports, this), bind(this.exports, this));
     } else if (factory.length === 2) {
-      factory(this.imports.bind(this), this.exports.bind(this));
+      factory(bind(this.imports, this), bind(this.exports, this));
     } else if (factory.length === 1) {
       factory(this);
     } else {
       this.exports(factory);
     }
   }
-}
+};
 
 /*
  * -------
@@ -317,6 +369,9 @@ z.env = {
   plugins: {},
 };
 
+/**
+ * Config settings
+ */
 z.settings = {
   root: '',
   map: {},
@@ -441,7 +496,7 @@ z.shim = function (module, options) {
  */
 z.plugin = function (name, callback) {
   if ( "function" === typeof callback ) {
-    z.env.plugins[name] = callback.bind(z);
+    z.env.plugins[name] = bind(callback, z);
   }
 }
 
@@ -478,35 +533,66 @@ z.ensureNamespace = function (namespace) {
 }
 
 /**
- * Check if a module is mapped to a path.
+ * Parse a request
  *
  * @param {String} module
- * @return {String | Bool}
+ * @param {String} root
+ * @return {Object}
  */
-z.getMappedPath = function (module) {
-  var mappedPath = false;
-  each(z.settings.map, function (maps, path) {
+z.parseRequest = function (module, root) {
+  root = root || z.config('root');
+  var path = {obj:'', src:''};
+  if (isPath(module)) {
+    path.obj = getObjectByPath(module, {stripExt:true});
+    path.src = module;
+  } else {
+    path.obj = module;
+    path.src = getPathByObject(module) + '.js';
+  }
+  each(z.config('map'), function (maps, pathPattern) {
     each(maps, function (map) {
-      if (map.test(module)){
-        mappedPath = path;
-        var matches = map.exec(module);
-
+      if (map.test(path.obj)){
+        path.src = pathPattern;
+        var matches = map.exec(path.obj);
         // NOTE: The following doesn't take ordering into account.
         // Could pose an issue for paths like: 'foo/*/**.js'
         // Think more on this. Could be fine as is! Not sure what the use cases are like.
         if (matches.length > 2) {
-          mappedPath = mappedPath
+          path.src = path.src
             .replace('**', matches[1].replace(/\./g, '/'))
             .replace('*', matches[2]);
         } else if (matches.length === 2) {
-          mappedPath = mappedPath
-            .replace('*', matches[1]);
+          path.src = path.src.replace('*', matches[1]);
         }
       }
     });
   });
-  return mappedPath;
-}
+  // Add root.
+  path.src = root + path.src;
+  return path;
+};
+
+/**
+ * Shortcut to get a path from a request.
+ *
+ * @param {String} module
+ * @param {String} root
+ * @return {Object}
+ */
+z.getMappedPath = function (module, root) {
+  return z.parseRequest(module, root).src;
+};
+
+/**
+ * Shortcut to get an object name from a request.
+ *
+ * @param {String} module
+ * @param {String} root
+ * @return {Object}
+ */
+z.getMappedObj = function (module, root) {
+  return z.parseRequest(module, root).obj;
+};
 
 /** 
  * Create a namespace path, ensuring that every level is defined
@@ -699,7 +785,7 @@ z.prototype.exports = function (name, definition) {
  */
 z.prototype.enable = function () {
   if (this.isPending()) {
-    this._loadImports();
+    this._importDependencies();
   } else if (this.isLoaded()) {
     this._ensureDependencies();
   } else if (this.isReady()) {
@@ -753,13 +839,30 @@ z.prototype.disable = function (reason) {
   return this.enable();
 }
 
+/* 
+ * ------------------------
+ * Private Instance Methods
+ * ------------------------
+ */
+
+/**
+ * Get the correct loader, checking if it's using a plugin.
+ *
+ * @param {Sting} item The name of the import to check.
+ * @return {Function} 
+ */
+z.prototype._getLoader = function (item) {
+  if (this._plugins[item]) return z.env.plugins[this._plugins[item]];
+  return z.load;
+};
+
 /**
  * Iterate through deps and load them.
  *
  * @api private
  * @return {z}
  */
-z.prototype._loadImports = function () {
+z.prototype._importDependencies = function () {
   var queue = [];
   var self = this;
   this.isWorking(true);
@@ -768,20 +871,16 @@ z.prototype._loadImports = function () {
   });
   if (size(queue)) {
     eachAsync(queue, function getImports (item, next, error) {
-      var loader = root.Z_MODULE_LOADER;
       if (z.settings.shim[item]) {
-        self._loadShimmedImport(item, next, error);
-        return;
+        self._importShim(item, next, error);
+      } else {
+        self._importModule(item, next, error);
       }
-      if ( self._plugins[item] ) {
-        loader = z.env.plugins[self._plugins[item]];
-      }
-      loader(item, next, error);
     }, function () {
       self.isLoaded(true);
       self.enable();
     }, function (reason) {
-      self.disable('Could not load dependency: ' + item);
+      self.disable(reason);
     });
   } else {
     this.isLoaded(true);
@@ -791,17 +890,37 @@ z.prototype._loadImports = function () {
 };
 
 /**
- * Load a shimmed import, ensuring each dependency is loaded.
+ * Import a z.module
+ *
+ * @param {String} module
+ * @param {Function} next
+ * @param {Function} error
  */
-z.prototype._loadShimmedImport = function (item, next, error) {
-  var shim = z.env.modules['@shim.' + item];
-  var loader = root.Z_MODULE_LOADER;
-  if (shim._dependencies) {
-    eachAsync(shim._dependencies, function (dep, next, error) {
+z.prototype._importModule = function (module, next, error) {
+  var loader = this._getLoader(module);
+  loader(module, next, error);
+};
+
+/**
+ * Load a shimmed import, ensuring each dependency is loaded.
+ * As an unwrapped file will execute right away, we need to make sure
+ * that all dependencies are loaded BEFORE we load the shimmed script.
+ *
+ * @param {String} module
+ * @param {Function} next
+ * @param {Function} error
+ */
+z.prototype._importShim = function (module, next, error) {
+  var loader = this._getLoader(module);
+  var shim = z.settings.shim[module];
+  if (shim.imports) {
+    eachAsync(shim.imports, function (dep, next, error) {
       loader(dep, next, error)
-    }, next, error);
+    }, function () {
+      loader(module, next, error);
+    }, error);
   } else {
-    loader(item, next, error);
+    loader(module, next, error);
   }
 };
 
@@ -820,6 +939,8 @@ z.prototype._ensureDependencies = function () {
   this.isWorking(true);
   eachAsync(this._imports, function ensureDependency (module, next, error) {
     if (!self.isWorking()) return;
+    // ensure 'module' is written in object syntax
+    if (isPath(module)) module = getObjectByPath(module, {stripExt:true});
     var current = z.env.modules[module];
     if (z.settings.shim.hasOwnProperty(module)){
       if(!z.getObjectByName(module)) {
@@ -896,33 +1017,33 @@ each(['Enabled', 'Ready', 'Working', 'Loaded', 'Pending', 'Failed'], function ( 
 
 /* 
  * -------
- * Globals
+ * Loaders
  * -------
  */
-if(!root.Z_MODULE_LOADER && z.isClient()){
 
+if (z.isClient()) {
   var visited = {};
 
   var onLoadEvent = (function (){
     var testNode = document.createElement('script')
     if (testNode.attachEvent){
-      return function(node, wait){
+      return function(node, Wait){
         var self = this;
         this.done(next, err);
         node.attachEvent('onreadystatechange', function () {
           if(node.readyState === 'complete'){
-            wait.resolve();
+            Wait.resolve();
           }
         });
         // Can't handle errors with old browsers.
       }
     }
-    return function(node, wait){
+    return function(node, Wait){
       node.addEventListener('load', function (e) {
-        wait.resolve();
+        Wait.resolve();
       }, false);
       node.addEventListener('error', function (e) {
-        wait.reject();
+        Wait.reject();
       }, false);
     }
   })();
@@ -935,31 +1056,38 @@ if(!root.Z_MODULE_LOADER && z.isClient()){
    * @param {Function} next Run on success
    * @param {Funtion} error Run on error
    */
-  root.Z_MODULE_LOADER = function (module, next, error) {
-    var src = z.config('root') + ( z.getMappedPath(module)
-      || module.replace(/\./g, '/') + '.js' );
+  z.load = function (module, next, error, options) {
+
+    if (module instanceof Array) {
+      eachThen(module, function (item, next, error) {
+        z.load(item, next, error);
+      }, next, error);
+      return;
+    }
+
+    var src = z.getMappedPath(module, z.config('root'));
 
     if (visited.hasOwnProperty(src)) {
       visited[src].done(next, error);
       return;
     }
 
-    var node = document.createElement('script')
-      , head = document.getElementsByTagName('head')[0];
+    var node = document.createElement('script');
+    var head = document.getElementsByTagName('head')[0];
 
     node.type = 'text/javascript';
     node.charset = 'utf-8';
     node.async = true;
     node.setAttribute('data-module', module);
 
-    visited[src] = new wait();
+    visited[src] = new Wait();
     visited[src].done(next, error);
 
     onLoadEvent(node, visited[src]);
 
     node.src = src;
     head.appendChild(node);
-  }
+  };
 
   /**
    * The default file loader (uses AJAX)
@@ -970,23 +1098,16 @@ if(!root.Z_MODULE_LOADER && z.isClient()){
    * @param {Function} next Run on success
    * @param {Funtion} error Run on error
    */
-  root.Z_FILE_LOADER = function (file, type, next, error) {
+  z.file = function (file, next, error, options) {
 
-    if (arguments.length < 4) {
-      error = next;
-      next = type;
-      type = 'txt'; 
-    }
-
-    var src = z.config('root') + ( z.getMappedPath(file)
-      || file.replace(/\./g, '/') + '.' + type )
+    var src = z.getMappedPath(file, z.config('root'));
 
     if(visited.hasOwnProperty(src)){
       visited[src].done(next, error);
       return;
     }
 
-    visited[src] = new wait();
+    visited[src] = new Wait();
     visited[src].done(next, error);
 
     if(root.XMLHttpRequest){
@@ -1017,30 +1138,24 @@ if(!root.Z_MODULE_LOADER && z.isClient()){
   var visited = {};
   var fs = require('fs');
 
-  root.Z_MODULE_LOADER = function (module, next, error) {
-    var src = z.config('root') + ( z.getMappedPath(module)
-      || module.replace(/\./g, '/') );
+  z.load = function (module, next, error) {
+    var src = z.getMappedPath(file, root);
     if (visited.hasOwnProperty(src)) return next();
     try {
       require(src);
+      next();
     } catch (e) {
       error(e);
     }
   };
 
-  root.Z_FILE_LOADER = function (file, type, next, error) {
-    if (arguments.length < 4) {
-      error = next;
-      next = type;
-      type = 'txt'; 
-    }
-    var src = z.config('root') + ( z.getMappedPath(file)
-      || file.replace(/\./g, '/') + '.' + type );
+  z.file = function (file, next, error, options) {
+    var src = z.getMappedPath(file, root);
     if(visited.hasOwnProperty(src)){
       visited[src].done(next, error);
       return;
     }
-    visited[src] = new wait();
+    visited[src] = new Wait();
     visited[src].done(next, error);
     fs.readFile(src, 'utf-8', function (err, data) {
       if (err) {
@@ -1057,8 +1172,9 @@ if(!root.Z_MODULE_LOADER && z.isClient()){
  * Default file plugin.
  */
 z.plugin('txt', function (module, next, error) {
-  root.Z_FILE_LOADER(module, 'txt', function (data) {
-    z(module).exports( function () { return data; } ).done(next);
+  var moduleName = z.getMappedObj(module, z.config('root'));
+  z.file(module, function (data) {
+    z(moduleName, function () { return data; } ).done(next, error);
   }, error);
 });
 

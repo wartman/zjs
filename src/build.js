@@ -5,7 +5,7 @@
  * Released under the MIT license
  */
 
-var z        = require('./z').z;
+var z        = require('./z');
 var sorter   = require('./sorter');
 var fs       = require('fs');
 var UglifyJS = require("uglify-js");
@@ -29,10 +29,11 @@ var Build = function (options) {
   // Register loaders.
   this.loaders();
 
-  // Overwrite plugin
+  // Overwrite default plugin
   z.plugin('txt', function (module, next, error) {
-    z.global.Z_FILE_LOADER(module, 'txt', function (file) {
-      var fileWrapper = z(module);
+    var moduleName = z.getMappedObj(module);
+    z.file(module, function (file) {
+      var fileWrapper = z(moduleName);
       fileWrapper.exports(Function('', '  return \'' + file + '\''));
       fileWrapper.done(next, error);
     }, error);
@@ -91,8 +92,9 @@ Build.prototype.render = function () {
   sortedModules = sorter(moduleList, this.options.main);
 
   // Compile
-  _.each(sortedModules, function(ns){
+  _.each(sortedModules, function (ns) {
     if(ns.indexOf('@') >= 0) return; // Don't add shims.
+    ns = z.getMappedObj(ns);
     compiled += self.renderModule( modules[ns], ns );
   });
 
@@ -211,13 +213,9 @@ Build.prototype.loaders = function () {
   /**
    * Loader that replaces the default.
    */
-  z.global.Z_MODULE_LOADER = function (module, next, error) {
-
-    var src = ( z.getMappedPath(module) 
-      || module.replace(/\./g, '/') + '.js' );
+  z.load = function (module, next, error) {
     
-    src = process.cwd() + '/' + z.config('root') + src;
-
+    var src = z.getMappedPath(module, process.cwd() + '/' + z.config('root'));
     var file = fs.readFileSync(src, 'utf-8');
 
     if (z.settings.shim[module]) {
@@ -234,15 +232,8 @@ Build.prototype.loaders = function () {
     }
   };
 
-  z.global.Z_FILE_LOADER  = function (module, type, next, error) {
-    if (arguments.length < 4) {
-      error = next;
-      next = type;
-      type = 'txt'; 
-    }
-    var src = ( z.getMappedPath(module)
-      || module.replace(/\./g, '/') + '.' + type );
-    src = process.cwd() + '/' + z.config('root') + src;
+  z.file  = function (module, next, error) {
+    var src = z.getMappedPath(module, process.cwd() + '/' + z.config('root'));
     var file = fs.readFileSync(src, 'utf-8');
     next(file);
   };
