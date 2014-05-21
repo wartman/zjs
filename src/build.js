@@ -17,7 +17,11 @@ var _        = require('lodash');
 var Build = function (options) {
   this.options = {
     dest: false,
-    main: 'main'
+    main: 'main',
+    names: {
+      global: '__global__',
+      exports: '__exports__'
+    }
   };
 
   this.setup(options);
@@ -82,8 +86,8 @@ Build.prototype.render = function () {
     compiled += self.renderModule( modules[ns], ns );
   });
 
-  // Wrap the compiled item, replacing 'z.global' with 'root'.
-  compiled = "(function () {\nvar root = this;\n" + compiled.replace(/z\.global/g, 'root') + "\n}).call(this);";
+  // Wrap the compiled item, replacing 'z.global' with the global var.
+  compiled = "(function () {\nvar " + this.options.names.global + " = this;\n" + compiled.replace(/z\.global/g, this.options.names.global) + "\n}).call(this);";
 
   if(this.options.optimize){
     compiled = UglifyJS.minify(compiled, {fromString: true}).code;
@@ -111,28 +115,29 @@ Build.prototype.renderModule = function (module, namespace) {
     this.extractLicenses(z.getObjectByName(namespace, z.global));
     return z.getObjectByName(namespace, z.global) + '\n';
   }
-  var header = 'var exports = {};\n';
+  var header = 'var ' + exportsName + ' = {};\n';
   var body = '';
+  var exportsName = this.options.names.exports;
   _.each(module._exports, function (item) {
     if (item.id) {
       if (_.isFunction(item.definition)) {
-        body += 'exports.' + item.id + ' = (' + item.definition.toString() + ')();\n';
+        body += exportsName + '.' + item.id + ' = (' + item.definition.toString() + ')();\n';
       } else {
-        body += 'exports.' + item.id + ' = ' + item.definition + '\n';
+        body += exportsName + '.' + item.id + ' = ' + item.definition + '\n';
       }
     } else {
       if (_.isFunction(item.definition)) {
-        header = 'var exports = (' + item.definition + ')();\n';
+        header = 'var ' + exportsName + ' = (' + item.definition.toString() + ')();\n';
       } else {
-        header = 'exports.' + item.id + ' = ' + item.definition + '\n';
+        header = exportsName + '.' + item.id + ' = ' + item.definition + '\n';
       }
     }
   });
   if (module._body) {
-    header = 'var exports = (' + module._body.toString() + ')();\n'
+    header = 'var __exports__ = (' + module._body.toString() + ')();\n'
   }
   this.logProgress(true);
-  return namespace + ' = (function () {\n' + header + body + 'return exports;\n})();\n';
+  return namespace + ' = (function () {\n' + header + body + 'return ' + exportsName + ';\n})();\n';
 };
 
 /**
@@ -147,7 +152,7 @@ Build.prototype.renderNamespace = function (namespace) {
   var exists = this._exists[parts[0]];
 
   if (!exists) {
-    render += "var " + parts[0] + ' = this.' + parts[0] + ' = {};\n';
+    render += "var " + parts[0] + ' = ' + this.options.names.global + '.' + parts[0] + ' = {};\n';
     exists = this._exists[parts[0]] = {};
   }
 

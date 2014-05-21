@@ -1,10 +1,10 @@
 /*!
- * zjs 1.0.1
+ * zjs 1.0.2
  *
  * Copyright 2014
  * Released under the MIT license
  *
- * Date: 2014-05-06T19:54Z
+ * Date: 2014-05-21T15:38Z
  */
 
 (function (factory) {
@@ -382,7 +382,7 @@ z.settings = {
 /**
  * The current version.
  */
-z.VERSION = '1.0.1';
+z.VERSION = '1.0.2';
 
 /**
  * Module states.
