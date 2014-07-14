@@ -11,9 +11,11 @@ z.map('foo.mapped', 'fixtures/map/mapped.js');
 
 z('app.main', function () {
 
-	z.imports('fixtures.stress.one');
-	z.imports('fixtures.stress.two');
-	z.imports('fixtures.stress.three');
-	z.imports('foo.mapped');
+	z.imports(
+    'fixtures.stress.one',
+    'fixtures.stress.two',
+    'fixtures.stress.three',
+    'foo.mapped'
+  );
 
 });

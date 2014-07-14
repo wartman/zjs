@@ -8,20 +8,9 @@ var z = root.z = function (name, factory) {
 z.configuration = {};
 
 // Define an import
-z.imports = function (dependency) {
-  // Does nothing
-  return {
-    using: function (plugin) {
-      return this;
-    },
-    as: function (alias) {
-      _createObjectByName(alias, _getObjectByName(dependency));
-      return this;
-    },
-    // Load a request, then look for this global variable.
-    global: function (item) {
-      return this;
-    }
+z.imports = function (/*...*/) {
+  if (arguments.length === 1) {
+    return _getObjectByName(arguments[0]);
   }
 };
 

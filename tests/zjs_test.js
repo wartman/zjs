@@ -33,7 +33,6 @@ describe('z', function () {
     z('tests.imports.waited', function (moduleDone) {
       setTimeout(function () {
         waited = 'yep';
-        console.log('done');
         moduleDone();
       }, 20);
     });
@@ -47,7 +46,6 @@ describe('z', function () {
 	it('shims globals', function (done) {
     z('tests.imports.globalShim', function (moduleDone) {
       z.load('fixtures/global.js', function () {
-        console.log(globalItem);
         tests.imports.globalShim = window.globalItem;
         moduleDone();
       });

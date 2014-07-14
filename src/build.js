@@ -98,20 +98,20 @@ Build.prototype.extractLicenses = function (file) {
 
 Build.prototype.compile = function () {
 	var modules = z.env.modules;
-	var packageList = {};
+	var moduleList = {};
 	var sortedPackages = [];
 	var self = this;
 
-	for (var pack in modules) {
+	for (var mod in modules) {
 		var list = [];
-		var raw = modules[pack].deps;
+		var raw = modules[mod].deps;
 		raw.forEach(function (item) {
 			list.push(item.id);
 		})
-		packageList[pack] = list;
+		moduleList[mod] = list;
 	}
 
-	sortedPackages = this.sort(packageList, this._main);
+	sortedPackages = this.sort(moduleList, this._main);
 
 	sortedPackages.forEach(function (name) {
 		self._compiled += self._raw[name] + '\n';

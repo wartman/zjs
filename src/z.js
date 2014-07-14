@@ -770,6 +770,8 @@
   };  
 
   Module.prototype.runFactory = function () {
+    // Don't define if we're compiling.
+    if (z.config('compile.running') === true) return this.wait.resolve();
     if (this._waitForCallback) {
       var self = this;
       this.factory(function (err) {
