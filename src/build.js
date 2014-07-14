@@ -121,7 +121,7 @@ Build.prototype.compile = function () {
 	if (z.config('compile.full')) {
 		var lib = fs.readFileSync(__dirname + '/z.js', 'utf-8');
 	} else {
-		var lib = fs.readFileSync(__dirname + '/zMinimal.js', 'utf-8');
+		var lib = fs.readFileSync(__dirname + '/runtime.js', 'utf-8');
 	}
 
 	// Add library
