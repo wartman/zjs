@@ -21,7 +21,9 @@
 
   // z's root. The primary API for z.
   var z = root.z = function (name, factory) {
-    return new Module(name, factory);
+    var mod = new Module(name, factory);
+    mod.enable();
+    return mod;
   };
 
   // The current version.
@@ -466,20 +468,9 @@
   };
 
   // Define an import
-  z.imports = function (dependency) {
-    // Does nothing
-    return {
-      using: function (plugin) {
-        return this;
-      },
-      as: function (alias) {
-        _createObjectByName(alias, _getObjectByName(dependency));
-        return this;
-      },
-      // Load a request, then look for this global variable.
-      global: function (item) {
-        return this;
-      }
+  z.imports = function (/*...*/) {
+    if (arguments.length === 1) {
+      return _getObjectByName(arguments[0]);
     }
   };
 
@@ -652,195 +643,154 @@
   // Module
   // ------
 
-  // Module states
-  var MODULE_STATE = {
-    PENDING: 0,
-    WORKING: 1,
-    LOADED: 2,
-    ENABLED: 3,
-    DISABLED: -1
-  };
-
-  function Module (name, environment) {
-    if (typeof name === 'function') {
-      environment = name;
-      name = null;
-    }
+  function Module (name, factory) {
     var self = this;
-    this._name = null;
-    this._namespace = null;
-    this._environment = null;
-    this._wait = new Wait();
-    this._imports = [];
-    this._state = MODULE_STATE.PENDING;
-    // Default onReady callback
-    this._onReady = function () {
-      self._wait.resolve();
-    };
-    if (name) this.setName(name);
-    if (environment) {
-      this.setEnvironment(environment);
-      this.parse();
-      this.enable();
+    this.factory = factory || function () {};
+    // Ensure the name is available.
+    this.define(name);
+    this.deps = this.findDeps();
+    this.wait = new Wait();
+    this.isPending = true;
+    this.isDisabled = false;
+    this.isEnabled = false;
+    this.isEnabling = false;
+    this._waitForCallback = false;
+    if (this.factory.length > 0) {
+      this._waitForCallback = true;
+      this.done(function () {
+        self._waitForCallback = false;
+      });
     }
   };
 
-  Module.prototype.setName = function (name) {
-    if (this._name) return;
+  var _importCheck = /z\.imports\(([\s\S\r\n]+?)\)/g;
+  var _depCheck = /([a-zA-Z0-9\.]+)/g;
+  // Plugins are defined with the syntax: 'plugin.name: module.name'
+  var _pluginCheck = /([a-zA-Z0-9\.]+)\s*?:\s*?([a-zA-Z0-9\.]+)/g;
+
+  Module.prototype.define = function (name) {
+    z.env.modules[name] = this;
     // Set this Module's name.
     this._name = name;
     // Register the namespace.
     this._namespace = _ensureNamespace(name);
-    // Register in the z.env
-    z.env.modules[name] = this;
-    _createObjectByName(name)
+    _createObjectByName(name);
   };
 
-  Module.prototype.getName = function () {
-    return this._name;
-  };
-
-  Module.prototype.getNamespace = function () {
-    return this._namespace;
-  };
-
-  Module.prototype.setEnvironment = function (environment) {
+  Module.prototype.findDeps = function () {
+    var factory = this.factory.toString();
+    var deps = [];
+    var matches = [];
+    var match;
     var self = this;
-    this._environment = environment;
-    this._onReady = function () {
-      self.isEnabled(true);
-      // Don't define if we're compiling.
-      if (z.config('compile.running') === true) return self._wait.resolve();
-      try {
-        self._environment();
-        self._wait.resolve();
-      } catch (e) {
-        _error(e);
-        self._wait.reject();
-      } 
-    };
-  };
-
-  Module.prototype.getEnvironment = function () {
-    return this._environment;
-  };
-
-  Module.prototype.setImport = function (dependency, options) {
-    this._imports.push(extend({
-      dependency: dependency,
-      using: false,
-      alias: false,
-      global: false
-    }, options));
-  };
-
-  Module.prototype.getImports = function () {
-    return this._imports;
-  };
-
-  // Regex to investigate imports/provider
-  var _environmentInvestigator = /\.imports\(([^\(]+?)\)|\.using\(([^\(]+?)\)|\.as\(([^\(]+?)\)|\.global\(([^\(]+?)\)|\.provides\(([^\(]+?)\)/g
-  
-  var _escapeStr = function (str) {
-    return str.replace(/'|"/g, "");
-  }
-
-  Module.prototype.parse = function () {
-    if(!this._environment) return;
-    var env = this._environment.toString();
-    var self = this;
-    var lastImport = null;
-    env.replace(_environmentInvestigator, function (match, imports, using, as, global, provides) {
-      if (imports) {
-        imports = _escapeStr(imports);
-        if (imports.indexOf('.') === 0) imports = self.getNamespace() + imports;
-        lastImport = {
-          dependency: imports,
-          using: false,
-          alias: false,
-          global: false
-        };
-        self._imports.push(lastImport);
-      }
-      if (using && lastImport) lastImport.using = _escapeStr(using);
-      if (as && lastImport) lastImport.alias = _escapeStr(as);
-      if (global && lastImport) lastImport.global = _escapeStr(global);
-      if (provides) self.setName(_escapeStr(provides));
+    factory.replace(_importCheck, function(match, imports){
+      matches.push(imports);
     });
-  };
-
-  // Wait for a package to load its deps before continuing,
-  // and ensure that an object is defined before continuing.
-  var _delayUntilImportReady = function (item, next, error) {
-    var name = (item.global)? item.global : item.dependency;
-    if (_isPath(name)) name = _pathToName(name);
-    if (z.env.modules.hasOwnProperty(name)) {
-      z.env.modules[name].done(next, error);
-    } else {
-      if (_getObjectByName(name)) {
-        nextTick(next);
-      } else {
-        error('A dependency was not loaded: ' + name);
-      }
-    }
+    each(matches, function (item) {
+      var parts = item.match(_depCheck);
+      each(parts, function (dep) {
+        var plugin = dep.match(_pluginCheck);
+        var item = {}
+        if (plugin) {
+          item.plugin = plugin.pop();
+          item.id = plugin.pop();
+        } else {
+          item.id = dep.trim();
+        }
+        // Allow for module shortcuts.
+        if (item.id.indexOf('.') === 0) {
+          item.id = self._namespace + item.id;
+        }
+        deps.push(item);
+      })
+    })
+    return deps;
   };
 
   Module.prototype.enable = function () {
-    if (!this.isPending()) return;
+    if (this.isDisabled || this.isEnabling) return;
+    if (this.isEnabled) {
+      if (!this._waitForCallback) this.wait.resolve();
+      return;
+    }
+
     var queue = [];
     var self = this;
 
-    // Enqueue unloaded imports
-    each(this._imports, function (item) {
-      if (item.imported === true || !!_getObjectByName(item.dependency)) return;
-      item.imported = true;
-      queue.push(item);
+    each(this.deps, function (item) {
+      if(!item.imported) {
+        queue.push(item);
+        item.imported = true;
+      }
     });
 
-    // Import items if needed.
     if (queue.length > 0) {
-      this.isWorking(true);
+
+      this.isEnabling = true;
       eachWait(queue, function getImports (item, next, error) {
+        // Wait for a package to load its deps before continuing,
+        // and ensure that an object is defined before continuing.
+        var check = function () {
+          var name = item.id;
+          if (_isPath(name)) name = _pathToName(name);
+          if (z.env.modules.hasOwnProperty(name)) {
+            z.env.modules[name].done(next, error);
+          } else {
+            if (_getObjectByName(name)) {
+              next();
+            } else {
+              error('A dependency was not loaded: ' + name);
+            }
+          }
+        };
         // Load the item, either with a plugin or the default method.
-        if (item.using) {
-          z.plugin(item.using, item.dependency, function () {
-            _delayUntilImportReady(item, next, error);
-          }, error);
+        if (z.env.modules.hasOwnProperty(item.id)) {
+          z.env.modules[item.id].done(next, error);
+        } else if (item.plugin) {
+          z.plugin(item.plugin, item.id, check, error);
         } else {
-          z.load(item.dependency, function () {
-            _delayUntilImportReady(item, next, error);
-          }, error);
+          z.load(item.id, check, error);
         }
       })
       .done(function () {
-        self.isLoaded(true);
-        self._onReady();
+        self.runFactory();
+        this.isEnabling = false;
       }, function (reason) {
+        this.isEnabling = false;
         self.disable(reason);
       });
+
     } else {
-      this.isLoaded(true);
-      this._onReady();
+      this.runFactory();
     }
   };
 
-  Module.prototype.disable = function () {
-    this.isDisabled(true);
-    this._wait.reject();
+  Module.prototype.done = function (onDone, onError) {
+    this.wait.done(onDone, onError);
+  };  
+
+  Module.prototype.runFactory = function () {
+    if (this._waitForCallback) {
+      var self = this;
+      this.factory(function (err) {
+        if (err) {
+          self.disable(err);
+        } else {
+          self.isEnabled = true;
+          self.wait.resolve();
+        }
+      });
+    } else {
+      this.factory();
+      this.isEnabled = true;
+      this.wait.resolve();
+    }
   };
 
-  // Run after package is done.
-  Module.prototype.done = function (next, error) {
-    this._wait.done(next, error);
+  Module.prototype.disable = function (e) {
+    if (e instanceof Error) throw e;
+    this.isDisabled = true;
+    this.wait.reject(e);
   };
-
-  // State methods
-  each(['Enabled', 'Working', 'Loaded', 'Pending', 'Disabled'], function (state) {
-    var modState = MODULE_STATE[state.toUpperCase()];
-    Module.prototype['is' + state] = function(set){
-      if(set) this._state = modState;
-      return this._state === modState;
-    } 
-  });
 
 }));

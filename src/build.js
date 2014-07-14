@@ -104,9 +104,9 @@ Build.prototype.compile = function () {
 
 	for (var pack in modules) {
 		var list = [];
-		var raw = modules[pack].getImports();
+		var raw = modules[pack].deps;
 		raw.forEach(function (item) {
-			list.push(item.dependency);
+			list.push(item.id);
 		})
 		packageList[pack] = list;
 	}

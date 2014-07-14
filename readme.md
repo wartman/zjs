@@ -23,12 +23,19 @@ executed when all dependencies are loaded. Here's an example:
 
 ```js
 
-    z('App.Foo', function () {
-        z.imports('App.Bar');
+    z('app.foo', function () {
 
-        App.Foo.Bin = App.Bar.extend({
-            foo: 'foo'
-        });
+      z.imports(
+        'app.bar',
+        'app.bin'
+      );
+
+      var foo = z.imports('app.bin')
+
+      app.foo.Bin = app.bar.Kit.extend({
+        foo: 'foo'
+      });
+      
     });
 
 ```

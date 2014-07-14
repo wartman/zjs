@@ -1,11 +1,11 @@
 describe('z', function () {
 
-	it('accepts a name and an environment', function () {
-		var mod = z('Test.Module.Constructor', function () {});
-		expect(mod.getName()).to.equal('Test.Module.Constructor');
-		expect(mod.getNamespace()).to.equal('Test.Module');
-		expect(mod.getEnvironment()).to.be.a('function');
-	});
+	// it('accepts a name and an environment', function () {
+	// 	var mod = z('Test.Module.Constructor', function () {});
+	// 	expect(mod.getName()).to.equal('Test.Module.Constructor');
+	// 	expect(mod.getNamespace()).to.equal('Test.Module');
+	// 	expect(mod.getEnvironment()).to.be.a('function');
+	// });
 
 	it('loads previously defined module', function (done) {
 		z('Test.Imports.ModuleTarget', function () {
@@ -13,31 +13,48 @@ describe('z', function () {
 		});
 		// Note: all the below is done automatically if you
 		// pass a function as the second argument to z.
-		var mod = new z('Test.Imports.Module');
-		mod.setEnvironment(function () {
+		z('Test.Imports.Module', function () {
 			z.imports('Test.Imports.ModuleTarget');
 			expect(Test.Imports.ModuleTarget).to.equal('target');
 			done();
 		});
-		mod.parse();
-		mod.enable();
 	});
 
 	it('parses module name as path, loads external script', function (done) {
-		var mod = new z('Test.Imports.Script')
-		mod.setEnvironment(function () {
+		z('Test.Imports.Script', function () {
 			z.imports('fixtures.Single');
 			expect(fixtures.Single).to.equal('one');
 			done();
 		});
-		mod.parse();
-		mod.enable();
 	});
 
-	it('imports globals', function (done) {
+  it('waits for a callback (when present) for async ops', function (done) {
+    var waited = 'nope';
+    z('tests.imports.waited', function (moduleDone) {
+      setTimeout(function () {
+        waited = 'yep';
+        console.log('done');
+        moduleDone();
+      }, 20);
+    });
+    z('tests.imports.waiting', function () {
+      var glob = z.imports('tests.imports.waited');
+      expect(waited).to.equal('yep');
+      done();
+    });
+  });
+
+	it('shims globals', function (done) {
+    z('tests.imports.globalShim', function (moduleDone) {
+      z.load('fixtures/global.js', function () {
+        console.log(globalItem);
+        tests.imports.globalShim = window.globalItem;
+        moduleDone();
+      });
+    })
 		z('Test.Imports.Globals', function () {
-			z.imports('fixtures.global').global('globalItem');
-			expect(globalItem).to.equal('globalItem');
+			var glob = z.imports('tests.imports.globalShim');
+			expect(glob).to.equal('globalItem');
 			done();
 		});
 	});
@@ -53,9 +70,11 @@ describe('z', function () {
 
 	it('imports many deps recursively from external files', function (done) {
     z('Test.Imports.Stress', function (stress) {
-      z.imports('fixtures.stress.one');
-      z.imports('fixtures.stress.two');
-      z.imports('fixtures.stress.three');
+      z.imports(
+        'fixtures.stress.one',
+        'fixtures.stress.two',
+        'fixtures.stress.three'
+      );
       var stress = fixtures.stress;
       expect(stress.one.One).to.be.equal('one');
       expect(stress.one.Foo).to.be.equal('Foo');
@@ -65,163 +84,42 @@ describe('z', function () {
     });
   });
 
-  describe('(instance methods)', function () {
-
-		describe('#setName', function () {
-
-			it('Sets the name and namespace', function () {
-				var mod = z();
-				mod.setName('Test.Module.SetName');
-				expect(mod.getName()).to.equal('Test.Module.SetName');
-				expect(mod.getNamespace()).to.equal('Test.Module');
-			});
-
-		});
-
-		describe('#setEnvironment', function () {
-
-			it('Sets the environment', function () {
-				var mod = z();
-				mod.setEnvironment(function () {});
-				expect(mod.getEnvironment()).to.be.a('function');
-			});
-
-		});
-
-		describe('#setImport', function () {
-
-			it('Sets an import', function () {
-				var mod = z('Test.Parser');
-				mod.setImport('Test.Fake.Imports');
-				mod.setImport('Test.Fake.ImportTwo', {using: 'Fake.Plugin'});
-				mod.setImport('Test.Fake.ImportThree', {alias: 'Fake.Alias'});
-				mod.setImport('Test.Fake.ImportFour', {global: 'Four', alias: 'Fake.Four'});
-				expect(mod.getImports()).to.deep.equal([
-					{
-						dependency: 'Test.Fake.Imports',
-						using: false,
-						global: false,
-						alias: false	
-					},
-					{
-						dependency: 'Test.Fake.ImportTwo',
-						using: 'Fake.Plugin',
-						global: false,
-						alias: false	
-					},
-					{
-						dependency: 'Test.Fake.ImportThree',
-						using: false,
-						global: false,
-						alias: 'Fake.Alias'	
-					},
-					{
-						dependency: 'Test.Fake.ImportFour',
-						using: false,
-						global: 'Four',
-						alias: 'Fake.Four'
-					}
-				]);
-			});
-
-		});
-
-		describe('#parse', function () {
-
-			it('detects imports', function () {
-				var mod = z('Test.Parser');
-				mod.setEnvironment(function () {
-					z.imports('Test.Fake.Imports');
-					z.imports('Test.Fake.ImportTwo').using('Fake.Plugin');
-					z.imports('Test.Fake.ImportThree').as('Fake.Alias');
-					z.imports('Test.Fake.ImportFour').global('Four').as('Fake.Four');
-				});
-				mod.parse();
-				expect(mod.getImports()).to.deep.equal([
-					{
-						dependency: 'Test.Fake.Imports',
-						using: false,
-						global: false,
-						alias: false	
-					},
-					{
-						dependency: 'Test.Fake.ImportTwo',
-						using: 'Fake.Plugin',
-						alias: false,
-						global: false,
-					},
-					{
-						dependency: 'Test.Fake.ImportThree',
-						using: false,
-						global: false,
-						alias: 'Fake.Alias'	
-					},
-					{
-						dependency: 'Test.Fake.ImportFour',
-						using: false,
-						global: 'Four',
-						alias: 'Fake.Four'
-					}
-				]);
-			});
-
-		});
-
-	});
-
 	describe('#imports', function () {
 
-		describe('#as', function () {
+		it('imports a list', function (done) {
+      z('app.foo', function () {
+        app.foo = 'foo';
+      });
+      z('app.bar', function () {
+        app.bar = 'bar';
+      });
+      z('tests.imports.list', function () {
+        z.imports(
+          'app.foo',
+          'app.bar'
+        );
+        expect(app.foo).to.equal('foo');
+        expect(app.bar).to.equal('bar');
+        done();
+      });
+    });
 
-			it('alias an import', function () {
-				z('Test.Imports.Alias');
-				Test.Imports.Alias = "foo";
-				z.imports('Test.Imports.Alias').as('Test.Imports.Aliased');
-				expect(Test.Imports.Aliased).to.equal('foo');
-			});
-			
-		});
-
-		describe('#using', function () {
-
-			it('uses a plugin', function (done) {
-				z.plugin.register('Tests.Plugin.One', function (req, next, error) {
-					z(req, function () {
-						var obj = z.sys.getObjectByName(req);
-						obj.foo = 'foo';
-					}).done(next, error);
-				});
-				z('tests.imports.using', function () {
-					z.imports('tests.imports.usingTarget').using('Tests.Plugin.One');
-					expect(tests.imports.usingTarget.foo).to.equal('foo');
-					done();
-				});
-			});
-
-			it('uses an external plugin', function (done) {
-				z('tests.imports.usingExternal', function () {
-					z.imports('tests.imports.usingExternalTarget').using('fixtures.plugin');
-					expect(tests.imports.usingTarget.foo).to.equal('foo');
-					done();
-				});
-			});
-
-		});
-
-	});
-
-	describe('#plugin', function () {
-
-		describe('#register', function () {
-
-			it('registers a plugin', function () {
-				z.plugin.register('Test.Plugin.Two', function (req, next, error) {
-					// code
-				});
-				expect(z.env.plugins['Test.Plugin.Two']).to.be.a('function');
-			});
-
-		});
+    it('imports single items', function (done) {
+      z('app.biz', function () {
+        app.biz = {
+          foo: 'foo',
+          bar: 'bar'
+        };
+      });
+      z('tests.imports.single', function () {
+        var biz = z.imports('app.biz');
+        expect(biz).to.deep.equal({
+          foo: 'foo',
+          bar: 'bar'
+        });
+        done();
+      });
+    });
 
 	});
 
