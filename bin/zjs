@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
+require('../src/Build'); // Returns global z
 var program = require('commander');
-var Build = require('../src/build');
 var fs = require('fs');
 
 program
@@ -11,7 +11,9 @@ program
 program
   .command('build [src] [dest]')
   .description('build a z app into a single file')
+  .description('Compile a z app into a single file')
   .option('-o --optimize', 'uglify the compiled script')
+  .option('-f --full', 'compile with the full z library')
   .option('-p --project <projectName>', 'set the project name')
   .option('-m --main <mainModule>', "set the name of your main module (if using an anonymous module)")
   .action(function(src, dest, options){
@@ -19,15 +21,23 @@ program
     options = options || {};
 
     if(typeof src === "undefined"){
-      // Look for a buildz.js file
-      src = process.cwd() + "/buildz.json";
-      options.buildfile = true;
+      // Look for a build.json file
+      var buildfile = require(process.cwd() + "/build.json");
+      for (key in buildfile) {
+        if (buildfile.hasOwnProperty(key)) {
+          options[key] = buildfile[key];
+        }
+      }
     }
 
-    var build = new Build(options);
-    build.start(src, dest);
+    options.main = src;
+    options.dest = dest;
 
-  }).on('--help', function(){
+    // Compile away!
+    z.Build(options);
+
+  })
+  .on('--help', function(){
     console.log('   Examples:\n');
     console.log('   $ zjs build -o foo/scripts/main.js foo/scripts/app-min.js\n');
   });

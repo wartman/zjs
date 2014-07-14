@@ -1,3 +1,3 @@
-z('foo.mapped', function () {
-  return "mapped";
+z('foo.mapped', function() {
+	foo.mapped = "mapped"
 });

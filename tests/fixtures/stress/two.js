@@ -1,6 +1,5 @@
-z('fixtures.stress.two')
-  .exports(function(){
-    return {
-      Two: "two"
-    };
-  });
+z('fixtures.stress.two', function () {
+
+  fixtures.stress.two.Two = "two";
+
+});

@@ -1,4 +1,5 @@
-z('fixtures.stress.item.foo').
-exports(function(){
-  return "Foo";
+z('fixtures.stress.item.foo', function () {
+
+	fixtures.stress.item.foo = 'Foo';
+
 });

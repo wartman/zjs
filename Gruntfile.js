@@ -2,11 +2,23 @@ module.exports = function(grunt){
 
   grunt.initConfig({
     pkg: grunt.file.readJSON('package.json'),
-    nodeunit: {
-      tests: [
-        'test/build_test.js',
-        'test/sorter_test.js'
-      ],
+    concat: {
+      dist: {
+        options: {
+          // Replace all 'use strict' statements in the code with a single one at the top
+          banner: "'use strict';\n",
+          process: function(src, filepath) {
+           return src
+            // Embed version
+            .replace( /@VERSION/g, grunt.config( "pkg" ).version )
+            // Embed date (yyyy-mm-ddThh:mmZ)
+            .replace( /@DATE/g, ( new Date() ).toISOString().replace( /:\d+\.\d+Z$/, "Z" ) );
+          },
+        },
+        files: {
+          'z.js': 'src/z.js'
+        },
+      },
     },
     simplemocha: {
       options: {
@@ -37,26 +49,12 @@ module.exports = function(grunt){
     }
   });
   
-  grunt.loadNpmTasks('grunt-contrib-nodeunit')
+  grunt.loadNpmTasks('grunt-contrib-concat');
   grunt.loadNpmTasks('grunt-contrib-connect');
   grunt.loadNpmTasks('grunt-simple-mocha');
   grunt.loadNpmTasks('grunt-mocha-phantomjs');
 
-  grunt.registerTask('distribute', function () {
-    var code = grunt.file.read(__dirname + '/src/z.js');
-    var dest = __dirname + '/z.js';
-    code = code
-      // Embed version
-      .replace( /@VERSION/g, grunt.config( "pkg" ).version )
-      // Embed date (yyyy-mm-ddThh:mmZ)
-      .replace( /@DATE/g, ( new Date() ).toISOString().replace( /:\d+\.\d+Z$/, "Z" ) );
-    if(grunt.file.exists(dest)){
-      grunt.file.delete(dest);
-    }
-    grunt.file.write(dest, code);
-  });
   grunt.registerTask('test', ['simplemocha', 'connect', 'mocha_phantomjs']);
-  // grunt.registerTask('test', ['connect', 'mocha_phantomjs']);
-  grunt.registerTask('default', ['test', 'distribute']);
+  grunt.registerTask('default', ['test', 'concat']);
 
 }
