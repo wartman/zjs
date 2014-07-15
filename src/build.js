@@ -1,8 +1,8 @@
 // z.Build
 
-require('./z');
+require('../dist/z');
 
-var fs 		   = require('fs');
+var fs = require('fs');
 var UglifyJS = require("uglify-js");
 
 var Build = z.Build = function (options) {
@@ -26,57 +26,80 @@ var Build = z.Build = function (options) {
 
 	// Overwrite default loaders.
 	var builder = this;
-	z.load = function (mod, next, error) {
-    var src = builder._dir + z.sys.getPath(mod);
-    fs.readFile(src, 'utf-8', function (err, data) {
+  var rootpath = builder._dir + z.config('root');
+  z.config('root', rootpath);
+
+	z.loader.load = function (path, next) {
+    next = next || function (err) { if (err) throw err; };
+
+    var mod = this.parseModulePath(path);
+    var self = this;
+
+    fs.readFile(mod.src, 'utf-8', function (err, data) {
       if (err) {
         throw err;
         error(err);
         return;
       }
-      builder._raw[mod] = data;
+      var deps = self.parse(data);
+
+      builder._raw[mod.name] = {
+        data: data,
+        deps: deps
+      };
       builder.extractLicenses(data);
-      // Run the module
-      try {
-	      var runner = Function(data);
-	      runner();
-      	next(data);
-      } catch (e) {
-      	throw e;
-      	error(e);
+      if (deps.length) {
+        var remaining = deps.length;
+        deps.forEach(function (dep) {
+          z.loader.load(dep, function (err) {
+            remaining -= 1;
+            if (err) {
+              next(err);
+              return;
+            }
+            if (remaining <= 0) {
+              next();
+            }
+          });
+        });
+      } else {
+        next();
       }
     });
 	};
-  z.file = function (mod, next, error) {
-    fs.readFile(mod, 'utf-8', function (err, data) {
-      if (err) {
-        throw err;
-        error(err);
-        return;
-      }
-      next(data);
-    });
-  };
 
 	// Start gathering scripts
 	this.start(this._main);
 };
 
-Build.prototype.start = function(main) {
+Build.prototype.start = function() {
 	var self = this;
-	z.load(main, function (data) {
-		if (z.config('main')) {
-			self._main = z.config('main');
-			self._raw[self._main] = data;
-		}
-		z.env.modules[self._main].done(function () {
-			self.compile();
-		}, function (e) {
-      throw new Error(e);
+
+  fs.readFile(this._main, 'utf-8', function (err, data) {
+
+    // Try to read the config first.
+    var getConfig = /z\.config\([\s\S\r\n'"\{\}]+?\)/g
+    var config = getConfig.exec(data);
+    if (config) {
+      var runner = Function('z', config);
+      runner(z);
+      if (z.config('main')) {
+        self._main = z.config('main');
+      } 
+      if (z.config('root')) {
+        var rootpath = self._dir + z.config('root');
+        z.config('root', rootpath);
+      }
+    }
+
+    z.loader.load(self._main, function (err) {
+      if (err) 
+        throw err;
+      else
+        self.compile();
     });
-	}, function (error) {
-		throw new Error(error);
-	});
+
+  });
 };
 
 Build.prototype.done = function (cb) {
@@ -97,7 +120,7 @@ Build.prototype.extractLicenses = function (file) {
 };
 
 Build.prototype.compile = function () {
-	var modules = z.env.modules;
+	var modules = this._raw;
 	var moduleList = {};
 	var sortedPackages = [];
 	var self = this;
@@ -106,7 +129,7 @@ Build.prototype.compile = function () {
 		var list = [];
 		var raw = modules[mod].deps;
 		raw.forEach(function (item) {
-			list.push(item.id);
+			list.push(item);
 		})
 		moduleList[mod] = list;
 	}
@@ -114,14 +137,14 @@ Build.prototype.compile = function () {
 	sortedPackages = this.sort(moduleList, this._main);
 
 	sortedPackages.forEach(function (name) {
-		self._compiled += self._raw[name] + '\n';
+		self._compiled += self._raw[name].data + '\n';
 	});
 
 	// Add the minimal implementation of z unless otherwise requested.
 	if (z.config('compile.full')) {
-		var lib = fs.readFileSync(__dirname + '/z.js', 'utf-8');
+		var lib = fs.readFileSync(__dirname + '../dist/z.js', 'utf-8');
 	} else {
-		var lib = fs.readFileSync(__dirname + '/runtime.js', 'utf-8');
+		var lib = fs.readFileSync(__dirname + '/api.js', 'utf-8');
 	}
 
 	// Add library

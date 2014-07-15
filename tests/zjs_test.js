@@ -1,143 +1,131 @@
 describe('z', function () {
 
-	// it('accepts a name and an environment', function () {
-	// 	var mod = z('Test.Module.Constructor', function () {});
-	// 	expect(mod.getName()).to.equal('Test.Module.Constructor');
-	// 	expect(mod.getNamespace()).to.equal('Test.Module');
-	// 	expect(mod.getEnvironment()).to.be.a('function');
-	// });
+  beforeEach(function () {
+    z.config('root', '');
+  })
 
-	it('loads previously defined module', function (done) {
-		z('Test.Imports.ModuleTarget', function () {
-			Test.Imports.ModuleTarget = 'target';
-		});
-		// Note: all the below is done automatically if you
-		// pass a function as the second argument to z.
-		z('Test.Imports.Module', function () {
-			z.imports('Test.Imports.ModuleTarget');
-			expect(Test.Imports.ModuleTarget).to.equal('target');
-			done();
-		});
-	});
+  describe('#module', function () {
 
-	it('parses module name as path, loads external script', function (done) {
-		z('Test.Imports.Script', function () {
-			z.imports('fixtures.Single');
-			expect(fixtures.Single).to.equal('one');
-			done();
-		});
-	});
-
-  it('waits for a callback (when present) for async ops', function (done) {
-    var waited = 'nope';
-    z('tests.imports.waited', function (moduleDone) {
-      setTimeout(function () {
-        waited = 'yep';
-        moduleDone();
-      }, 20);
+    it('defines a new namespace', function () {
+      var mod = z.module('tests.module');
+      expect(tests).to.not.be.an('undefined');
+      expect(tests.module).to.be.an('object');
+      expect(mod).to.be.an('object');
+      mod.foo = 'foo';
+      expect(tests.module.foo).to.equal('foo');
     });
-    z('tests.imports.waiting', function () {
-      var glob = z.imports('tests.imports.waited');
-      expect(waited).to.equal('yep');
-      done();
-    });
+
   });
 
-	it('shims globals', function (done) {
-    z('tests.imports.globalShim', function (moduleDone) {
-      z.load('fixtures/global.js', function () {
-        tests.imports.globalShim = window.globalItem;
-        moduleDone();
-      });
-    })
-		z('Test.Imports.Globals', function () {
-			var glob = z.imports('tests.imports.globalShim');
-			expect(glob).to.equal('globalItem');
-			done();
-		});
-	});
+  describe('#imports', function () {
 
-	it('imports a mapped global', function (done) {
-		z.map('globalMapped', 'fixtures/globalMapped.js');
-		z('Test.Imports.MappedGlobal', function () {
-			z.imports('globalMapped');
-			expect(globalMapped).to.equal('globalMapped');
-			done();
-		});
-	});
+    it('returns a previously defined module', function () {
+      z.module('tests.imports.target');
+      var targ = z.imports('tests.imports.target');
+      expect(targ).to.be.an('object');
+    });
 
-	it('imports many deps recursively from external files', function (done) {
-    z('Test.Imports.Stress', function (stress) {
-      z.imports(
-        'fixtures.stress.one',
-        'fixtures.stress.two',
-        'fixtures.stress.three'
+    it('returns undefined if more then one argument is passed', function () {
+      z.module('tests.imports.target2');
+      z.module('tests.imports.target3');
+      var targ = z.imports(
+        'tests.imports.target2',
+        'tests.imports.target3'
       );
-      var stress = fixtures.stress;
-      expect(stress.one.One).to.be.equal('one');
-      expect(stress.one.Foo).to.be.equal('Foo');
-      expect(stress.two.Two).to.be.equal('two');
-      expect(stress.three.Three).to.be.equal('three');
-      done();
+      expect(targ).to.be.an('undefined');
     });
+
   });
 
-	describe('#imports', function () {
+  describe('#loader', function () {
+    
+    describe('#parse', function () {
 
-		it('imports a list', function (done) {
-      z('app.foo', function () {
-        app.foo = 'foo';
-      });
-      z('app.bar', function () {
-        app.bar = 'bar';
-      });
-      z('tests.imports.list', function () {
-        z.imports(
-          'app.foo',
-          'app.bar'
-        );
-        expect(app.foo).to.equal('foo');
-        expect(app.bar).to.equal('bar');
-        done();
-      });
-    });
+      it('detects imports', function () {
+        var mock = function () {
+          z.imports(
+            'foo.bar',
+            'foo.bin',
 
-    it('imports single items', function (done) {
-      z('app.biz', function () {
-        app.biz = {
-          foo: 'foo',
-          bar: 'bar'
+            'foo.bax'
+          );
         };
+        var deps = z.loader.parse(mock.toString());
+        expect(deps).to.deep.equal([
+          'foo.bar',
+          'foo.bin',
+          'foo.bax'
+        ]);
       });
-      z('tests.imports.single', function () {
-        var biz = z.imports('app.biz');
-        expect(biz).to.deep.equal({
-          foo: 'foo',
-          bar: 'bar'
-        });
-        done();
-      });
+
     });
 
-	});
+    describe('#parseModulePath', function () {
 
-  it('registers namespaces/modules', function () {
-    z('main');
-    expect(z.env.namespaces['main']).to.be.an('undefined');
-    z('tests.namespaces');
-    expect(z.env.namespaces['tests']).to.be.true;
-    expect(z.env.namespaces['tests.namespaces']).to.be.an('undefined');
-    z('tests.sub.namespaces');
-    expect(z.env.namespaces['tests.sub']).to.be.true;
-    expect(z.env.namespaces['tests.sub.namespaces']).to.be.an('undefined');
-    expect(z.env.modules['tests.sub.namespaces']).to.be.an('object');
+      it('parses into name and src', function () {
+        var mod = z.loader.parseModulePath('foo.bin.bar');
+        expect(mod.src).to.equal('foo/bin/bar.js');
+        expect(mod.name).to.equal('foo.bin.bar');
+        var mod = z.loader.parseModulePath('foo/bin/bar.js');
+        expect(mod.src).to.equal('foo/bin/bar.js');
+        expect(mod.name).to.equal('foo.bin.bar')
+      });
+
+    });
+
+    describe('#load', function () {
+
+      it('won\'t request a defined module.', function (done) {
+        z.module('tests.load.defined.target');
+        tests.load.defined.target = 'target';
+        z.loader.load('tests.load.defined.target', function (err) {
+          if (err) {
+            throw err;
+            done();
+          } else {
+            expect(tests.load.defined.target).to.equal('target');
+            done();
+          }
+        })
+      });
+
+      it('loads an external script', function (done) {
+        z.loader.load('fixtures.Single', function (err) {
+          if (err) {
+            throw err;
+            done();
+          } else {
+            expect(fixtures.Single).to.equal('one');
+            done();
+          }
+        });
+      });
+
+      it('loads many external scripts', function (done) {
+        z.loader.load('fixtures.main', function (err) {
+          if (err) {
+            throw err;
+            done();
+          } else {
+            var stress = fixtures.stress;
+            expect(stress.one.One).to.be.equal('one');
+            expect(stress.one.Foo).to.be.equal('Foo');
+            expect(stress.two.Two).to.be.equal('two');
+            expect(stress.three.Three).to.be.equal('three');
+            done();
+          }
+        })
+      });
+
+    });
+
   });
 
 	describe('#config', function () {
 
     it('sets an item', function () {
       z.config('foo', 'bar');
-      expect(z.configuration.foo).to.be.equal('bar');
+      expect(z.config('foo')).to.be.equal('bar');
     });
 
     it('sets several objects at a time', function () {
@@ -145,8 +133,8 @@ describe('z', function () {
         bar: 'bin',
         baz: 'baz'
       });
-      expect(z.configuration.bar).to.be.equal('bin');
-      expect(z.configuration.baz).to.be.equal('baz');
+      expect(z.config('bar')).to.be.equal('bin');
+      expect(z.config('baz')).to.be.equal('baz');
     });
 
     it('gets a value, or returns false if undefined', function () {
@@ -157,39 +145,39 @@ describe('z', function () {
       expect(z.config('notFalse')).to.not.be.an('undefined');
     });
 
-    it('passes things in the "map" key to z.map', function () {
-    	z.config('map', {
-    		'FooBix': 'some/path/to/file.js'
-    	});
-			expect(z.sys.getPath('FooBix')).to.equal('some/path/to/file.js');
-    });
+   //  it('passes things in the "map" key to z.map', function () {
+   //  	z.config('map', {
+   //  		'FooBix': 'some/path/to/file.js'
+   //  	});
+			// expect(z.loader.parseModulePath('FooBix').src).to.equal('some/path/to/file.js');
+   //  });
 
-    it('passes things in the "namespaces" key to z.map.namespaces', function () {
-    	z.config('namespaces', {
-    		'Froo': 'some/path/to/Froo'
-    	});
-			expect(z.sys.getPath('Froo.Blix')).to.equal('some/path/to/Froo/Blix.js');
-    });
+   //  it('passes things in the "namespaces" key to z.map.namespaces', function () {
+   //  	z.config('namespaces', {
+   //  		'Froo': 'some/path/to/Froo'
+   //  	});
+			// expect(z.loader.parseModulePath('Froo.Blix').src).to.equal('some/path/to/Froo/Blix.js');
+   //  });
 
   });
 
-	describe('#map', function () {
+	// describe('#map', function () {
 
-		it('maps a single item', function () {
-			z.config('root', '');
-			z.map('Item', 'MyLib.Item');
-			expect(z.sys.getPath('Item')).to.equal('MyLib/Item.js');
-			z.map('ItemTwo', 'MyLib/ItemTwo.js');
-			expect(z.sys.getPath('ItemTwo')).to.equal('MyLib/ItemTwo.js');
-		});
+	// 	it('maps a single item', function () {
+	// 		z.config('root', '');
+	// 		z.map('Item', 'MyLib.Item');
+	// 		expect(z.sys.getPath('Item')).to.equal('MyLib/Item.js');
+	// 		z.map('ItemTwo', 'MyLib/ItemTwo.js');
+	// 		expect(z.sys.getPath('ItemTwo')).to.equal('MyLib/ItemTwo.js');
+	// 	});
 
-		it('maps namespaces', function () {
-			z.config('root', '');
-			z.map.namespace('Foo.Bar', 'libs/FooBar/');
-			expect(z.sys.getPath('Foo.Bar.Bin')).to.equal('libs/FooBar/Bin.js');
-			expect(z.sys.getPath('Foo.Bar.Bax.Bin')).to.equal('libs/FooBar/Bax/Bin.js');
-		});
+	// 	it('maps namespaces', function () {
+	// 		z.config('root', '');
+	// 		z.map.namespace('Foo.Bar', 'libs/FooBar/');
+	// 		expect(z.sys.getPath('Foo.Bar.Bin')).to.equal('libs/FooBar/Bin.js');
+	// 		expect(z.sys.getPath('Foo.Bar.Bax.Bin')).to.equal('libs/FooBar/Bax/Bin.js');
+	// 	});
 
-	});
+	// });
 
 });

@@ -1,5 +1,3 @@
-z('fixtures.stress.single', function () {
+z.module('fixtures.stress.single');
 
-	fixtures.stress.single.Foo = "Foo";
-
-});
+fixtures.stress.single.Foo = "Foo";

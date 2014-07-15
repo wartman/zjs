@@ -1,9 +1,6 @@
-z('fixtures.stress.one', function () {
+z.module('fixtures.stress.one');
 
-	// Tests importing inside same namespace ('fixtures.stress', in this case):
-	z.imports('.item.foo');
+z.imports('fixtures.stress.item.foo');
 
-  fixtures.stress.one.One = "one";
-  fixtures.stress.one.Foo = fixtures.stress.item.foo;
-
-});
+fixtures.stress.one.One = "one";
+fixtures.stress.one.Foo = fixtures.stress.item.foo;

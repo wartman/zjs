@@ -1,3 +1,3 @@
-z('fixtures.Single', function() {
-	fixtures.Single = 'one';
-});
+z.module('fixtures.Single');
+
+fixtures.Single = 'one';

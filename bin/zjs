@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('../src/Build'); // Returns global z
+require('../src/build'); // Returns global z
 var program = require('commander');
 var fs = require('fs');
 

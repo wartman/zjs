@@ -1,6 +1,6 @@
 var expect = require('chai').expect;
 require('../src/build');
-var grunt = require('grunt');
+var fs = require('fs');
 
 // describe('sorter', function () {
 
@@ -38,8 +38,7 @@ describe('z.Build', function () {
       dest: 'tests/tmp/app.js'
     });
     build.done(function () {
-      var actual = grunt.file.read(__dirname + "/tmp/app.js");
-      var root = {};
+      var actual = fs.readFileSync(__dirname + "/tmp/app.js", 'utf-8');
       var module = Function('', actual);
 
       // Load the compiled module and make sure everything
