@@ -4,38 +4,92 @@ A lightweight module loader for browsers.
 
 About zjs
 ---------
-Zjs is a modular script loader and compiler for browsers. It can be compared to
-more robust options like requireJs, but differs in that it loads modules based on
-namespaces (which are just javascript objects, such as 'app.foo.bar'), not filepaths.
-The advantage of this is that a project can be compiled into a single file without
-needing any extra code (such as 'require' wrappers); in fact, a compiled zjs project
-won't have a single line of code from the zjs library.
-
-If you need lots of AMD stuff on your projects, zjs is likely not the way to go. However,
-it might be ideal for smaller apps. If you need to use popular libraries like Backbone, jQuery
-or Underscore you can import them into zjs with minimal trouble.
-
-How does it work?
------------------
-Zjs lets you split your javascript project up into different files, what Zjs calls 'packages'.
-All code written in a package file should be wrapped by Zjs to ensure that it is only
-executed when all dependencies are loaded. Here's an example:
+Zjs is a super-simple way to create modules in javascript. Here's a simple example:
 
 ```js
 
-    z('app.foo', function () {
+z.module('foo.bar');
 
-      z.imports(
-        'app.bar',
-        'app.bin'
-      );
+z.imports(
+ 'foo.bin',
+ 'foo.bax'
+);
 
-      var foo = z.imports('app.bin')
-
-      app.foo.Bin = app.bar.Kit.extend({
-        foo: 'foo'
-      });
-      
-    });
+foo.bar.SomeFunction = function () {
+  //code;
+};
 
 ```
+
+No need for wrappers or anything else. Just a few method calls at the top of your
+script.
+
+It's not the most robust option, but ZJS tries to keep out of your way and let you
+write the code you want.
+
+
+How does it work?
+-----------------
+When you import a script, ZJS uses AJAX to load it. It investigates the file, looking
+for any dependencies via a regular expression. Once everything is loaded, it places
+the script into the DOM.
+
+An important note: in order to provide useful debugging information ZJS loads each script
+twice: once via ajax and once via a `<script>` tag. This is obviously not useable in a 
+production environment, which is why you should always compile your project before deploying it.
+If you absolutely need to load scripts dynamically, you can set `z.config('debugging', false);`
+and scripts will be dynamically insterted without a second request. You won't be able to check
+line numbers with this method, however, so only use it on a script you know works well.
+
+Compiling is highly recomended, however. To compile a project, use the `zjs` command-line tool:
+
+```
+$ zjs build path\to\my\main\module.js path\to\dest.js
+```
+
+You can optimize the script from the command line as well, simply add the '-o' option:
+
+```
+$ zjs build path\to\my\main\module.js path\to\dest.js -o
+```
+
+Compiled projects use the tiny zjs runtime script, not the entire library, making zjs even more lightweight.
+
+
+API
+---
+
+- module
+  Creates a new module. This method creates an object based on
+  the passed module path, ensuring that all segments are defined.
+  It should be at the top of every zjs module.
+
+  ```javascript 
+  z.module('app.foo.bar');
+  // The module is now available as a basic javascript object.
+  app.foo.bar.Bin = function () { /* code */ };
+  ```
+
+- imports
+  Import a module or modules. Imported modules are then available for the
+  current module.
+
+  You can import all dependencies at once by overloading this method, or
+  load them one at a time. For example:
+
+  ```javascript
+  z.imports(
+    'app.foo',
+    'app.bar'
+  );
+  ```
+
+  If only one argument is passed, `z.imports` will return that module. This
+  can be handy if you want to alias a module for whatever reason:
+
+  ```javascript
+  var foo = z.imports('app.long.unweildly.module.path.foo');
+  ```
+
+There's more, but this is all thats working at the moment.
+

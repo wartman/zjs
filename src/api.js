@@ -105,6 +105,7 @@ z.map.namespace = function (ns, path) {
 
 // Creates a new module. This method creates an object based on
 // the passed module path, ensuring that all segments are defined.
+// It should be at the top of every zjs module.
 // 
 //    z.module('app.foo.bar');
 //    // The module is now available as a basic javascript object.
