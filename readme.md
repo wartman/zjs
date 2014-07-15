@@ -56,10 +56,11 @@ $ zjs build path\to\my\main\module.js path\to\dest.js -o
 Compiled projects use the tiny zjs runtime script, not the entire library, making zjs even more lightweight.
 
 
-API
+API 
 ---
+The following is the core API, which is always available.
 
-- z.__module__
+- z.__module__(*name*)
 
   Creates a new module. This method creates an object based on
   the passed module path, ensuring that all segments are defined.
@@ -71,7 +72,7 @@ API
   app.foo.bar.Bin = function () { /* code */ };
   ```
 
-- z.__imports__
+- z.__imports__(*...*)
 
   Import a module or modules. Imported modules are then available for the
   current module.
