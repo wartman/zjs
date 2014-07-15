@@ -59,7 +59,8 @@ Compiled projects use the tiny zjs runtime script, not the entire library, makin
 API
 ---
 
-- module
+- z.__module__
+
   Creates a new module. This method creates an object based on
   the passed module path, ensuring that all segments are defined.
   It should be at the top of every zjs module.
@@ -70,7 +71,8 @@ API
   app.foo.bar.Bin = function () { /* code */ };
   ```
 
-- imports
+- z.__imports__
+
   Import a module or modules. Imported modules are then available for the
   current module.
 
