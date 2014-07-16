@@ -234,7 +234,8 @@ function _insertScript(script, next) {
 };
 
 // Add a script to the page. 'text' is the raw js code that we'll be
-// injecting into the <script> tag.
+// injecting into the <script> tag. This is similar to just using `eval`,
+// but slightly less evil.
 function _addScript (mod, text, next) {
 
   // add a sourceURL to help with debugging
