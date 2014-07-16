@@ -215,27 +215,10 @@
     return wait;
   };
 
-  // Extend an object
-  var extend = function(obj /*...*/){
-    each(Array.prototype.slice.call(arguments, 1), function(source){
-      if(source){
-        for(var prop in source){
-          if (source.hasOwnProperty(prop)) obj[prop] = source[prop];
-        }
-      }
-    });
-    return obj;
-  };
-
   // A simple shim for Function.bind
   function bind (func, ctx) {
     if (Function.prototype.bind && func.bind) return func.bind(ctx);
     return function () { func.apply(ctx, arguments); };
-  };
-
-  // Ensure the string ends with a backslash
-  function _slashify (str) {
-    return (str.lastIndexOf('/') !== (str.length - 1))? str + '/' : str;
   };
 
   // Check z's env and map any requests that need it.
@@ -249,7 +232,8 @@
       var match = new RegExp(map + '\\.');
       if (match.test(path.obj)) {
         var item = _nameToPath(path.obj.replace(match, ''));
-        path.src = _slashify(ns) + item + '.js';
+        slashed = (ns.lastIndexOf('/') !== (ns.length - 1))? ns + '/' : ns;
+        path.src = slashed + item + '.js';
         // Break the loop.
         return true;
       }
@@ -519,53 +503,48 @@
 
   if (_isClient()) {
 
-    // Get the load event, based on the current browser
-    var onLoadEvent = (function (){
-      var testNode = document.createElement('script')
-      if (testNode.attachEvent){
-        return function(node, wait){
-          node.attachEvent('onreadystatechange', function () {
-            if(node.readyState === 'complete'){
-              wait.resolve();
-            }
-          });
-          // Can't handle errors with old browsers.
-        }
-      }
-      return function(node, wait){
-        node.addEventListener('load', function (e) {
-          wait.resolve();
-        }, false);
-        node.addEventListener('error', function (e) {
-          wait.reject();
-        }, false);
-      }
-    })();
-
     // The default module loader.
     z.load = function (mod, next, error, options) {
+
       if (mod instanceof Array) {
-        eachThen(mod, function (item, next, error) {
+        eachWait(mod, function (item, next, error) {
           z.load(item, next, error);
-        }, next, error);
+        })
+        .done(next, error);
         return;
       }
+
       var src = _getPath(mod, z.config('root'));
+
       if (visited.hasOwnProperty(src)) {
         visited[src].done(next, error);
         return;
       }
-      var node = document.createElement('script');
+
+      var wait = visited[src] = new Wait();
+      var script = document.createElement('script');
       var head = document.getElementsByTagName('head')[0];
-      node.type = 'text/javascript';
-      node.charset = 'utf-8';
-      node.async = true;
-      node.setAttribute('data-module', mod);
-      visited[src] = new Wait();
-      visited[src].done(next, error);
-      onLoadEvent(node, visited[src]);
-      node.src = src;
-      head.appendChild(node);
+      var done = false;
+
+      script.type = 'text/javascript';
+      script.charset = 'utf-8';
+      script.async = true;
+      script.setAttribute('data-module', mod);
+
+      wait.done(next, error);
+
+      script.onload = script.onreadystatechange = function() {
+        if (!done && (!this.readyState ||
+            this.readyState === "loaded" || this.readyState === "complete") ) {
+          done = true;
+          wait.resolve();
+          // Handle memory leak in IE
+          script.onload = script.onreadystatechange = null;
+        }
+      };
+
+      script.src = src;
+      head.appendChild(script);
     };
 
     // The default file loader (uses AJAX)
@@ -575,8 +554,8 @@
         visited[src].done(next, error);
         return;
       }
-      visited[src] = new Wait();
-      visited[src].done(next, error);
+      var wait = visited[src] = new Wait();
+      wait.done(next, error);
       if(root.XMLHttpRequest){
         var request = new XMLHttpRequest();
       } else { // code for IE6, IE5
@@ -585,9 +564,9 @@
       request.onreadystatechange = function(){
         if(4 === this.readyState){
           if(200 === this.status){
-            visited[src].resolve(this.responseText);
+            wait.resolve(this.responseText);
           } else {
-            visited[src].reject(this.status);
+            wait.reject(this.status);
           }
         }
       }
@@ -663,11 +642,6 @@
     }
   };
 
-  var _importCheck = /z\.imports\(([\s\S\r\n]+?)\)/g;
-  var _depCheck = /([a-zA-Z0-9\.]+)/g;
-  // Plugins are defined with the syntax: 'plugin.name: module.name'
-  var _pluginCheck = /([a-zA-Z0-9\.]+)\s*?:\s*?([a-zA-Z0-9\.]+)/g;
-
   Module.prototype.define = function (name) {
     z.env.modules[name] = this;
     // Set this Module's name.
@@ -677,33 +651,38 @@
     _createObjectByName(name);
   };
 
+  // RegExp to find an import.
+  var _importsMatch = /z\.imports\(([\s\S\r\n]+?)\)/g;
+
+  // RegExp to check for plugins
+  var _pluginCheck = /([\s\S]+)\s*?:\s*?([\s\S]+)/g;
+
+  // RegExp to cleanup module paths
+  var _cleanModulePath = /[\r|\n|'|"|\s]/g;
+
+  // Parse the factory to find all dependencies in this module.
   Module.prototype.findDeps = function () {
     var factory = this.factory.toString();
-    var deps = [];
-    var matches = [];
-    var match;
     var self = this;
-    factory.replace(_importCheck, function(match, imports){
-      matches.push(imports);
-    });
-    each(matches, function (item) {
-      var parts = item.match(_depCheck);
-      each(parts, function (dep) {
+    var deps = [];
+    factory.replace(_importsMatch, function (matches, importList) {
+      var imports = importList.split(',');
+      each(imports, function (dep) {
         var plugin = dep.match(_pluginCheck);
         var item = {}
         if (plugin) {
-          item.plugin = plugin.pop();
-          item.id = plugin.pop();
+          item.plugin = plugin.pop().replace(_cleanModulePath, "");
+          item.id = plugin.pop().replace(_cleanModulePath, "");
         } else {
-          item.id = dep.trim();
+          item.id = dep.replace(_cleanModulePath, "");
         }
         // Allow for module shortcuts.
         if (item.id.indexOf('.') === 0) {
           item.id = self._namespace + item.id;
         }
         deps.push(item);
-      })
-    })
+      });
+    });
     return deps;
   };
 
