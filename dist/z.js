@@ -4,7 +4,7 @@
  * Copyright 2014
  * Released under the MIT license
  *
- * Date: 2014-07-16T19:27Z
+ * Date: 2014-07-16T21:37Z
  */
 
 (function (factory) {
@@ -498,6 +498,12 @@ loader.parseModulePath = function (req) {
   return path;
 };
 
+// Load using NodeJs
+loader.require = function (src, next) {
+  require(src);
+  next();
+};
+
 // Send an AJAX request.
 loader.request = function (src, next) {
   var visited = this.visited;
@@ -580,7 +586,8 @@ function _insertScript(script, next) {
 };
 
 // Add a script to the page. 'text' is the raw js code that we'll be
-// injecting into the <script> tag.
+// injecting into the <script> tag. This is similar to just using `eval`,
+// but slightly less evil.
 function _addScript (mod, text, next) {
 
   // add a sourceURL to help with debugging

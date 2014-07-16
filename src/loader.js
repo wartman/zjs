@@ -152,6 +152,12 @@ loader.parseModulePath = function (req) {
   return path;
 };
 
+// Load using NodeJs
+loader.require = function (src, next) {
+  require(src);
+  next();
+};
+
 // Send an AJAX request.
 loader.request = function (src, next) {
   var visited = this.visited;

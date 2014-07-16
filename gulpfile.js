@@ -32,12 +32,12 @@ gulp.task('build', function() {
 });
 
 gulp.task('mochaPhantomJs', function () {
-  gulp.src('test/runner.html')
+  gulp.src('tests/runner.html')
     .pipe(mochaPhantomJs({reporter: 'spec'}));
 });
 
 gulp.task('mocha', function () {
-  gulp.src('./test/server_test.js')
+  gulp.src('./tests/server_test.js')
     .pipe(mocha({reporter: 'spec'}));
 });
 
