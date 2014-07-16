@@ -210,67 +210,45 @@ function _newScript (moduleName) {
 };
 
 // Add a script to the page. 'text' is the raw js code that we'll be
-// injecting into the <script> tag. We do things this way, rather then
-// running `eval` because eval is evil.
-function _addScript (text, moduleName) {
+// injecting into the <script> tag.
+function _addScript (mod, text, next) {
+
+  // add a sourceURL to help with debugging
+  text = text + '\n\n//# sourceURL=' + mod.src;
+
   var head = document.getElementsByTagName("head")[0] || document.documentElement;
+  var script = _newScript(mod.name);
+  var done = false;
 
-  var script = _newScript(moduleName);
-
-  // to do: browser detection
-  if (z.config('browser') === 'ie')
+  if (z.config('debug')) {
+    // Yes, we're sticking the script in the src attribute. See:
+    //    https://developer.mozilla.org/en-US/docs/Web/HTTP/data_URIs
+    // This is done to help with debugging, as we can actually get line
+    // numbers this way. Don't use this in production: some browsers,
+    // like ie8, can't handle this.
+    script.src = 'data:text/javascript;charset=utf-8,' + encodeURIComponent(text);
+    head.insertBefore(script, head.firstChild).parentNode;
+    script.onload = script.onreadystatechange = function() {
+      if (!done && (!this.readyState ||
+          this.readyState === "loaded" || this.readyState === "complete") ) {
+        done = true;
+        next();
+        // Handle memory leak in IE
+        script.onload = script.onreadystatechange = null;
+      }
+    };
+  } else {
     script.text = text;
-  else
-    script.appendChild(document.createTextNode(text));
-  
-  try {
-    head.insertBefore(script, head.firstChild);
-  } catch (e) {
-    e.message += " in module " + moduleName;
-    throw e;
+    head.insertBefore(script, head.firstChild).parentNode;
+    next();
   }
 };
-
-// Instead of adding a script tag with and inserting code, request
-// the script from the server. This is really innefficient, but it's
-// the only way we can get useful debug information. This function will
-// only be run if `z.config('debugging') === true` (the default setting).
-//
-// If you ARE going to use the `z.loader` in a production setting, you
-// should change `z.config('debugging')` to false before you deploy.
-function _loadScript (path, moduleName, next) {
-  var head = document.getElementsByTagName("head")[0] || document.documentElement;
-  var script = _newScript(moduleName);
-  var done = false;
-  script.src = path;
-  script.onload = script.onreadystatechange = function() {
-    if (!done && (!this.readyState ||
-        this.readyState === "loaded" || this.readyState === "complete") ) {
-      done = true;
-      next();
-      // Handle memory leak in IE
-      script.onload = script.onreadystatechange = null;
-      if (head && script.parentNode) head.removeChild( script );
-    }
-  };
-  head.insertBefore( script, head.firstChild );
-}
 
 // Take a raw module string and place it into the DOM as a `<script>`.
 // This will only be run after any dependencies have been loaded first.
 loader.enable = function (rawModule, mod, next) {
   next = next || _handleErr;
-  // Otherwise, stick it in the DOM.
-  if (z.config('debugging') === true) {
-    _loadScript(mod.src, mod.name, next);
-  } else {
-    try {
-      _addScript(rawModule, mod.name);
-      next();
-    } catch (e) {
-      next(e);
-    }
-  }
+  _addScript(mod, rawModule, next);
 };
 
 z.loader = loader;

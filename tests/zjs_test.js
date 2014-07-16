@@ -2,6 +2,7 @@ describe('z', function () {
 
   beforeEach(function () {
     z.config('root', '');
+    z.config('debug', true);
   })
 
   describe('#module', function () {

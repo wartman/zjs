@@ -36,7 +36,7 @@ z.VERSION = "@VERSION";
 
 // Z's config (private: use z.config to get values)
 var _config = {
-  debugging: true,
+  debug: false,
   root: '',
   maps: {
     modules: {},

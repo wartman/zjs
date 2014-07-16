@@ -4,7 +4,7 @@
  * Copyright 2014
  * Released under the MIT license
  *
- * Date: 2014-07-15T19:26Z
+ * Date: 2014-07-16T16:52Z
  */
 
 (function (factory) {
@@ -54,7 +54,7 @@ z.VERSION = "2.0.0";
 
 // Z's config (private: use z.config to get values)
 var _config = {
-  debugging: true,
+  debug: false,
   root: '',
   maps: {
     modules: {},
@@ -123,6 +123,7 @@ z.map.namespace = function (ns, path) {
 
 // Creates a new module. This method creates an object based on
 // the passed module path, ensuring that all segments are defined.
+// It should be at the top of every zjs module.
 // 
 //    z.module('app.foo.bar');
 //    // The module is now available as a basic javascript object.

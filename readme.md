@@ -4,7 +4,7 @@ A lightweight module loader for browsers.
 
 About zjs
 ---------
-Zjs is a super-simple way to create modules in javascript. Here's a simple example:
+Zjs is a super-simple way to create modules in javascript. Here's an example:
 
 ```js
 
@@ -33,13 +33,6 @@ How does it work?
 When you import a script, ZJS uses AJAX to load it. It investigates the file, looking
 for any dependencies via a regular expression. Once everything is loaded, it places
 the script into the DOM.
-
-An important note: in order to provide useful debugging information ZJS loads each script
-twice: once via ajax and once via a `<script>` tag. This is obviously not useable in a 
-production environment, which is why you should always compile your project before deploying it.
-If you absolutely need to load scripts dynamically, you can set `z.config('debugging', false);`
-and scripts will be dynamically insterted without a second request. You won't be able to check
-line numbers with this method, however, so only use it on a script you know works well.
 
 Compiling is highly recomended, however. To compile a project, use the `zjs` command-line tool:
 
