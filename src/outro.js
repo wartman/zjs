@@ -5,7 +5,7 @@
 // to parse the root path from the main module, which
 // often is all you need.
 z.start = function (mainFile, done) {
-  lastSegment = (mainFile.lastIndexOf('/') + 1);
+  var lastSegment = (mainFile.lastIndexOf('/') + 1);
   var root = mainFile.substring(0, lastSegment);
   var main = mainFile.substring(lastSegment);
   z.config('root', root);
@@ -30,7 +30,7 @@ z.start = function (mainFile, done) {
 
 // By convention, this file is nammed 'config.js', but you can
 // call it whatever you'd like.
-z.start.config = function (configFile, done) {
+z.startConfig = function (configFile, done) {
   configFile = configFile + '.js';
   z.loader.getScript(configFile, function () {
     if (z.config('main'))
@@ -54,6 +54,7 @@ function _autostart() {
   }
 };
 
-_autostart();
+if (typeof document !== 'undefined')
+  _autostart();
 
 }));

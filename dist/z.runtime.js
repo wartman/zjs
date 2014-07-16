@@ -4,7 +4,7 @@
  * Copyright 2014
  * Released under the MIT license
  *
- * Date: 2014-07-16T17:46Z
+ * Date: 2014-07-16T18:45Z
  */
 
 (function (factory) {
@@ -74,47 +74,45 @@ z.config = function (key, value) {
   }
   if (typeof value !== 'undefined') {
     if ('map' === key) return z.map(value);
-    if ('namespaces' === key) return z.map.namespace(value);
+    if ('namespaces' === key) return z.mapNamespace(value);
     _config[key] = value;
   }
   return ('undefined' !== typeof _config[key]) 
     ? _config[key] : false;
 };
 
-// Map an import to the given path.
-// example:
+// Map a module to the given path.
 //
 //    z.map('Foo', 'libs/foo.min.js');
 //    z.imports('Foo'); // -> Imports from libs/foo.min.js
 //
 // Note that this method will automatically work with any 
-// script that exports a global var, so long as `item` is 
+// script that exports a global var, so long as `mod` is 
 // equal to the global you want. Here is an example for jQuery:
 //
 //    z.map('$', 'libs/jQuery.min.js')
 //
-z.map = function (item, path) {
-  if ('object' === typeof item) {
-    for (var key in item) {
+z.map = function (mod, path) {
+  if ('object' === typeof mod) {
+    for (var key in mod) {
       z.map(key, value[key]);
     }
     return;
   }
-  _config.maps.modules[item] = path;
+  _config.maps.modules[mod] = path;
 };
 
-// Create a namespace map.
-// example:
-//
-//    z.map.namespace('Foo.Bin', 'libs/FooBin');
+// Map a namespace to the given path.
+
+//    z.mapNamespace('Foo.Bin', 'libs/FooBin');
 //    // The following import will now import 'lib/FooBin/Bax.js'
 //    // rather then 'Foo/Bin/Bax.js'
 //    z.imports('Foo.Bin.Bax');
-//
-z.map.namespace = function (ns, path) {
+
+z.mapNamespace = function (ns, path) {
   if ('object' === typeof ns) {
     for (var key in ns) {
-      z.map.namespace(key, ns[key]);
+      z.mapNamespace(key, ns[key]);
     }
     return;
   }

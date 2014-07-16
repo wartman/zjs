@@ -162,24 +162,24 @@ describe('z', function () {
 
   });
 
-	// describe('#map', function () {
+	describe('#map', function () {
 
-	// 	it('maps a single item', function () {
-	// 		z.config('root', '');
-	// 		z.map('Item', 'MyLib.Item');
-	// 		expect(z.sys.getPath('Item')).to.equal('MyLib/Item.js');
-	// 		z.map('ItemTwo', 'MyLib/ItemTwo.js');
-	// 		expect(z.sys.getPath('ItemTwo')).to.equal('MyLib/ItemTwo.js');
-	// 	});
+		it('maps a single item', function () {
+			z.config('root', '');
+			z.map('Item', 'MyLib.Item');
+			expect(z.loader.parseModulePath('Item').src).to.equal('MyLib/Item.js');
+			z.map('ItemTwo', 'MyLib/ItemTwo.js');
+			expect(z.loader.parseModulePath('ItemTwo').src).to.equal('MyLib/ItemTwo.js');
+		});
 
-	// 	it('maps namespaces', function () {
-	// 		z.config('root', '');
-	// 		z.map.namespace('Foo.Bar', 'libs/FooBar/');
-	// 		expect(z.sys.getPath('Foo.Bar.Bin')).to.equal('libs/FooBar/Bin.js');
-	// 		expect(z.sys.getPath('Foo.Bar.Bax.Bin')).to.equal('libs/FooBar/Bax/Bin.js');
-	// 	});
+		it('maps namespaces', function () {
+			z.config('root', '');
+			z.mapNamespace('Foo.Bar', 'libs/FooBar/');
+			expect(z.loader.parseModulePath('Foo.Bar.Bin').src).to.equal('libs/FooBar/Bin.js');
+			expect(z.loader.parseModulePath('Foo.Bar.Bax.Bin').src).to.equal('libs/FooBar/Bax/Bin.js');
+		});
 
-	// });
+	});
 
   describe('#start', function () {
 
@@ -196,11 +196,12 @@ describe('z', function () {
     describe('#config', function () {
 
       it('loads a config file', function (done) {
-        z.start.config('fixtures/start-config/config', function () {
+        z.startConfig('fixtures/start-config/config', function () {
           expect(z.config('test')).to.equal('test');
           expect(z.config('root')).to.equal('fixtures/start-config/');
           expect(z.config('main')).to.equal('mainfoo');
           expect(main).to.equal('Configured');
+          expect(foo.bin.bar).to.equal('mapped');
           expect(startconfigfoo).to.equal('startconfigfoo');
           done();
         });

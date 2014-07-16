@@ -34,7 +34,7 @@ describe('z.Build', function () {
 
   it('compiles modules', function (done) {
     var build = z.Build({
-      main: 'tests/fixtures/main.js',
+      main: 'tests/fixtures/config.js',
       dest: 'tests/tmp/app.js'
     });
     build.done(function () {

@@ -2,13 +2,6 @@
  * This is an example of a license header.
  */
 
-z.config({
-  root: 'tests/',
-  main: 'fixtures.main'
-});
-
-// z.map('foo.mapped', 'fixtures/map/mapped.js');
-
 z.module('fixtures.main');
 
 z.imports(

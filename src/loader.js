@@ -83,7 +83,11 @@ loader.load = function (path, next) {
 // Check if the passed item is a path
 // @private
 function _isPath (obj) {
-  return obj.indexOf('/') >= 0;
+  var result = false;
+  result = obj.indexOf('/') >= 0;
+  if (!result)
+    result = obj.indexOf('.js') >= 0;
+  return result;
 };
 
 // Convert a path into an object name
@@ -114,15 +118,15 @@ function _nameToPath (obj, options) {
 // Check z's config and map any requests that need it.
 // @private
 function _mapRequest (path) {
-  if (_config.maps.modules.hasOwnProperty(path.obj)) {
-    path.src = _config.maps.modules[path.obj];
+  if (_config.maps.modules.hasOwnProperty(path.name)) {
+    path.src = _config.maps.modules[path.name];
     if (!_isPath(path.src)) path.src = _nameToPath(path.src) + '.js';
     return path;
   }
   each(_config.maps.namespaces, function (ns, map) {
     var match = new RegExp(map + '\\.');
-    if (match.test(path.obj)) {
-      var item = _nameToPath(path.obj.replace(match, ''));
+    if (match.test(path.name)) {
+      var item = _nameToPath(path.name.replace(match, ''));
       path.src = slashify(ns) + item + '.js';
       // Break the loop.
       return true;

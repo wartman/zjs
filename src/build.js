@@ -1,4 +1,5 @@
 // z.Build
+// -------
 
 require('../dist/z');
 
@@ -18,6 +19,7 @@ var Build = z.Build = function (options) {
 	this._raw = {};
 	this._main = options.main || 'main';
 	this._dest = options.dest;
+  this._namespaces = [];
 	this._compiled = '';
 	this._header = '';
 	this._dir = (options.dir || process.cwd()) + '/';
@@ -34,6 +36,12 @@ var Build = z.Build = function (options) {
 
     var mod = this.parseModulePath(path);
     var self = this;
+
+    // Add root-level namespaces.
+    var ns = mod.name.substring(0, mod.name.indexOf('.'));
+    if (builder._namespaces.indexOf(ns) < 0) {
+      builder._namespaces.push(ns);
+    }
 
     fs.readFile(mod.src, 'utf-8', function (err, data) {
       if (err) {
@@ -72,15 +80,18 @@ var Build = z.Build = function (options) {
 	this.start(this._main);
 };
 
+// Start compiling.
 Build.prototype.start = function() {
 	var self = this;
 
   fs.readFile(this._main, 'utf-8', function (err, data) {
 
-    // Try to read the config first.
+    // If this is a config file, try to parse it.
     var getConfig = /z\.config\([\s\S\r\n'"\{\}]+?\)/g
     var config = getConfig.exec(data);
     if (config) {
+
+      self._config = config;
       var runner = Function('z', config);
       runner(z);
       if (z.config('main')) {
@@ -90,6 +101,22 @@ Build.prototype.start = function() {
         var rootpath = self._dir + z.config('root');
         z.config('root', rootpath);
       }
+    } else {
+
+      // Try to infer defaults.
+      var lastSegment = (self._main.lastIndexOf('/') + 1);
+      var root = self._main.substring(0, lastSegment);
+      var main = self._main.substring(lastSegment);
+      z.config('root', root);
+      z.config('main', main);
+      self._main = main;
+      self._config = [
+        "z.config({",
+          "main:'" + main + "',",
+          "root:'" + root + "'",
+        "})"
+      ].join('');
+
     }
 
     z.loader.load(self._main, function (err) {
@@ -102,6 +129,7 @@ Build.prototype.start = function() {
   });
 };
 
+// A callback to fire when everything is ready.
 Build.prototype.done = function (cb) {
   if (this.isDone)
     cb();
@@ -109,9 +137,7 @@ Build.prototype.done = function (cb) {
     this._onDone = cb;
 };
 
-/**
- * Try to extract license info from included modules.
- */
+// Try to extract license info from included modules.
 var _licenseMatch = /\/\*\![\s\S]+?\*\//g;
 Build.prototype.extractLicenses = function (file) {
   var matches = _licenseMatch.exec(file);
@@ -119,6 +145,7 @@ Build.prototype.extractLicenses = function (file) {
   this._header += matches[0] + '\n\n';
 };
 
+// Compile the project.
 Build.prototype.compile = function () {
 	var modules = this._raw;
 	var moduleList = {};
@@ -137,7 +164,8 @@ Build.prototype.compile = function () {
 	sortedPackages = this.sort(moduleList, this._main);
 
 	sortedPackages.forEach(function (name) {
-		self._compiled += self._raw[name].data + '\n';
+    // Add each module, wrapping it in a function first..
+		self._compiled += "\n;(function () {\n" + self._raw[name].data + "\n})();\n";
 	});
 
 	// Add the minimal implementation of z unless otherwise requested.
@@ -147,12 +175,25 @@ Build.prototype.compile = function () {
 		var lib = fs.readFileSync(__dirname + '/api.js', 'utf-8');
 	}
 
-	// Add library
-	this._compiled = "(function (root) {\n" + lib + "\n\n/* modules */\n" + this._compiled + "\n})(this);"
+
+  // Add root namespaces
+  var namespaces = [];
+  this._namespaces.forEach(function (ns) {
+    namespaces.push('var ' + ns + '= root.' + ns +' = {};');
+  });
+
+
+	// Put it together.
+	this._compiled = "\n;(function (root) {\n" 
+    + lib
+    + '\n\n/* namespaces */\n' + namespaces.join('\n') + '\n'
+    + '\n\n/* config */\n' + this._config + ';\n'
+    + "\n\n/* modules */\n" + this._compiled 
+    + "\n})(this);"
 
 	if(this.options.optimize){
     this._compiled = UglifyJS.minify(this._compiled, {fromString: true}).code;
-    // Add license headers. (to do)
+    // Add license headers.
     this._compiled = this._header + this._compiled;
   }
 

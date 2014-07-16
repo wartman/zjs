@@ -4,7 +4,7 @@
  * Copyright 2014
  * Released under the MIT license
  *
- * Date: 2014-07-16T17:46Z
+ * Date: 2014-07-16T18:45Z
  */
 
 (function (factory) {
@@ -247,47 +247,45 @@ z.config = function (key, value) {
   }
   if (typeof value !== 'undefined') {
     if ('map' === key) return z.map(value);
-    if ('namespaces' === key) return z.map.namespace(value);
+    if ('namespaces' === key) return z.mapNamespace(value);
     _config[key] = value;
   }
   return ('undefined' !== typeof _config[key]) 
     ? _config[key] : false;
 };
 
-// Map an import to the given path.
-// example:
+// Map a module to the given path.
 //
 //    z.map('Foo', 'libs/foo.min.js');
 //    z.imports('Foo'); // -> Imports from libs/foo.min.js
 //
 // Note that this method will automatically work with any 
-// script that exports a global var, so long as `item` is 
+// script that exports a global var, so long as `mod` is 
 // equal to the global you want. Here is an example for jQuery:
 //
 //    z.map('$', 'libs/jQuery.min.js')
 //
-z.map = function (item, path) {
-  if ('object' === typeof item) {
-    for (var key in item) {
+z.map = function (mod, path) {
+  if ('object' === typeof mod) {
+    for (var key in mod) {
       z.map(key, value[key]);
     }
     return;
   }
-  _config.maps.modules[item] = path;
+  _config.maps.modules[mod] = path;
 };
 
-// Create a namespace map.
-// example:
-//
-//    z.map.namespace('Foo.Bin', 'libs/FooBin');
+// Map a namespace to the given path.
+
+//    z.mapNamespace('Foo.Bin', 'libs/FooBin');
 //    // The following import will now import 'lib/FooBin/Bax.js'
 //    // rather then 'Foo/Bin/Bax.js'
 //    z.imports('Foo.Bin.Bax');
-//
-z.map.namespace = function (ns, path) {
+
+z.mapNamespace = function (ns, path) {
   if ('object' === typeof ns) {
     for (var key in ns) {
-      z.map.namespace(key, ns[key]);
+      z.mapNamespace(key, ns[key]);
     }
     return;
   }
@@ -431,7 +429,11 @@ loader.load = function (path, next) {
 // Check if the passed item is a path
 // @private
 function _isPath (obj) {
-  return obj.indexOf('/') >= 0;
+  var result = false;
+  result = obj.indexOf('/') >= 0;
+  if (!result)
+    result = obj.indexOf('.js') >= 0;
+  return result;
 };
 
 // Convert a path into an object name
@@ -462,15 +464,15 @@ function _nameToPath (obj, options) {
 // Check z's config and map any requests that need it.
 // @private
 function _mapRequest (path) {
-  if (_config.maps.modules.hasOwnProperty(path.obj)) {
-    path.src = _config.maps.modules[path.obj];
+  if (_config.maps.modules.hasOwnProperty(path.name)) {
+    path.src = _config.maps.modules[path.name];
     if (!_isPath(path.src)) path.src = _nameToPath(path.src) + '.js';
     return path;
   }
   each(_config.maps.namespaces, function (ns, map) {
     var match = new RegExp(map + '\\.');
-    if (match.test(path.obj)) {
-      var item = _nameToPath(path.obj.replace(match, ''));
+    if (match.test(path.name)) {
+      var item = _nameToPath(path.name.replace(match, ''));
       path.src = slashify(ns) + item + '.js';
       // Break the loop.
       return true;
@@ -625,7 +627,7 @@ z.loader = loader;
 // to parse the root path from the main module, which
 // often is all you need.
 z.start = function (mainFile, done) {
-  lastSegment = (mainFile.lastIndexOf('/') + 1);
+  var lastSegment = (mainFile.lastIndexOf('/') + 1);
   var root = mainFile.substring(0, lastSegment);
   var main = mainFile.substring(lastSegment);
   z.config('root', root);
@@ -635,7 +637,7 @@ z.start = function (mainFile, done) {
 
 // Start a script by loading a config file. At the very
 // minimum, you'll need the following:
-//
+
 //    z.config({
 //      root: 'scripts/'
 //      main: 'app.main'
@@ -647,10 +649,10 @@ z.start = function (mainFile, done) {
 //        }
 //      }
 //    });
-//
+
 // By convention, this file is nammed 'config.js', but you can
 // call it whatever you'd like.
-z.start.config = function (configFile, done) {
+z.startConfig = function (configFile, done) {
   configFile = configFile + '.js';
   z.loader.getScript(configFile, function () {
     if (z.config('main'))
@@ -674,6 +676,7 @@ function _autostart() {
   }
 };
 
-_autostart();
+if (typeof document !== 'undefined')
+  _autostart();
 
 }));

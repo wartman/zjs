@@ -34,7 +34,8 @@ When you import a script, ZJS uses AJAX to load it. It investigates the file, lo
 for any dependencies via a regular expression. Once everything is loaded, it places
 the script into the DOM.
 
-Compiling is highly recomended, however. To compile a project, use the `zjs` command-line tool:
+Compiling is highly recomended for deployed scripts. To compile a project, use 
+the `zjs` command-line tool:
 
 ```
 $ zjs build path\to\my\main\module.js path\to\dest.js
@@ -92,6 +93,34 @@ API
   at once, pass an object to `key`. To get an option without
   changing its value, simply omit the `value` arg.
 
+- z.__map__(*mod*, *path*)
+  
+  Map a module to the given path.
+  
+  ```javascript
+  z.map('Foo', 'libs/foo.min.js');
+  z.imports('Foo'); // -> Imports from libs/foo.min.js
+  ```
+
+  Note that this method will automatically work with any 
+  script that exports a global var, so long as `mod` is 
+  equal to the global you want. Here is an example for jQuery:
+  
+  ```javascript
+  z.map('$', 'libs/jQuery.min.js')
+  ```
+
+- z.__mapNamespace__(*ns*, *path*)
+
+  Map a namespace to the given path.
+
+  ```javascript
+  z.mapNamespace('Foo.Bin', 'libs/FooBin');
+  // The following import will now import 'lib/FooBin/Bax.js'
+  // rather then 'Foo/Bin/Bax.js'
+  z.imports('Foo.Bin.Bax');
+  ```
+
 - z.__start__(*mainFile*, *done*)
 
   Load the main module and start your app. You can call this directly, or add a
@@ -103,7 +132,7 @@ API
 
   This method is not available in `z.runtime.js` or compiled scripts.
 
-- z.start.__config__(*configFile*, *done*)
+- z.__startConfig__(*configFile*, *done*)
   
   If you need to do any configuration for your app (such as adding maps, etc)
   you should use this method. 
@@ -137,5 +166,7 @@ API
 
   This method is not available in `z.runtime.js` or compiled scripts.
 
-There's more, but this is all thats working at the moment.
+
+Compiling
+---------
 
