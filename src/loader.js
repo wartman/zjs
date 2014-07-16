@@ -201,12 +201,32 @@ loader.parse = function (rawModule) {
   return deps;
 };
 
-// Simply create a new script node (without inserting it into the DOM).
+// Create a new script node (without inserting it into the DOM).
 function _newScript (moduleName) {
   var script = document.createElement("script");
   script.type = "text/javascript";
-  script.setAttribute('data-module', moduleName);
+  if (moduleName)
+    script.setAttribute('data-module', moduleName);
   return script;
+};
+
+// Place a script in the DOM
+function _insertScript(script, next) {
+  var head = document.getElementsByTagName("head")[0] || document.documentElement;
+  head.insertBefore(script, head.firstChild).parentNode;
+  if (next) {
+    // If a callback is provided, use an event listener.
+    var done = false;
+    script.onload = script.onreadystatechange = function() {
+      if (!done && (!this.readyState ||
+          this.readyState === "loaded" || this.readyState === "complete") ) {
+        done = true;
+        next();
+        // Handle memory leak in IE
+        script.onload = script.onreadystatechange = null;
+      }
+    };
+  }
 };
 
 // Add a script to the page. 'text' is the raw js code that we'll be
@@ -216,7 +236,6 @@ function _addScript (mod, text, next) {
   // add a sourceURL to help with debugging
   text = text + '\n\n//# sourceURL=' + mod.src;
 
-  var head = document.getElementsByTagName("head")[0] || document.documentElement;
   var script = _newScript(mod.name);
   var done = false;
 
@@ -227,19 +246,10 @@ function _addScript (mod, text, next) {
     // numbers this way. Don't use this in production: some browsers,
     // like ie8, can't handle this.
     script.src = 'data:text/javascript;charset=utf-8,' + encodeURIComponent(text);
-    head.insertBefore(script, head.firstChild).parentNode;
-    script.onload = script.onreadystatechange = function() {
-      if (!done && (!this.readyState ||
-          this.readyState === "loaded" || this.readyState === "complete") ) {
-        done = true;
-        next();
-        // Handle memory leak in IE
-        script.onload = script.onreadystatechange = null;
-      }
-    };
+    _insertScript(script, next);
   } else {
     script.text = text;
-    head.insertBefore(script, head.firstChild).parentNode;
+    _insertScript(script);
     next();
   }
 };
@@ -249,6 +259,13 @@ function _addScript (mod, text, next) {
 loader.enable = function (rawModule, mod, next) {
   next = next || _handleErr;
   _addScript(mod, rawModule, next);
+};
+
+// Load a script by placing it in the DOM
+loader.getScript = function (src, next) {
+  var script = _newScript();
+  script.src = src;
+  _insertScript(script, next);
 };
 
 z.loader = loader;

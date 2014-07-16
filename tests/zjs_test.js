@@ -181,4 +181,33 @@ describe('z', function () {
 
 	// });
 
+  describe('#start', function () {
+
+    it('loads the main module', function (done) {
+      z.start('fixtures/start/main', function () {
+        expect(main).to.equal('Started');
+        expect(startfoo).to.equal('startfoo');
+        expect(z.config('root')).to.equal('fixtures/start/');
+        expect(z.config('main')).to.equal('main');
+        done();
+      });
+    });
+
+    describe('#config', function () {
+
+      it('loads a config file', function (done) {
+        z.start.config('fixtures/start-config/config', function () {
+          expect(z.config('test')).to.equal('test');
+          expect(z.config('root')).to.equal('fixtures/start-config/');
+          expect(z.config('main')).to.equal('mainfoo');
+          expect(main).to.equal('Configured');
+          expect(startconfigfoo).to.equal('startconfigfoo');
+          done();
+        });
+      });
+
+    });
+
+  })
+
 });

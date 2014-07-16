@@ -51,7 +51,6 @@ Compiled projects use the tiny zjs runtime script, not the entire library, makin
 
 API 
 ---
-The following is the core API, which is always available.
 
 - z.__module__(*name*)
 
@@ -86,6 +85,57 @@ The following is the core API, which is always available.
   ```javascript
   var foo = z.imports('app.long.unweildly.module.path.foo');
   ```
+
+- z.__config__(*key*, *value*)
+
+  Set or get a configuation option. To set several options
+  at once, pass an object to `key`. To get an option without
+  changing its value, simply omit the `value` arg.
+
+- z.__start__(*mainFile*, *done*)
+
+  Load the main module and start your app. You can call this directly, or add a
+  'data-main' attribute to your script tag:
+
+  ```html
+  <script src="libs/z.js" data-main="app/main"></script>
+  ```
+
+  This method is not available in `z.runtime.js` or compiled scripts.
+
+- z.start.__config__(*configFile*, *done*)
+  
+  If you need to do any configuration for your app (such as adding maps, etc)
+  you should use this method. 
+
+  Here's an example of a config file:
+
+  ```javascript
+  z.config({
+    root: 'scripts/'
+    main: 'app.main'
+    // You can also map modules and namespaces
+    // here, if you need to.
+    maps: {
+      modules: {
+        'foo' : 'libs/foo/foo.js'
+      }
+    }
+  });
+  ```
+
+  By convention, this file is named 'config.js', but you can
+  call it whatever you'd like. Once the config is ready, zjs 
+  will try to fetch `z.config('main')`.
+
+  You can call this directly, or add a 'data-config' attribute 
+  to your script tag:
+
+  ```html
+  <script src="libs/z.js" data-config="app/config"></script>
+  ``` 
+
+  This method is not available in `z.runtime.js` or compiled scripts.
 
 There's more, but this is all thats working at the moment.
 
