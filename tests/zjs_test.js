@@ -146,19 +146,19 @@ describe('z', function () {
       expect(z.config('notFalse')).to.not.be.an('undefined');
     });
 
-   //  it('passes things in the "map" key to z.map', function () {
-   //  	z.config('map', {
-   //  		'FooBix': 'some/path/to/file.js'
-   //  	});
-			// expect(z.loader.parseModulePath('FooBix').src).to.equal('some/path/to/file.js');
-   //  });
+    it('passes things in the "map" key to z.map', function () {
+    	z.config('map', {
+    		'FooBix': 'some/path/to/file.js'
+    	});
+			expect(z.loader.parseModulePath('FooBix').src).to.equal('some/path/to/file.js');
+    });
 
-   //  it('passes things in the "namespaces" key to z.map.namespaces', function () {
-   //  	z.config('namespaces', {
-   //  		'Froo': 'some/path/to/Froo'
-   //  	});
-			// expect(z.loader.parseModulePath('Froo.Blix').src).to.equal('some/path/to/Froo/Blix.js');
-   //  });
+    it('passes things in the "namespaces" key to z.map.namespaces', function () {
+    	z.config('namespaces', {
+    		'Froo': 'some/path/to/Froo'
+    	});
+			expect(z.loader.parseModulePath('Froo.Blix').src).to.equal('some/path/to/Froo/Blix.js');
+    });
 
   });
 

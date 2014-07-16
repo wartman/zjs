@@ -4,7 +4,7 @@
  * Copyright 2014
  * Released under the MIT license
  *
- * Date: 2014-07-16T18:45Z
+ * Date: 2014-07-16T19:27Z
  */
 
 (function (factory) {
@@ -268,7 +268,7 @@ z.config = function (key, value) {
 z.map = function (mod, path) {
   if ('object' === typeof mod) {
     for (var key in mod) {
-      z.map(key, value[key]);
+      z.map(key, mod[key]);
     }
     return;
   }
@@ -671,7 +671,7 @@ function _autostart() {
     if (main) {
       z.start(main);
     } else if (config) {
-      z.start.config(config);
+      z.startConfig(config);
     }
   }
 };

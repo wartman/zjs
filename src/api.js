@@ -77,7 +77,7 @@ z.config = function (key, value) {
 z.map = function (mod, path) {
   if ('object' === typeof mod) {
     for (var key in mod) {
-      z.map(key, value[key]);
+      z.map(key, mod[key]);
     }
     return;
   }

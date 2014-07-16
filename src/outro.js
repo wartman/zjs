@@ -49,7 +49,7 @@ function _autostart() {
     if (main) {
       z.start(main);
     } else if (config) {
-      z.start.config(config);
+      z.startConfig(config);
     }
   }
 };
