@@ -9,11 +9,22 @@ describe('z', function () {
 
     it('defines a new namespace', function () {
       var mod = z.module('tests.module');
-      expect(tests).to.not.be.an('undefined');
-      expect(tests.module).to.be.an('object');
+      expect(z.env.modules.tests).to.not.be.an('undefined');
+      expect(z.env.modules.tests.module).to.be.an('object');
+      expect(z.env.namespaces.tests).to.be.true;
       expect(mod).to.be.an('object');
       mod.foo = 'foo';
-      expect(tests.module.foo).to.equal('foo');
+      expect(z.env.modules.tests.module.foo).to.equal('foo');
+    });
+
+  });
+
+  describe('#namespace', function () {
+
+    it('ensures a namespace exists', function () {
+      z.namespace('testsfoo');
+      expect(z.env.namespaces.testsfoo).to.be.true;
+      expect(z.env.modules.testsfoo).to.be.an('object');
     });
 
   });
@@ -78,13 +89,13 @@ describe('z', function () {
 
       it('won\'t request a defined module.', function (done) {
         z.module('tests.load.defined.target');
-        tests.load.defined.target = 'target';
+        z.env.modules.tests.load.defined.target = 'target';
         z.loader.load('tests.load.defined.target', function (err) {
           if (err) {
             throw err;
             done();
           } else {
-            expect(tests.load.defined.target).to.equal('target');
+            expect(z.env.modules.tests.load.defined.target).to.equal('target');
             done();
           }
         })
@@ -96,7 +107,7 @@ describe('z', function () {
             throw err;
             done();
           } else {
-            expect(fixtures.Single).to.equal('one');
+            expect(z.env.modules.fixtures.Single).to.equal('one');
             done();
           }
         });
@@ -108,7 +119,7 @@ describe('z', function () {
             throw err;
             done();
           } else {
-            var stress = fixtures.stress;
+            var stress = z.imports('fixtures.stress');
             expect(stress.one.One).to.be.equal('one');
             expect(stress.one.Foo).to.be.equal('Foo');
             expect(stress.two.Two).to.be.equal('two');
@@ -185,8 +196,8 @@ describe('z', function () {
 
     it('loads the main module', function (done) {
       z.start('fixtures/start/main', function () {
-        expect(main).to.equal('Started');
-        expect(startfoo).to.equal('startfoo');
+        expect(z.env.modules.main.foo).to.equal('Started');
+        expect(z.env.modules.startfoo.foo).to.equal('startfoo');
         expect(z.config('root')).to.equal('fixtures/start/');
         expect(z.config('main')).to.equal('main');
         done();
@@ -200,9 +211,9 @@ describe('z', function () {
           expect(z.config('test')).to.equal('test');
           expect(z.config('root')).to.equal('fixtures/start-config/');
           expect(z.config('main')).to.equal('mainfoo');
-          expect(main).to.equal('Configured');
-          expect(foo.bin.bar).to.equal('mapped');
-          expect(startconfigfoo).to.equal('startconfigfoo');
+          expect(z.env.modules.main.foo).to.equal('Configured');
+          expect(z.env.modules.foo.bin.bar.mapped).to.equal('mapped');
+          expect(z.env.modules.startconfigfoo.foo).to.equal('startconfigfoo');
           done();
         });
       });

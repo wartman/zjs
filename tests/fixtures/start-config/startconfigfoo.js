@@ -1,3 +1,3 @@
 z.module('startconfigfoo');
 
-startconfigfoo = 'startconfigfoo';
+startconfigfoo.foo = 'startconfigfoo';

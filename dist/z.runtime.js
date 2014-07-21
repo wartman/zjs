@@ -4,7 +4,7 @@
  * Copyright 2014
  * Released under the MIT license
  *
- * Date: 2014-07-16T21:37Z
+ * Date: 2014-07-21T17:10Z
  */
 
 (function (factory) {
@@ -51,6 +51,11 @@
 var z = root.z = {};
 
 z.VERSION = "2.0.0";
+
+z.env = {
+  modules: {},
+  namespaces: {}
+};
 
 // Z's config (private: use z.config to get values)
 var _config = {
@@ -128,8 +133,10 @@ z.mapNamespace = function (ns, path) {
 //    app.foo.bar.Bin = function () { /* code */ };
 //
 z.module = function (name) {
-  var cur = root;
+  var cur = z.env.modules;
   var parts = name.split('.');
+  var ns = parts[0];
+  z.namespace(ns);
   for (var part; parts.length && (part = parts.shift()); ) {
     if (cur[part]) {
       cur = cur[part];
@@ -138,6 +145,15 @@ z.module = function (name) {
     }
   }
   return cur;
+};
+
+// Ensure a namespace exists.
+z.namespace = function (name) {
+  if (!z.env.namespaces.hasOwnProperty(name))
+    z.env.namespaces[name] = true;
+  if (!z.env.modules.hasOwnProperty(name)) 
+    z.env.modules[name] = {};
+  return z.env.modules[name];
 };
 
 // Import a module or modules. Imported modules are then available for the
@@ -159,7 +175,7 @@ z.module = function (name) {
 z.imports = function (/*...*/) {
   if (arguments.length === 1) {
     var name = arguments[0];
-    var cur = root;
+    var cur = z.env.modules;
     var parts = name.split('.');
     for (var part; part = parts.shift(); ) {
       if(typeof cur[part] !== "undefined"){

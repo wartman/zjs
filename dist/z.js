@@ -4,7 +4,7 @@
  * Copyright 2014
  * Released under the MIT license
  *
- * Date: 2014-07-16T21:37Z
+ * Date: 2014-07-21T17:10Z
  */
 
 (function (factory) {
@@ -225,6 +225,11 @@ var z = root.z = {};
 
 z.VERSION = "2.0.0";
 
+z.env = {
+  modules: {},
+  namespaces: {}
+};
+
 // Z's config (private: use z.config to get values)
 var _config = {
   debug: false,
@@ -301,8 +306,10 @@ z.mapNamespace = function (ns, path) {
 //    app.foo.bar.Bin = function () { /* code */ };
 //
 z.module = function (name) {
-  var cur = root;
+  var cur = z.env.modules;
   var parts = name.split('.');
+  var ns = parts[0];
+  z.namespace(ns);
   for (var part; parts.length && (part = parts.shift()); ) {
     if (cur[part]) {
       cur = cur[part];
@@ -311,6 +318,15 @@ z.module = function (name) {
     }
   }
   return cur;
+};
+
+// Ensure a namespace exists.
+z.namespace = function (name) {
+  if (!z.env.namespaces.hasOwnProperty(name))
+    z.env.namespaces[name] = true;
+  if (!z.env.modules.hasOwnProperty(name)) 
+    z.env.modules[name] = {};
+  return z.env.modules[name];
 };
 
 // Import a module or modules. Imported modules are then available for the
@@ -332,7 +348,7 @@ z.module = function (name) {
 z.imports = function (/*...*/) {
   if (arguments.length === 1) {
     var name = arguments[0];
-    var cur = root;
+    var cur = z.env.modules;
     var parts = name.split('.');
     for (var part; part = parts.shift(); ) {
       if(typeof cur[part] !== "undefined"){
@@ -525,7 +541,7 @@ loader.request = function (src, next) {
       if(200 === this.status){
         visited[src].resolve(this.responseText);
       } else {
-        visited[src].reject(this.status);
+        visited[src].reject('AJAX Error: Could not load [' + src + '], status code: ' + this.status);
       }
     }
   }
@@ -537,8 +553,24 @@ loader.request = function (src, next) {
 // RegExp to find an import.
 var _importsMatch = /z\.imports\(([\s\S\r\n]+?)\)/g;
 
+// RegExp to find the module name
+var _moduleNameMatch = /z\.module\(([\s\S]+?)\)/g
+
 // RegExp to cleanup module paths
 var _cleanModulePath = /[\r|\n|'|"|\s]/g;
+
+// Ensures that top-level (or root) namespaces are defined.
+// For example, in `app.foo.bar` the root namespace is `app`.
+// If a module-name has only one segment, like `main`, then `main`
+// is the root.
+function _ensureRootNamespace (name) {
+  var ns = (name.indexOf('.') > 0) 
+    ? name.substring(0, name.indexOf('.'))
+    : name;
+  if (!z.env.namespaces.hasOwnProperty(ns)) {
+    z.env.namespaces[ns] = true;
+  }
+};
 
 // Parse a module loaded by AJAX, using regular expressions to match
 // any `z.imports` calls in the provided module. Any matches will be
@@ -547,13 +579,20 @@ var _cleanModulePath = /[\r|\n|'|"|\s]/g;
 loader.parse = function (rawModule) {
   var self = this;
   var deps = [];
+  var nsList = [];
   rawModule.replace(_importsMatch, function (matches, importList) {
     var imports = importList.split(',');
     each(imports, function (item) {
       item = item.replace(_cleanModulePath, "");
+      _ensureRootNamespace(item)
       deps.push(item);
     });
   });
+  rawModule.replace(_moduleNameMatch, function (matches, modName) {
+    var item = modName.replace(_cleanModulePath, "") 
+    z.module(item);
+    _ensureRootNamespace(item);
+  })
   return deps;
 };
 
@@ -611,11 +650,27 @@ function _addScript (mod, text, next) {
   }
 };
 
+loader.wrap = function (rawModule) {
+  var nsVals = [];
+  var nsList = [];
+  var compiled = '';
+  each(z.env.namespaces, function (val, ns) {
+    nsVals.push("z.namespace('" + ns + "')");
+    nsList.push(ns);
+  });
+  nsVals.push('z');
+  nsList.push('z');
+
+  compiled = ";(function (" + nsList.join(', ') + ") {/* <- zjs runtime */ " + rawModule + "\n})(" + nsVals.join(', ') + ");\n";
+  return compiled;
+};
+
 // Take a raw module string and place it into the DOM as a `<script>`.
 // This will only be run after any dependencies have been loaded first.
 loader.enable = function (rawModule, mod, next) {
   next = next || _handleErr;
-  _addScript(mod, rawModule, next);
+  var compiled = this.wrap(rawModule);
+  _addScript(mod, compiled, next);
 };
 
 // Load a script by placing it in the DOM

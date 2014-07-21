@@ -179,7 +179,7 @@ loader.request = function (src, next) {
       if(200 === this.status){
         visited[src].resolve(this.responseText);
       } else {
-        visited[src].reject(this.status);
+        visited[src].reject('AJAX Error: Could not load [' + src + '], status code: ' + this.status);
       }
     }
   }
@@ -191,8 +191,24 @@ loader.request = function (src, next) {
 // RegExp to find an import.
 var _importsMatch = /z\.imports\(([\s\S\r\n]+?)\)/g;
 
+// RegExp to find the module name
+var _moduleNameMatch = /z\.module\(([\s\S]+?)\)/g
+
 // RegExp to cleanup module paths
 var _cleanModulePath = /[\r|\n|'|"|\s]/g;
+
+// Ensures that top-level (or root) namespaces are defined.
+// For example, in `app.foo.bar` the root namespace is `app`.
+// If a module-name has only one segment, like `main`, then `main`
+// is the root.
+function _ensureRootNamespace (name) {
+  var ns = (name.indexOf('.') > 0) 
+    ? name.substring(0, name.indexOf('.'))
+    : name;
+  if (!z.env.namespaces.hasOwnProperty(ns)) {
+    z.env.namespaces[ns] = true;
+  }
+};
 
 // Parse a module loaded by AJAX, using regular expressions to match
 // any `z.imports` calls in the provided module. Any matches will be
@@ -201,13 +217,20 @@ var _cleanModulePath = /[\r|\n|'|"|\s]/g;
 loader.parse = function (rawModule) {
   var self = this;
   var deps = [];
+  var nsList = [];
   rawModule.replace(_importsMatch, function (matches, importList) {
     var imports = importList.split(',');
     each(imports, function (item) {
       item = item.replace(_cleanModulePath, "");
+      _ensureRootNamespace(item)
       deps.push(item);
     });
   });
+  rawModule.replace(_moduleNameMatch, function (matches, modName) {
+    var item = modName.replace(_cleanModulePath, "") 
+    z.module(item);
+    _ensureRootNamespace(item);
+  })
   return deps;
 };
 
@@ -265,11 +288,27 @@ function _addScript (mod, text, next) {
   }
 };
 
+loader.wrap = function (rawModule) {
+  var nsVals = [];
+  var nsList = [];
+  var compiled = '';
+  each(z.env.namespaces, function (val, ns) {
+    nsVals.push("z.namespace('" + ns + "')");
+    nsList.push(ns);
+  });
+  nsVals.push('z');
+  nsList.push('z');
+
+  compiled = ";(function (" + nsList.join(', ') + ") {/* <- zjs runtime */ " + rawModule + "\n})(" + nsVals.join(', ') + ");\n";
+  return compiled;
+};
+
 // Take a raw module string and place it into the DOM as a `<script>`.
 // This will only be run after any dependencies have been loaded first.
 loader.enable = function (rawModule, mod, next) {
   next = next || _handleErr;
-  _addScript(mod, rawModule, next);
+  var compiled = this.wrap(rawModule);
+  _addScript(mod, compiled, next);
 };
 
 // Load a script by placing it in the DOM

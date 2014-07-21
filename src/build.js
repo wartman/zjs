@@ -52,7 +52,7 @@ var Build = z.Build = function (options) {
       var deps = self.parse(data);
 
       builder._raw[mod.name] = {
-        data: data,
+        data: self.wrap(data),
         deps: deps
       };
       builder.extractLicenses(data);
@@ -163,9 +163,9 @@ Build.prototype.compile = function () {
 
 	sortedPackages = this.sort(moduleList, this._main);
 
+  // Add compiled modules in order of dependencies.
 	sortedPackages.forEach(function (name) {
-    // Add each module, wrapping it in a function first..
-		self._compiled += "\n;(function () {\n" + self._raw[name].data + "\n})();\n";
+		self._compiled += self._raw[name].data;
 	});
 
 	// Add the minimal implementation of z unless otherwise requested.
@@ -175,18 +175,9 @@ Build.prototype.compile = function () {
 		var lib = fs.readFileSync(__dirname + '/api.js', 'utf-8');
 	}
 
-
-  // Add root namespaces
-  var namespaces = [];
-  this._namespaces.forEach(function (ns) {
-    namespaces.push('var ' + ns + '= root.' + ns +' = {};');
-  });
-
-
 	// Put it together.
 	this._compiled = "\n;(function (root) {\n" 
     + lib
-    + '\n\n/* namespaces */\n' + namespaces.join('\n') + '\n'
     + '\n\n/* config */\n' + this._config + ';\n'
     + "\n\n/* modules */\n" + this._compiled 
     + "\n})(this);"

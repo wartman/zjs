@@ -22,12 +22,7 @@ describe('z.Build', function () {
   beforeEach(function () {
     z.env = {
       namespaces: {},
-      modules: {},
-      plugins: {},
-      maps: {
-        items: {},
-        namespaces: {}
-      }
+      modules: {}
     };
     z.config('root', '')
   });
@@ -46,7 +41,7 @@ describe('z.Build', function () {
       // correctly.
       module.call(global);
 
-      var stress = global.fixtures.stress;
+      var stress = z.imports('fixtures.stress');
 
       expect(stress.one.One).to.equal('one');
       expect(stress.one.Foo).to.equal('Foo');

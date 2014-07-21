@@ -1,3 +1,3 @@
 z.module('startfoo');
 
-startfoo = 'startfoo';
+startfoo.foo = 'startfoo';

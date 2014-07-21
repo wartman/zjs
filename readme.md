@@ -4,7 +4,7 @@ A lightweight module loader for browsers.
 
 About zjs
 ---------
-Zjs is a super-simple way to create modules in javascript. Here's an example:
+*zjs* is a super-simple way to create modules in javascript. Here's an example:
 
 ```js
 
@@ -24,18 +24,19 @@ foo.bar.SomeFunction = function () {
 No need for wrappers or anything else. Just a few method calls at the top of your
 script.
 
-It's not the most robust option, but ZJS tries to keep out of your way and let you
+Other module loaders are more robust, but *zjs* tries to keep out of your way and let you
 write the code you want.
 
 
 How does it work?
 -----------------
-When you import a script, ZJS uses AJAX to load it. It investigates the file, looking
-for any dependencies via a regular expression. Once everything is loaded, it places
-the script into the DOM.
+When used on the browser, *zjs* loads imported scripts with AJAX, then inserts them into the DOM using a `<script>` tag.
+To keep from polluting the global namespace, imported scripts are wrapped in a self-executing function first (this is done
+in such a way that line-numbers will still match up with the original file). You should use a modern browser when debugging
+*zjs* to get useful information when errors are thrown.
 
-Compiling is highly recomended for deployed scripts. To compile a project, use 
-the `zjs` command-line tool:
+When you're ready to deploy your app, you should **always** use the *zjs* command-line tool to compile the project.
+The browser-loader is best thought of as a development aid: compiled scripts will run much faster and have little overhead.
 
 ```
 $ zjs build path\to\my\main\module.js path\to\dest.js
@@ -48,7 +49,6 @@ $ zjs build path\to\my\main\module.js path\to\dest.js -o
 ```
 
 Compiled projects use the tiny zjs runtime script, not the entire library, making zjs even more lightweight.
-
 
 API 
 ---
@@ -165,8 +165,4 @@ API
   ``` 
 
   This method is not available in `z.runtime.js` or compiled scripts.
-
-
-Compiling
----------
 
