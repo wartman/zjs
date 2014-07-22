@@ -4,7 +4,7 @@
   Copyright 2014
   Released under the MIT license
 
-  Date: 2014-07-22T16:02Z
+  Date: 2014-07-22T16:30Z
 */
 
 (function (factory) {
@@ -52,15 +52,13 @@ var z = root.z = {};
 
 z.VERSION = "2.0.0";
 
-z.env = {
-  modules: {},
-  namespaces: {}
-};
+z.env = {};
 
 // Z's config (private: use z.config to get values)
 var _config = {
   debug: false,
   root: '',
+  namespaces: {},
   maps: {
     modules: {},
     namespaces: {}
@@ -133,7 +131,7 @@ z.mapNamespace = function (ns, path) {
 //    app.foo.bar.Bin = function () { /* code */ };
 //
 z.module = function (name) {
-  var cur = z.env.modules;
+  var cur = z.env;
   var parts = name.split('.');
   var ns = parts[0];
   z.namespace(ns);
@@ -149,11 +147,19 @@ z.module = function (name) {
 
 // Ensure a namespace exists.
 z.namespace = function (name) {
-  if (!z.env.namespaces.hasOwnProperty(name))
-    z.env.namespaces[name] = true;
-  if (!z.env.modules.hasOwnProperty(name)) 
-    z.env.modules[name] = {};
-  return z.env.modules[name];
+  if (!_config.namespaces.hasOwnProperty(name))
+    _config.namespaces[name] = true;
+  if (!z.env.hasOwnProperty(name)) 
+    z.env[name] = {};
+  return z.env[name];
+};
+
+z.getNamespaces = function () {
+  return _config.namespaces;
+};
+
+z.getModules = function () {
+  return z.env;
 };
 
 // Import a module or modules. Imported modules are then available for the
@@ -175,7 +181,7 @@ z.namespace = function (name) {
 z.imports = function (/*...*/) {
   if (arguments.length === 1) {
     var name = arguments[0];
-    var cur = z.env.modules;
+    var cur = z.env;
     var parts = name.split('.');
     for (var part; part = parts.shift(); ) {
       if(typeof cur[part] !== "undefined"){

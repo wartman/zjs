@@ -205,8 +205,10 @@ function _ensureRootNamespace (name) {
   var ns = (name.indexOf('.') > 0) 
     ? name.substring(0, name.indexOf('.'))
     : name;
-  if (!z.env.namespaces.hasOwnProperty(ns)) {
-    z.env.namespaces[ns] = true;
+  // z.namespace(ns);
+  var namespaces = z.getNamespaces();
+  if (!namespaces.hasOwnProperty(ns)) {
+    namespaces[ns] = true;
   }
 };
 
@@ -232,6 +234,24 @@ loader.parse = function (rawModule) {
     _ensureRootNamespace(item);
   })
   return deps;
+};
+
+// Wrap a module in a function to keep it from messing with globals. This
+// will also provide it with any required namespaces.
+loader.wrap = function (rawModule) {
+  var nsVals = [];
+  var nsList = [];
+  var compiled = '';
+  var namespaces = z.getNamespaces();
+  each(namespaces, function (val, ns) {
+    nsVals.push("z.namespace('" + ns + "')");
+    nsList.push(ns);
+  });
+  nsVals.push('z');
+  nsList.push('z');
+
+  compiled = ";(function (" + nsList.join(', ') + ") {/* <- zjs runtime */ " + rawModule + "\n})(" + nsVals.join(', ') + ");\n";
+  return compiled;
 };
 
 // Create a new script node (without inserting it into the DOM).
@@ -267,7 +287,6 @@ function _insertScript(script, next) {
 };
 
 // Add a script to the page.
-// Can't get this to display useful debug info: may force me to give up :P
 function _addScript (mod, text, next) {
 
   // add a sourceURL to help with debugging
@@ -276,8 +295,8 @@ function _addScript (mod, text, next) {
   var script = _newScript(mod.name);
   var done = false;
 
-  // We don't get useful line numbers if we just let the browser handle syntax errors,
-  // so we need to use the following code.
+  // We don't get useful line numbers if we just let the 
+  // browser handle syntax errors, so we need to use the following code.
   // @todo: Firefox seems to get a line-number one less then it should be.
   var oldErr = window.onerror || null;
   window.onerror = function (errorMsg, url, lineNumber) {
@@ -298,21 +317,6 @@ function _addScript (mod, text, next) {
   window.onerror = oldErr;
 
   next();
-};
-
-loader.wrap = function (rawModule) {
-  var nsVals = [];
-  var nsList = [];
-  var compiled = '';
-  each(z.env.namespaces, function (val, ns) {
-    nsVals.push("z.namespace('" + ns + "')");
-    nsList.push(ns);
-  });
-  nsVals.push('z');
-  nsList.push('z');
-
-  compiled = ";(function (" + nsList.join(', ') + ") {/* <- zjs runtime */ " + rawModule + "\n})(" + nsVals.join(', ') + ");\n";
-  return compiled;
 };
 
 // Take a raw module string and place it into the DOM as a `<script>`.
