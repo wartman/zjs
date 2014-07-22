@@ -1,11 +1,11 @@
 /*!
- * zjs 2.0.0
- *
- * Copyright 2014
- * Released under the MIT license
- *
- * Date: 2014-07-21T17:10Z
- */
+  zjs 2.0.0
+
+  Copyright 2014
+  Released under the MIT license
+
+  Date: 2014-07-22T16:02Z
+*/
 
 (function (factory) {
   if ( typeof module === "object" && typeof module.exports === "object" ) {
@@ -608,7 +608,11 @@ function _newScript (moduleName) {
 // Place a script in the DOM
 function _insertScript(script, next) {
   var head = document.getElementsByTagName("head")[0] || document.documentElement;
-  head.insertBefore(script, head.firstChild).parentNode;
+  try {
+    head.insertBefore(script, head.firstChild).parentNode;
+  } catch (e) {
+    console.log('caught:', e);
+  }
   if (next) {
     // If a callback is provided, use an event listener.
     var done = false;
@@ -624,30 +628,38 @@ function _insertScript(script, next) {
   }
 };
 
-// Add a script to the page. 'text' is the raw js code that we'll be
-// injecting into the <script> tag. This is similar to just using `eval`,
-// but slightly less evil.
+// Add a script to the page.
+// Can't get this to display useful debug info: may force me to give up :P
 function _addScript (mod, text, next) {
 
   // add a sourceURL to help with debugging
-  text = text + '\n\n//# sourceURL=' + mod.src;
+  text += '\n//# sourceURL=' + mod.src;
 
   var script = _newScript(mod.name);
   var done = false;
 
-  if (z.config('debug')) {
-    // Yes, we're sticking the script in the src attribute. See:
-    //    https://developer.mozilla.org/en-US/docs/Web/HTTP/data_URIs
-    // This is done to help with debugging, as we can actually get line
-    // numbers this way. Don't use this in production: some browsers,
-    // like ie8, can't handle this.
-    script.src = 'data:text/javascript;charset=utf-8,' + encodeURIComponent(text);
-    _insertScript(script, next);
-  } else {
-    script.text = text;
-    _insertScript(script);
-    next();
-  }
+  // We don't get useful line numbers if we just let the browser handle syntax errors,
+  // so we need to use the following code.
+  // @todo: Firefox seems to get a line-number one less then it should be.
+  var oldErr = window.onerror || null;
+  window.onerror = function (errorMsg, url, lineNumber) {
+    if (errorMsg.indexOf('SyntaxError') >= 0) {
+      var message = errorMsg + '\n\tEvaluating [' + mod.name + '] on line ' + lineNumber;
+      if (oldErr) return oldErr(message, url, lineNumber);
+      console.error(message);
+      return true;
+    }
+    // Otherwise, it's fine to let the browser handle runtime errors.
+    return oldErr? oldErr(errorMsg, url, lineNumber) : false;
+  };
+
+  script.appendChild(document.createTextNode(text));
+  _insertScript(script);
+
+  // Rebind the old error handler.
+  window.onerror = oldErr;
+
+  next();
 };
 
 loader.wrap = function (rawModule) {
@@ -677,6 +689,7 @@ loader.enable = function (rawModule, mod, next) {
 loader.getScript = function (src, next) {
   var script = _newScript();
   script.src = src;
+  script.async = true;
   _insertScript(script, next);
 };
 

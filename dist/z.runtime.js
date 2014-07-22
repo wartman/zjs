@@ -1,11 +1,11 @@
 /*!
- * zjs 2.0.0
- *
- * Copyright 2014
- * Released under the MIT license
- *
- * Date: 2014-07-21T17:10Z
- */
+  zjs 2.0.0
+
+  Copyright 2014
+  Released under the MIT license
+
+  Date: 2014-07-22T16:02Z
+*/
 
 (function (factory) {
   if ( typeof module === "object" && typeof module.exports === "object" ) {

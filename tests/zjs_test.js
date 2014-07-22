@@ -91,43 +91,41 @@ describe('z', function () {
         z.module('tests.load.defined.target');
         z.env.modules.tests.load.defined.target = 'target';
         z.loader.load('tests.load.defined.target', function (err) {
-          if (err) {
-            throw err;
-            done();
-          } else {
-            expect(z.env.modules.tests.load.defined.target).to.equal('target');
-            done();
-          }
+          expect(z.env.modules.tests.load.defined.target).to.equal('target');
+          done();
         })
       });
 
       it('loads an external script', function (done) {
         z.loader.load('fixtures.Single', function (err) {
-          if (err) {
-            throw err;
-            done();
-          } else {
-            expect(z.env.modules.fixtures.Single).to.equal('one');
-            done();
-          }
+          expect(z.env.modules.fixtures.Single).to.equal('one');
+          done();
         });
       });
 
       it('loads many external scripts', function (done) {
-        z.loader.load('fixtures.main', function (err) {
-          if (err) {
-            throw err;
-            done();
-          } else {
-            var stress = z.imports('fixtures.stress');
-            expect(stress.one.One).to.be.equal('one');
-            expect(stress.one.Foo).to.be.equal('Foo');
-            expect(stress.two.Two).to.be.equal('two');
-            expect(stress.three.Three).to.be.equal('three');
-            done();
-          }
+        z.loader.load('fixtures.main', function () {
+          var stress = z.imports('fixtures.stress');
+          expect(stress.one.One).to.be.equal('one');
+          expect(stress.one.Foo).to.be.equal('Foo');
+          expect(stress.two.Two).to.be.equal('two');
+          expect(stress.three.Three).to.be.equal('three');
+          done();
         })
       });
+
+      it('catches syntax errors', function (done) {
+        var mochaHandler = window.onerror;
+
+        window.onerror = function (errorMsg, url, lineNumber) {
+          expect(errorMsg).to.have.string('Evaluating [fixtures.errors.syntax] on line ' + lineNumber);
+          window.onerror = mochaHandler;
+          done();
+          return true;
+        };
+
+        z.loader.load('fixtures.errors.syntax');
+      })
 
     });
 
@@ -204,22 +202,22 @@ describe('z', function () {
       });
     });
 
-    describe('#config', function () {
+  });
 
-      it('loads a config file', function (done) {
-        z.startConfig('fixtures/start-config/config', function () {
-          expect(z.config('test')).to.equal('test');
-          expect(z.config('root')).to.equal('fixtures/start-config/');
-          expect(z.config('main')).to.equal('mainfoo');
-          expect(z.env.modules.main.foo).to.equal('Configured');
-          expect(z.env.modules.foo.bin.bar.mapped).to.equal('mapped');
-          expect(z.env.modules.startconfigfoo.foo).to.equal('startconfigfoo');
-          done();
-        });
+  describe('#startConfig', function () {
+
+    it('loads a config file', function (done) {
+      z.startConfig('fixtures/start-config/config', function () {
+        expect(z.config('test')).to.equal('test');
+        expect(z.config('root')).to.equal('fixtures/start-config/');
+        expect(z.config('main')).to.equal('mainfoo');
+        expect(z.env.modules.main.foo).to.equal('Configured');
+        expect(z.env.modules.foo.bin.bar.mapped).to.equal('mapped');
+        expect(z.env.modules.startconfigfoo.foo).to.equal('startconfigfoo');
+        done();
       });
-
     });
 
-  })
+  }); 
 
 });
