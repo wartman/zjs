@@ -174,22 +174,27 @@ z.imports = function (/*...*/) {
 // compiling. Here's an example:
 //
 //    z.plugin('foo.bin', {
-//      handler: function (req, next, error) {
+//      handler: function (mod, next) {
 //        var self = this;
-//        z.loader.load(req, function (raw) {
+//        z.loader.load(mod.src, function (err, data) {
 //          self.parse(raw);
 //          next();
 //        }, error);
 //      },
-//      parse: function (raw) {
+//      parse: function (raw, mod) {
 //        // code
 //        return raw;
 //      },
-//      build: function (raw, compiler) {
-//        compiler.push(this.parse(raw));
+//      build: function (mod, next) {
+//        z.build.fs.readFile(mod.src, 'utf-8', function (err, raw) {
+//          z.build.modules[mod.name] = {
+//            data: raw
+//          };
+//          next();
+//        });
 //      }
 //    });
-// 
+
 z.plugin = function (name, options) {
   _plugins[name] = options;
 };
