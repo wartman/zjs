@@ -175,7 +175,7 @@ API
   z.plugin('foo.bin', {
     handler: function (mod, next) {
       var self = this;
-      z.loader.load(mod.src, function (err, data) {
+      z.loader.load(mod.src, function (err, raw) {
         self.parse(raw);
         next();
       }, error);
