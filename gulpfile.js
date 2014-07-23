@@ -12,7 +12,10 @@ gulp.task('build', function() {
       './src/helpers.js',
       './src/wait.js',
       './src/api.js',
+      './src/plugins.js',
+      './src/parser.js',
       './src/loader.js',
+      './src/start.js',
       './src/outro.js',
     ])
     .pipe(concat('z.js'))
@@ -23,7 +26,7 @@ gulp.task('build', function() {
   gulp.src([
       './src/intro.js',
       './src/api.js',
-      './src/outro-runtime.js',
+      './src/outro.js',
     ])
     .pipe(concat('z.runtime.js'))
     .pipe(replace(/@VERSION/g, meta.version))

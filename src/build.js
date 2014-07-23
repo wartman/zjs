@@ -1,4 +1,4 @@
-// z.Build
+// z.build
 // -------
 
 require('../dist/z');
@@ -6,8 +6,8 @@ require('../dist/z');
 var fs = require('fs');
 var UglifyJS = require("uglify-js");
 
-var Build = z.Build = function (options) {
-	if (!(this instanceof z.Build)) return new z.Build(options);
+var Build = function (options) {
+	if (!(this instanceof z.build)) return new z.build(options);
 
 	options = options || {};
 
@@ -19,62 +19,20 @@ var Build = z.Build = function (options) {
 	this._raw = {};
 	this._main = options.main || 'main';
 	this._dest = options.dest;
-  this._namespaces = [];
-	this._compiled = '';
+	this._compiled = [];
 	this._header = '';
 	this._dir = (options.dir || process.cwd()) + '/';
   this._onDone = function () {};
 	this.options = options;
 
+  this.modules = {};
+  this.fs = fs;
+
 	// Overwrite default loaders.
 	var builder = this;
   var rootpath = builder._dir + z.config('root');
   z.config('root', rootpath);
-
-	z.loader.load = function (path, next) {
-    next = next || function (err) { if (err) throw err; };
-
-    var mod = this.parseModulePath(path);
-    var self = this;
-
-    // Add root-level namespaces.
-    var ns = mod.name.substring(0, mod.name.indexOf('.'));
-    if (builder._namespaces.indexOf(ns) < 0) {
-      builder._namespaces.push(ns);
-    }
-
-    fs.readFile(mod.src, 'utf-8', function (err, data) {
-      if (err) {
-        throw err;
-        error(err);
-        return;
-      }
-      var deps = self.parse(data);
-
-      builder._raw[mod.name] = {
-        data: self.wrap(data),
-        deps: deps
-      };
-      builder.extractLicenses(data);
-      if (deps.length) {
-        var remaining = deps.length;
-        deps.forEach(function (dep) {
-          z.loader.load(dep, function (err) {
-            remaining -= 1;
-            if (err) {
-              next(err);
-              return;
-            }
-            if (remaining <= 0) {
-              next();
-            }
-          });
-        });
-      } else {
-        next();
-      }
-    });
-	};
+  z.config('building', true);
 
 	// Start gathering scripts
 	this.start(this._main);
@@ -147,25 +105,28 @@ Build.prototype.extractLicenses = function (file) {
 
 // Compile the project.
 Build.prototype.compile = function () {
-	var modules = this._raw;
+	var modules = this.modules;
 	var moduleList = {};
-	var sortedPackages = [];
+	var sortedModules = [];
 	var self = this;
 
 	for (var mod in modules) {
 		var list = [];
 		var raw = modules[mod].deps;
-		raw.forEach(function (item) {
-			list.push(item);
-		})
+    if (raw) {
+  		raw.forEach(function (item) {
+  			list.push(item);
+  		});
+    }
 		moduleList[mod] = list;
 	}
 
-	sortedPackages = this.sort(moduleList, this._main);
+	sortedModules = this.sort(moduleList, this._main);
 
   // Add compiled modules in order of dependencies.
-	sortedPackages.forEach(function (name) {
-		self._compiled += self._raw[name].data;
+	sortedModules.forEach(function (name) {
+    mod = z.loader.parseModulePath(name);
+		self._compiled.push(modules[mod.name].data);
 	});
 
 	// Add the minimal implementation of z unless otherwise requested.
@@ -176,26 +137,23 @@ Build.prototype.compile = function () {
 	}
 
 	// Put it together.
-	this._compiled = "\n;(function (root) {\n" 
-    + lib
-    + '\n\n/* config */\n' + this._config + ';\n'
-    + "\n\n/* modules */\n" + this._compiled 
-    + "\n})(this);"
+  output = "\n;(function (root) {\n"
+    + lib + "\n"
+    + '\n/* config */\n' + this._config + ';\n'
+    + "\n/* modules */\n" + this._compiled.join('\n')
+    + "})(this);"
 
 	if(this.options.optimize){
-    this._compiled = UglifyJS.minify(this._compiled, {fromString: true}).code;
+    output = UglifyJS.minify(output, {fromString: true}).code;
     // Add license headers.
-    this._compiled = this._header + this._compiled;
+    output = this._header + output;
   }
 
-  if(this._dest){
-    fs.writeFileSync(this._dir + this._dest, this._compiled);
-    this._onDone();
-  } else {
-    this._onDone();
-  }
+  if(this._dest)
+    fs.writeFileSync(this._dir + this._dest, output);
 
-  return this._compiled;
+  this._onDone(null, output);
+  return output;
 };
 
 // Topological sorter for dependencites. Sorts modules in order
@@ -207,7 +165,7 @@ Build.prototype.sort = function (dependencies, root) {
   var ready = [];
   var output = [];
 
-  // Build the graph
+  // build the graph
   function add (element) {
     nodeCount += 1;
     nodes[element] = { needs:[], neededBy:[], name: element };
@@ -248,3 +206,10 @@ Build.prototype.sort = function (dependencies, root) {
 
   return output;
 }
+
+Build.newInstance = function (options) {
+  z.build = new Build(options);
+  z.build.newInstance = Build.newInstance;
+};
+
+z.build = Build;

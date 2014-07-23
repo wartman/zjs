@@ -4,7 +4,7 @@
   Copyright 2014
   Released under the MIT license
 
-  Date: 2014-07-22T16:30Z
+  Date: 2014-07-23T17:49Z
 */
 
 (function (factory) {
@@ -52,9 +52,16 @@ var z = root.z = {};
 
 z.VERSION = "2.0.0";
 
-z.env = {};
+// Module registry
+var _modules = {};
 
-// Z's config (private: use z.config to get values)
+// Namespace registry
+var _namespaces = {};
+
+// Plugin registry
+var _plugins = {};
+
+// Default config options.
 var _config = {
   debug: false,
   root: '',
@@ -69,15 +76,20 @@ var _config = {
 // at once, pass an object to `key`. To get an option without
 // changing its value, simply omit the `value` arg.
 z.config = function (key, value) {
+  if (arguments.length === 0)
+    return _config;
   if ('object' === typeof key) {
     for (var item in key) {
       z.config(item, key[item]);
     }
-    return;
+    return _config;
   }
   if (typeof value !== 'undefined') {
-    if ('map' === key) return z.map(value);
-    if ('namespaces' === key) return z.mapNamespace(value);
+    if ('map' === key) {
+      each(value, function (vals, type) {
+        z.map(vals, null, {type: type});
+      });
+    }
     _config[key] = value;
   }
   return ('undefined' !== typeof _config[key]) 
@@ -89,37 +101,27 @@ z.config = function (key, value) {
 //    z.map('Foo', 'libs/foo.min.js');
 //    z.imports('Foo'); // -> Imports from libs/foo.min.js
 //
-// Note that this method will automatically work with any 
-// script that exports a global var, so long as `mod` is 
-// equal to the global you want. Here is an example for jQuery:
-//
-//    z.map('$', 'libs/jQuery.min.js')
-//
-z.map = function (mod, path) {
+z.map = function (mod, path, options) {
+  options = options || {};
   if ('object' === typeof mod) {
     for (var key in mod) {
-      z.map(key, mod[key]);
+      z.map(key, mod[key], options);
     }
     return;
   }
-  _config.maps.modules[mod] = path;
+  var type = options.type || 'modules';
+  _config.maps[type][mod] = path;
 };
 
 // Map a namespace to the given path.
-
+//
 //    z.mapNamespace('Foo.Bin', 'libs/FooBin');
 //    // The following import will now import 'lib/FooBin/Bax.js'
 //    // rather then 'Foo/Bin/Bax.js'
 //    z.imports('Foo.Bin.Bax');
-
+//
 z.mapNamespace = function (ns, path) {
-  if ('object' === typeof ns) {
-    for (var key in ns) {
-      z.mapNamespace(key, ns[key]);
-    }
-    return;
-  }
-  _config.maps.namespaces[ns] = path;
+  z.map(ns, path, {type: 'namespaces'});
 };
 
 // Creates a new module. This method creates an object based on
@@ -131,7 +133,7 @@ z.mapNamespace = function (ns, path) {
 //    app.foo.bar.Bin = function () { /* code */ };
 //
 z.module = function (name) {
-  var cur = z.env;
+  var cur = _modules;
   var parts = name.split('.');
   var ns = parts[0];
   z.namespace(ns);
@@ -147,19 +149,11 @@ z.module = function (name) {
 
 // Ensure a namespace exists.
 z.namespace = function (name) {
-  if (!_config.namespaces.hasOwnProperty(name))
-    _config.namespaces[name] = true;
-  if (!z.env.hasOwnProperty(name)) 
-    z.env[name] = {};
-  return z.env[name];
-};
-
-z.getNamespaces = function () {
-  return _config.namespaces;
-};
-
-z.getModules = function () {
-  return z.env;
+  if (!_namespaces.hasOwnProperty(name))
+    _namespaces[name] = true;
+  if (!_modules.hasOwnProperty(name)) 
+    _modules[name] = {};
+  return _modules[name];
 };
 
 // Import a module or modules. Imported modules are then available for the
@@ -181,7 +175,7 @@ z.getModules = function () {
 z.imports = function (/*...*/) {
   if (arguments.length === 1) {
     var name = arguments[0];
-    var cur = z.env;
+    var cur = _modules;
     var parts = name.split('.');
     for (var part; part = parts.shift(); ) {
       if(typeof cur[part] !== "undefined"){
@@ -192,5 +186,58 @@ z.imports = function (/*...*/) {
     }
     return cur;  
   }
+};
+
+// Register a plugin. Plugins can handle module loading, parsing and
+// compiling. Here's an example:
+//
+//    z.plugin('foo.bin', {
+//      handler: function (req, next, error) {
+//        var self = this;
+//        z.loader.load(req, function (raw) {
+//          self.parse(raw);
+//          next();
+//        }, error);
+//      },
+//      parse: function (raw) {
+//        // code
+//        return raw;
+//      },
+//      build: function (raw, compiler) {
+//        compiler.push(this.parse(raw));
+//      }
+//    });
+// 
+z.plugin = function (name, options) {
+  _plugins[name] = options;
+};
+
+// Get a plugin. If it isn't loaded, use z.loader to get it. If this is the zjs
+// runtime (and z.loader isn't available), this will throw an error.
+z.usePlugin = function (name, next) {
+  if (_plugins.hasOwnProperty(name)) {
+    next(_plugins[name]);
+  } else if (z.loader) {
+    mod = z.loader.parseModulePath(name);
+    z.loader.requestScript(mod.src, function () {
+      if (!_plugins.hasOwnProperty(name)) {
+        throw new Error('No plugin found: ' + name);
+        return;
+      }
+      z.usePlugin(name, next);
+    });
+  } else {
+    throw new Error('No plugin found: ' + name);
+  }
+};
+
+// Get all registered modules.
+z.getModules = function () {
+  return _modules;
+};
+
+// Get all registered namespaces.
+z.getNamespaces = function () {
+  return _namespaces;
 };
 }));

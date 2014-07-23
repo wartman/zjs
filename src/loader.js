@@ -1,11 +1,7 @@
 // z.loader
-// ----------
+// --------
 // The loader, as its name suggests, handles all importing
-// of scripts. In order to load modules correctly, the loader
-// uses AJAX to load the script, then investigates it for any
-// dependencies (registered with `z.imports`). The loader will 
-// create a `<script>` tag once all dependencies are loaded and 
-// insert the module there.
+// of scripts. 
 var loader = {};
 
 // A list of visited scripts, used to ensure that things are only
@@ -16,68 +12,6 @@ loader.visited = {};
 // provided.
 function _handleErr (err) {
   if (err) throw err;
-};
-
-// Load a module via AJAX. This method will also try to parse
-// the script and gather any aditional imports that are
-// defined there. `next` will be called when the module is ready,
-// NOT when the raw file is loaded. NodeJs callback conventions are
-// followed here, and, if an error occours, `next` will be called 
-// with an error as the first argument (or 'null' if all is well).
-// The second argument is the next callback in the current stack
-// (or `null` if we're at the end of the stack).
-//
-//    loader.load('app.foo', function (err, next) { /* code */ });
-//
-// If 'path' is an array, the loader will load each item in turn,
-// then fire 'next' when all items are complete.
-//
-//    loader.load(['app.foo', 'app.bar'], function (err, next) { /* code */ });
-//
-loader.load = function (path, next) {
-  next = next || _handleErr;
-
-  if (path instanceof Array) {
-    eachWait(path, function (item, next) {
-      loader.load(item, next);
-    })
-    .done(function (err) {
-      if (err) {
-        next(err);
-        return;
-      }
-      next();
-    });
-    return;
-  }
-
-  var mod = this.parseModulePath(path);
-  var self = this;
-
-  // If we can import this module, it's already been enabled.
-  if (mod.name && !!z.imports(mod.name)){
-    next();
-    return;
-  }
-
-  this.request(mod.src, function (err, raw) {
-    if (err) {
-      next(err);
-      return;
-    }
-    var deps = self.parse(raw);
-    if (deps.length) {
-      loader.load(deps, function (err) {
-        if (err) {
-          next(err);
-          return;
-        }
-        self.enable(raw, mod, next);
-      });
-    } else {
-      self.enable(raw, mod, next);
-    }
-  });
 };
 
 // Check if the passed item is a path
@@ -138,7 +72,12 @@ function _mapRequest (path) {
 // Make sure the module path is converted into a uri.
 loader.parseModulePath = function (req) {
   var root = z.config('root');
-  var path = {name:'', src:''};
+  var path = {name:'', src:'', plugin: '__module'};
+  var parts = req.split(':');
+  if (parts.length > 1) {
+    path.plugin = parts[0].trim();
+    req = parts[1].trim();
+  }
   if (_isPath(req)) {
     path.name = _pathToName(req, {stripExt:true});
     path.src = req;
@@ -152,106 +91,39 @@ loader.parseModulePath = function (req) {
   return path;
 };
 
-// Load using NodeJs
-loader.require = function (src, next) {
-  require(src);
-  next();
-};
+loader.load = function (path, next) {
+  next = next || _handleErr;
 
-// Send an AJAX request.
-loader.request = function (src, next) {
-  var visited = this.visited;
-  if(visited.hasOwnProperty(src)){
-    visited[src].done(next);
+  if (path instanceof Array) {
+    eachWait(path, function (item, next) {
+      loader.load(item, next);
+    })
+    .done(function (err) {
+      if (err) {
+        next(err);
+        return;
+      }
+      next();
+    });
     return;
   }
-  visited[src] = new Wait();
-  visited[src].done(next);
 
-  if(root.XMLHttpRequest){
-    var request = new XMLHttpRequest();
-  } else { // code for IE6, IE5
-    var request = new ActiveXObject("Microsoft.XMLHTTP");
-  }
-
-  request.onreadystatechange = function(){
-    if(4 === this.readyState){
-      if(200 === this.status){
-        visited[src].resolve(this.responseText);
-      } else {
-        visited[src].reject('AJAX Error: Could not load [' + src + '], status code: ' + this.status);
-      }
-    }
-  }
-
-  request.open('GET', src, true);
-  request.send();
-}
-
-// RegExp to find an import.
-var _importsMatch = /z\.imports\(([\s\S\r\n]+?)\)/g;
-
-// RegExp to find the module name
-var _moduleNameMatch = /z\.module\(([\s\S]+?)\)/g
-
-// RegExp to cleanup module paths
-var _cleanModulePath = /[\r|\n|'|"|\s]/g;
-
-// Ensures that top-level (or root) namespaces are defined.
-// For example, in `app.foo.bar` the root namespace is `app`.
-// If a module-name has only one segment, like `main`, then `main`
-// is the root.
-function _ensureRootNamespace (name) {
-  var ns = (name.indexOf('.') > 0) 
-    ? name.substring(0, name.indexOf('.'))
-    : name;
-  // z.namespace(ns);
-  var namespaces = z.getNamespaces();
-  if (!namespaces.hasOwnProperty(ns)) {
-    namespaces[ns] = true;
-  }
-};
-
-// Parse a module loaded by AJAX, using regular expressions to match
-// any `z.imports` calls in the provided module. Any matches will be
-// returned in an array; if no imports are found, then an empty array
-// will be returned.
-loader.parse = function (rawModule) {
+  var mod = this.parseModulePath(path);
   var self = this;
-  var deps = [];
-  var nsList = [];
-  rawModule.replace(_importsMatch, function (matches, importList) {
-    var imports = importList.split(',');
-    each(imports, function (item) {
-      item = item.replace(_cleanModulePath, "");
-      _ensureRootNamespace(item)
-      deps.push(item);
-    });
-  });
-  rawModule.replace(_moduleNameMatch, function (matches, modName) {
-    var item = modName.replace(_cleanModulePath, "") 
-    z.module(item);
-    _ensureRootNamespace(item);
-  })
-  return deps;
-};
 
-// Wrap a module in a function to keep it from messing with globals. This
-// will also provide it with any required namespaces.
-loader.wrap = function (rawModule) {
-  var nsVals = [];
-  var nsList = [];
-  var compiled = '';
-  var namespaces = z.getNamespaces();
-  each(namespaces, function (val, ns) {
-    nsVals.push("z.namespace('" + ns + "')");
-    nsList.push(ns);
-  });
-  nsVals.push('z');
-  nsList.push('z');
+  // If we can import this module, it's already been enabled.
+  if (mod.name && !!z.imports(mod.name)){
+    next();
+    return;
+  }
 
-  compiled = ";(function (" + nsList.join(', ') + ") {/* <- zjs runtime */ " + rawModule + "\n})(" + nsVals.join(', ') + ");\n";
-  return compiled;
+  z.usePlugin((mod.plugin || '__module'), function (plugin) {
+    if (z.config('building')) {
+      plugin.build(mod, next);
+    } else {
+      plugin.handler(mod, next);
+    }
+  });
 };
 
 // Create a new script node (without inserting it into the DOM).
@@ -319,20 +191,60 @@ function _addScript (mod, text, next) {
   next();
 };
 
-// Take a raw module string and place it into the DOM as a `<script>`.
-// This will only be run after any dependencies have been loaded first.
-loader.enable = function (rawModule, mod, next) {
-  next = next || _handleErr;
-  var compiled = this.wrap(rawModule);
-  _addScript(mod, compiled, next);
+// Send an AJAX request.
+loader.requestAJAX = function (src, next) {
+  var visited = this.visited;
+  if(visited.hasOwnProperty(src)){
+    visited[src].done(next);
+    return;
+  }
+  visited[src] = new Wait();
+  visited[src].done(next);
+
+  if(root.XMLHttpRequest){
+    var request = new XMLHttpRequest();
+  } else { // code for IE6, IE5
+    var request = new ActiveXObject("Microsoft.XMLHTTP");
+  }
+
+  request.onreadystatechange = function(){
+    if(4 === this.readyState){
+      if(200 === this.status){
+        visited[src].resolve(this.responseText);
+      } else {
+        visited[src].reject('AJAX Error: Could not load [' + src + '], status code: ' + this.status);
+      }
+    }
+  }
+
+  request.open('GET', src, true);
+  request.send();
 };
 
 // Load a script by placing it in the DOM
-loader.getScript = function (src, next) {
+loader.requestScript = function (src, next) {
+  var visited = this.visited;
+  if(visited.hasOwnProperty(src)){
+    visited[src].done(next);
+    return;
+  }
+
+  visited[src] = new Wait();
+  visited[src].done(next);
+
   var script = _newScript();
   script.src = src;
   script.async = true;
-  _insertScript(script, next);
+  _insertScript(script, function () {
+    visited[src].resolve();
+  });
+};
+
+// Take a raw module string and place it into the DOM as a `<script>`.
+// This will only be run after any dependencies have been loaded first.
+loader.enable = function (compiled, mod, next) {
+  next = next || _handleErr;
+  _addScript(mod, compiled, next);
 };
 
 z.loader = loader;

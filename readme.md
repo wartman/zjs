@@ -166,3 +166,58 @@ API
 
   This method is not available in `z.runtime.js` or compiled scripts.
 
+- z.__plugin__(*name*, *options*)
+
+  Register a plugin. Plugins can handle module loading, parsing and
+  compiling. Here's an example:
+
+  ```javascript
+  z.plugin('foo.bin', {
+    handler: function (req, next, error) {
+      var self = this;
+      z.loader.load(req, function (raw) {
+        self.parse(raw);
+        next();
+      }, error);
+    },
+    parse: function (raw) {
+      // code
+      return raw;
+    },
+    build: function (raw, compiler) {
+      compiler.push(this.parse(raw));
+    }
+  });
+  ```
+
+  Using plugins is simple: just write the plugin name, a colon, and the module
+  you want to load. For example:
+
+  ```javascript
+  z.plugin('txt:some/text/file.txt');
+  ```
+
+  Plugins can be automatically loaded from an external file. Just give the plugin
+  a module-path, then name the plugin the same thing:
+
+  ```javascript
+  // in a module file:
+  z.plugin('foo.bar:my.module');
+
+  // in my/module.js:
+  z.plugin('foo.bar', {
+    // code
+  });
+  ```
+
+  Note that maps will work for all plugin requests. You can even set up a map to
+  use a plugin:
+
+  ```
+  z.map('$', 'shim:bower_components/jquery/dist/jquery.min.js');
+  ```
+
+  `zjs` ships with a 'txt' plugin for loading files and a 'shim' plugin to load scripts
+  that export a global var.
+
+  This method is not available in `z.runtime.js` or compiled scripts.

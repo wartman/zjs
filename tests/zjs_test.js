@@ -9,13 +9,14 @@ describe('z', function () {
 
     it('defines a new namespace', function () {
       var mod = z.module('tests.module');
+      var modules = z.getModules();
       var namespaces = z.getNamespaces();
-      expect(z.env.tests).to.not.be.an('undefined');
-      expect(z.env.tests.module).to.be.an('object');
+      expect(modules.tests).to.not.be.an('undefined');
+      expect(modules.tests.module).to.be.an('object');
       expect(namespaces.tests).to.be.true;
       expect(mod).to.be.an('object');
       mod.foo = 'foo';
-      expect(z.env.tests.module.foo).to.equal('foo');
+      expect(modules.tests.module.foo).to.equal('foo');
     });
 
   });
@@ -25,8 +26,9 @@ describe('z', function () {
     it('ensures a namespace exists', function () {
       z.namespace('testsfoo');
       var namespaces = z.getNamespaces();
+      var modules = z.getModules();
       expect(namespaces.testsfoo).to.be.true;
-      expect(z.env.testsfoo).to.be.an('object');
+      expect(modules.testsfoo).to.be.an('object');
     });
 
   });
@@ -51,9 +53,44 @@ describe('z', function () {
 
   });
 
-  describe('#loader', function () {
+  describe('#plugin', function () {
+
+    it('registers a plugin', function (done) {
+      z.plugin('tests.plugin', {
+        handler: function (mod, next) {
+          var test = z.module(mod.name);
+          test.foo = 'foo';
+          next();
+        }
+      });
+      z.usePlugin('tests.plugin', function(plugin) {
+        plugin.handler({name:'tests.plugins.target'}, function () {
+          var modules = z.getModules();
+          expect(modules.tests.plugins.target.foo).to.equal('foo');
+          done();
+        });
+      });
+    });
+
+  });
+
+  describe('#usePlugin', function () {
+
+    it('loads an external plugin', function (done) {
+      z.usePlugin('fixtures.plugins.test', function(plugin) {
+        plugin.handler({name:'tests.external.plugins.target'}, function () {
+          var modules = z.getModules();
+          expect(modules.tests.external.plugins.target.foo).to.equal('foo');
+          done();
+        });
+      });
+    })
+
+  });
+
+  describe('#parser', function () {
     
-    describe('#parse', function () {
+    describe('#getDeps', function () {
 
       it('detects imports', function () {
         var mock = function () {
@@ -64,7 +101,7 @@ describe('z', function () {
             'foo.bax'
           );
         };
-        var deps = z.loader.parse(mock.toString());
+        var deps = z.parser.getDeps(mock.toString());
         expect(deps).to.deep.equal([
           'foo.bar',
           'foo.bin',
@@ -73,6 +110,10 @@ describe('z', function () {
       });
 
     });
+
+  });
+
+  describe('#loader', function () {
 
     describe('#parseModulePath', function () {
 
@@ -91,16 +132,18 @@ describe('z', function () {
 
       it('won\'t request a defined module.', function (done) {
         z.module('tests.load.defined.target');
-        z.env.tests.load.defined.target = 'target';
+        z.getModules().tests.load.defined.target = 'target';
         z.loader.load('tests.load.defined.target', function (err) {
-          expect(z.env.tests.load.defined.target).to.equal('target');
+          var modules = z.getModules();
+          expect(modules.tests.load.defined.target).to.equal('target');
           done();
         })
       });
 
       it('loads an external script', function (done) {
         z.loader.load('fixtures.Single', function (err) {
-          expect(z.env.fixtures.Single).to.equal('one');
+          var modules = z.getModules();
+          expect(modules.fixtures.Single).to.equal('one');
           done();
         });
       });
@@ -114,6 +157,22 @@ describe('z', function () {
           expect(stress.three.Three).to.be.equal('three');
           done();
         })
+      });
+
+      it('loads using the txt plugin', function (done) {
+        z.loader.load('txt:fixtures/file/txt.txt', function (err) {
+          if (err) throw err;
+          var modules = z.getModules();
+          expect(modules.fixtures.file.txt).to.equal('loaded');
+          done();
+        });
+      });
+
+      it('loads using the shim plugin', function (done) {
+        z.loader.load('shim:fixtures.global', function () {
+          expect(window.globalItem).to.equal('globalItem');
+          done();
+        });
       });
 
       it('catches syntax errors', function (done) {
@@ -159,14 +218,18 @@ describe('z', function () {
 
     it('passes things in the "map" key to z.map', function () {
     	z.config('map', {
-    		'FooBix': 'some/path/to/file.js'
+        modules: {
+    		  'FooBix': 'some/path/to/file.js'
+        }
     	});
 			expect(z.loader.parseModulePath('FooBix').src).to.equal('some/path/to/file.js');
     });
 
     it('passes things in the "namespaces" key to z.map.namespaces', function () {
-    	z.config('namespaces', {
-    		'Froo': 'some/path/to/Froo'
+    	z.config('map', {
+        namespaces: {
+    		  'Froo': 'some/path/to/Froo'
+        }
     	});
 			expect(z.loader.parseModulePath('Froo.Blix').src).to.equal('some/path/to/Froo/Blix.js');
     });
@@ -196,8 +259,9 @@ describe('z', function () {
 
     it('loads the main module', function (done) {
       z.start('fixtures/start/main', function () {
-        expect(z.env.main.foo).to.equal('Started');
-        expect(z.env.startfoo.foo).to.equal('startfoo');
+        var modules = z.getModules();
+        expect(modules.main.foo).to.equal('Started');
+        expect(modules.startfoo.foo).to.equal('startfoo');
         expect(z.config('root')).to.equal('fixtures/start/');
         expect(z.config('main')).to.equal('main');
         done();
@@ -210,12 +274,13 @@ describe('z', function () {
 
     it('loads a config file', function (done) {
       z.startConfig('fixtures/start-config/config', function () {
+        var modules = z.getModules();
         expect(z.config('test')).to.equal('test');
         expect(z.config('root')).to.equal('fixtures/start-config/');
         expect(z.config('main')).to.equal('mainfoo');
-        expect(z.env.main.foo).to.equal('Configured');
-        expect(z.env.foo.bin.bar.mapped).to.equal('mapped');
-        expect(z.env.startconfigfoo.foo).to.equal('startconfigfoo');
+        expect(modules.main.foo).to.equal('Configured');
+        expect(modules.foo.bin.bar.mapped).to.equal('mapped');
+        expect(modules.startconfigfoo.foo).to.equal('startconfigfoo');
         done();
       });
     });

@@ -17,7 +17,7 @@ var fs = require('fs');
 
 // });
 
-describe('z.Build', function () {
+describe('z.build', function () {
 
   beforeEach(function () {
     z.env = {
@@ -28,11 +28,11 @@ describe('z.Build', function () {
   });
 
   it('compiles modules', function (done) {
-    var build = z.Build({
+    z.build.newInstance({
       main: 'tests/fixtures/config.js',
       dest: 'tests/tmp/app.js'
     });
-    build.done(function () {
+    z.build.done(function () {
       var actual = fs.readFileSync(__dirname + "/tmp/app.js", 'utf-8');
       var module = Function('', actual);
 

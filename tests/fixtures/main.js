@@ -7,7 +7,8 @@ z.module('fixtures.main');
 z.imports(
   'fixtures.stress.one',
   'fixtures.stress.two',
-  'fixtures.stress.three'
+  'fixtures.stress.three',
+  'txt:fixtures/file/txt.txt'
 );
 
 fixtures.main.run = function () {
