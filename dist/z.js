@@ -17,7 +17,7 @@
   Copyright 2014
   Released under the MIT license
 
-  Date: 2014-07-28T17:45Z
+  Date: 2014-07-28T19:51Z
 */
 
 (function (factory) {
@@ -29,6 +29,7 @@
     factory(window);
   }
 }( function (root, undefined) {
+
 // Helpers
 // -------
 
@@ -118,6 +119,7 @@ function eachWait (obj, callback, context) {
 function slashify (str) {
   return (str.lastIndexOf('/') !== (str.length - 1))? str + '/' : str;
 }
+
 // Wait
 // ----
 // This is a very stripped-down, promise-like class.
@@ -211,6 +213,7 @@ Wait.prototype._dispatch = function (fns, err, value, ctx) {
   var self = this;
   each(fns, function(fn){ fn.call(ctx, err, self._value); });
 };
+
 // zjs
 // ===
 // zjs' api is intentionally minimal, with the intent to impact
@@ -389,6 +392,7 @@ z.getModules = function () {
 z.getNamespaces = function () {
   return _namespaces;
 };
+
 // z.plugin
 // --------
 
@@ -542,6 +546,7 @@ z.plugin('txt', {
     });
   }
 });
+
 // z.parser
 // --------
 // The parser handles module dependencies and the like.
@@ -616,6 +621,7 @@ parser.wrap = function (rawModule) {
 };
 
 z.parser = parser;
+
 // z.Loader
 // --------
 // The Loader, as its name suggests, handles all importing
@@ -879,6 +885,7 @@ Loader.prototype.enable = function (compiled, mod, next) {
 };
 
 z.Loader = Loader;
+
 // Start a script by loading a main file. Please note that,
 // due to the way zjs loads scripts, z.config won't work
 // if you place it in your main module. Use `z.start.config`
@@ -939,4 +946,5 @@ function _autostart() {
 
 if (typeof document !== 'undefined')
   _autostart();
+
 }));

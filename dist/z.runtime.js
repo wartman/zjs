@@ -17,7 +17,7 @@
   Copyright 2014
   Released under the MIT license
 
-  Date: 2014-07-28T17:45Z
+  Date: 2014-07-28T19:51Z
 */
 
 (function (factory) {
@@ -29,6 +29,7 @@
     factory(window);
   }
 }( function (root, undefined) {
+
 // zjs
 // ===
 // zjs' api is intentionally minimal, with the intent to impact
@@ -207,4 +208,5 @@ z.getModules = function () {
 z.getNamespaces = function () {
   return _namespaces;
 };
+
 }));
