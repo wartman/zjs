@@ -34,7 +34,8 @@ program
     options.dest = dest;
 
     // Compile away!
-    z.build.newInstance(options);
+    var build = z.Build.getInstance(options);
+    build.start();
 
   })
   .on('--help', function(){

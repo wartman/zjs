@@ -1,12 +1,26 @@
-// z.loader
+// z.Loader
 // --------
-// The loader, as its name suggests, handles all importing
+// The Loader, as its name suggests, handles all importing
 // of scripts. 
-var loader = {};
+var Loader = function (options) {
+  options = options || {};
+  this.visited = {};
+  this.options = defaults({
+    // ???
+  }, options);
+};
 
-// A list of visited scripts, used to ensure that things are only
-// requested once.
-loader.visited = {};
+// Used with 'getInstance()'
+var _loaderInstance = null;
+
+// Get a singleton instance of z.Loader. If this
+// is the first time `getInstance` is called, the
+// options arg will be passed to z.Loader's constructor.
+Loader.getInstance = function (options) {
+  if (!_loaderInstance)
+    _loaderInstance = new Loader(options);
+  return _loaderInstance;
+}
 
 // A simple error handler to use if a callback is not
 // provided.
@@ -15,7 +29,6 @@ function _handleErr (err) {
 };
 
 // Check if the passed item is a path
-// @private
 function _isPath (obj) {
   var result = false;
   result = obj.indexOf('/') >= 0;
@@ -25,7 +38,6 @@ function _isPath (obj) {
 };
 
 // Convert a path into an object name
-// @private
 function _pathToName (path, options) {
   options = options || {};
   if (_isPath(path)
@@ -70,7 +82,7 @@ function _mapRequest (path) {
 };
 
 // Make sure the module path is converted into a uri.
-loader.parseModulePath = function (req) {
+Loader.prototype.parseModulePath = function (req) {
   var root = z.config('root');
   var path = {name:'', src:'', plugin: '__module'};
   var parts = req.split(':');
@@ -91,12 +103,13 @@ loader.parseModulePath = function (req) {
   return path;
 };
 
-loader.load = function (path, next) {
+Loader.prototype.load = function (path, next) {
+  var self = this;
   next = next || _handleErr;
 
   if (path instanceof Array) {
     eachWait(path, function (item, next) {
-      loader.load(item, next);
+      self.load(item, next);
     })
     .done(function (err) {
       if (err) {
@@ -192,7 +205,7 @@ function _addScript (mod, text, next) {
 };
 
 // Send an AJAX request.
-loader.requestAJAX = function (src, next) {
+Loader.prototype.requestAJAX = function (src, next) {
   var visited = this.visited;
   if(visited.hasOwnProperty(src)){
     visited[src].done(next);
@@ -222,7 +235,7 @@ loader.requestAJAX = function (src, next) {
 };
 
 // Load a script by placing it in the DOM
-loader.requestScript = function (src, next) {
+Loader.prototype.requestScript = function (src, next) {
   var visited = this.visited;
   if(visited.hasOwnProperty(src)){
     visited[src].done(next);
@@ -242,9 +255,9 @@ loader.requestScript = function (src, next) {
 
 // Take a raw module string and place it into the DOM as a `<script>`.
 // This will only be run after any dependencies have been loaded first.
-loader.enable = function (compiled, mod, next) {
+Loader.prototype.enable = function (compiled, mod, next) {
   next = next || _handleErr;
   _addScript(mod, compiled, next);
 };
 
-z.loader = loader;
+z.Loader = Loader;

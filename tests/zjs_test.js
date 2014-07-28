@@ -113,15 +113,16 @@ describe('z', function () {
 
   });
 
-  describe('#loader', function () {
+  describe('#Loader', function () {
 
     describe('#parseModulePath', function () {
 
       it('parses into name and src', function () {
-        var mod = z.loader.parseModulePath('foo.bin.bar');
+        var loader = z.Loader.getInstance();
+        var mod = loader.parseModulePath('foo.bin.bar');
         expect(mod.src).to.equal('foo/bin/bar.js');
         expect(mod.name).to.equal('foo.bin.bar');
-        var mod = z.loader.parseModulePath('foo/bin/bar.js');
+        var mod = loader.parseModulePath('foo/bin/bar.js');
         expect(mod.src).to.equal('foo/bin/bar.js');
         expect(mod.name).to.equal('foo.bin.bar')
       });
@@ -131,9 +132,10 @@ describe('z', function () {
     describe('#load', function () {
 
       it('won\'t request a defined module.', function (done) {
+        var loader = z.Loader.getInstance();
         z.module('tests.load.defined.target');
         z.getModules().tests.load.defined.target = 'target';
-        z.loader.load('tests.load.defined.target', function (err) {
+        loader.load('tests.load.defined.target', function (err) {
           var modules = z.getModules();
           expect(modules.tests.load.defined.target).to.equal('target');
           done();
@@ -141,7 +143,8 @@ describe('z', function () {
       });
 
       it('loads an external script', function (done) {
-        z.loader.load('fixtures.Single', function (err) {
+        var loader = z.Loader.getInstance();
+        loader.load('fixtures.Single', function (err) {
           var modules = z.getModules();
           expect(modules.fixtures.Single).to.equal('one');
           done();
@@ -149,7 +152,8 @@ describe('z', function () {
       });
 
       it('loads many external scripts', function (done) {
-        z.loader.load('fixtures.main', function () {
+        var loader = z.Loader.getInstance();
+        loader.load('fixtures.main', function () {
           var stress = z.imports('fixtures.stress');
           expect(stress.one.One).to.be.equal('one');
           expect(stress.one.Foo).to.be.equal('Foo');
@@ -160,7 +164,8 @@ describe('z', function () {
       });
 
       it('loads using the txt plugin', function (done) {
-        z.loader.load('txt:fixtures/file/txt.txt', function (err) {
+        var loader = z.Loader.getInstance();
+        loader.load('txt:fixtures/file/txt.txt', function (err) {
           if (err) throw err;
           var modules = z.getModules();
           expect(modules.fixtures.file.txt).to.equal('loaded');
@@ -169,7 +174,8 @@ describe('z', function () {
       });
 
       it('loads using the shim plugin', function (done) {
-        z.loader.load('shim:fixtures.global', function () {
+        var loader = z.Loader.getInstance();
+        loader.load('shim:fixtures.global', function () {
           expect(window.globalItem).to.equal('globalItem');
           done();
         });
@@ -177,6 +183,7 @@ describe('z', function () {
 
       it('catches syntax errors', function (done) {
         var mochaHandler = window.onerror;
+        var loader = z.Loader.getInstance();
 
         window.onerror = function (errorMsg, url, lineNumber) {
           expect(errorMsg).to.have.string('Evaluating [fixtures.errors.syntax] on line ' + lineNumber);
@@ -185,7 +192,7 @@ describe('z', function () {
           return true;
         };
 
-        z.loader.load('fixtures.errors.syntax');
+        loader.load('fixtures.errors.syntax');
       });
 
     });
@@ -217,21 +224,23 @@ describe('z', function () {
     });
 
     it('passes things in the "map" key to z.map', function () {
+      var loader = z.Loader.getInstance();
     	z.config('map', {
         modules: {
     		  'FooBix': 'some/path/to/file.js'
         }
     	});
-			expect(z.loader.parseModulePath('FooBix').src).to.equal('some/path/to/file.js');
+			expect(loader.parseModulePath('FooBix').src).to.equal('some/path/to/file.js');
     });
 
     it('passes things in the "namespaces" key to z.map.namespaces', function () {
+      var loader = z.Loader.getInstance();
     	z.config('map', {
         namespaces: {
     		  'Froo': 'some/path/to/Froo'
         }
     	});
-			expect(z.loader.parseModulePath('Froo.Blix').src).to.equal('some/path/to/Froo/Blix.js');
+			expect(loader.parseModulePath('Froo.Blix').src).to.equal('some/path/to/Froo/Blix.js');
     });
 
   });
@@ -239,18 +248,20 @@ describe('z', function () {
 	describe('#map', function () {
 
 		it('maps a single item', function () {
+      var loader = z.Loader.getInstance();
 			z.config('root', '');
 			z.map('Item', 'MyLib.Item');
-			expect(z.loader.parseModulePath('Item').src).to.equal('MyLib/Item.js');
+			expect(loader.parseModulePath('Item').src).to.equal('MyLib/Item.js');
 			z.map('ItemTwo', 'MyLib/ItemTwo.js');
-			expect(z.loader.parseModulePath('ItemTwo').src).to.equal('MyLib/ItemTwo.js');
+			expect(loader.parseModulePath('ItemTwo').src).to.equal('MyLib/ItemTwo.js');
 		});
 
 		it('maps namespaces', function () {
+      var loader = z.Loader.getInstance();
 			z.config('root', '');
 			z.mapNamespace('Foo.Bar', 'libs/FooBar/');
-			expect(z.loader.parseModulePath('Foo.Bar.Bin').src).to.equal('libs/FooBar/Bin.js');
-			expect(z.loader.parseModulePath('Foo.Bar.Bax.Bin').src).to.equal('libs/FooBar/Bax/Bin.js');
+			expect(loader.parseModulePath('Foo.Bar.Bin').src).to.equal('libs/FooBar/Bin.js');
+			expect(loader.parseModulePath('Foo.Bar.Bax.Bin').src).to.equal('libs/FooBar/Bax/Bin.js');
 		});
 
 	});

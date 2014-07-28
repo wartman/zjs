@@ -10,7 +10,8 @@ z.start = function (mainFile, done) {
   var main = mainFile.substring(lastSegment);
   z.config('root', root);
   z.config('main', main);
-  z.loader.load(main, done);
+  var loader = z.Loader.getInstance();
+  loader.load(main, done);
 };
 
 // Start a script by loading a config file. At the very
@@ -31,10 +32,11 @@ z.start = function (mainFile, done) {
 // By convention, this file is nammed 'config.js', but you can
 // call it whatever you'd like.
 z.startConfig = function (configFile, done) {
+  var loader = z.Loader.getInstance();
   configFile = configFile + '.js';
-  z.loader.requestScript(configFile, function () {
+  loader.requestScript(configFile, function () {
     if (z.config('main'))
-      z.loader.load(z.config('main'), done);
+      loader.load(z.config('main'), done);
   });
 };
 

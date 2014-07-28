@@ -42,6 +42,15 @@ function each (obj, callback, context) {
   return obj;
 }
 
+function defaults (obj, source) {
+  if (source) {
+    for (var prop in source) {
+      if (obj[prop] === void 0) obj[prop] = source[prop];
+    }
+  }
+  return obj;
+};
+
 // Run through each item in an array, then resolve a Wait
 // once all items have been iterated through.
 //

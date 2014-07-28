@@ -1,4 +1,4 @@
-// z.build
+// z.Build
 // -------
 
 require('../dist/z');
@@ -7,8 +7,6 @@ var fs = require('fs');
 var UglifyJS = require("uglify-js");
 
 var Build = function (options) {
-	if (!(this instanceof z.build)) return new z.build(options);
-
 	options = options || {};
 
 	// Setup.
@@ -33,14 +31,20 @@ var Build = function (options) {
   var rootpath = builder._dir + z.config('root');
   z.config('root', rootpath);
   z.config('building', true);
+};
 
-	// Start gathering scripts
-	this.start(this._main);
+var _buildInstance = null;
+
+Build.getInstance = function (options) {
+  if (!_buildInstance) 
+    _buildInstance = new Build(options);
+  return _buildInstance;
 };
 
 // Start compiling.
-Build.prototype.start = function() {
+Build.prototype.start = function () {
 	var self = this;
+  var loader = z.Loader.getInstance();
 
   fs.readFile(this._main, 'utf-8', function (err, data) {
 
@@ -77,7 +81,7 @@ Build.prototype.start = function() {
 
     }
 
-    z.loader.load(self._main, function (err) {
+    loader.load(self._main, function (err) {
       if (err) 
         throw err;
       else
@@ -85,6 +89,8 @@ Build.prototype.start = function() {
     });
 
   });
+
+  return this;
 };
 
 // A callback to fire when everything is ready.
@@ -109,6 +115,7 @@ Build.prototype.compile = function () {
 	var moduleList = {};
 	var sortedModules = [];
 	var self = this;
+  var loader = z.Loader.getInstance();
 
 	for (var mod in modules) {
 		var list = [];
@@ -125,7 +132,7 @@ Build.prototype.compile = function () {
 
   // Add compiled modules in order of dependencies.
 	sortedModules.forEach(function (name) {
-    mod = z.loader.parseModulePath(name);
+    mod = loader.parseModulePath(name);
 		self._compiled.push(modules[mod.name].data);
 	});
 
@@ -205,11 +212,6 @@ Build.prototype.sort = function (dependencies, root) {
   }
 
   return output;
-}
-
-Build.newInstance = function (options) {
-  z.build = new Build(options);
-  z.build.newInstance = Build.newInstance;
 };
 
-z.build = Build;
+z.Build = Build;

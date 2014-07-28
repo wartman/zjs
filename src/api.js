@@ -40,9 +40,6 @@ var _modules = {};
 // Namespace registry
 var _namespaces = {};
 
-// Plugin registry
-var _plugins = {};
-
 // Default config options.
 var _config = {
   debug: false,
@@ -167,54 +164,6 @@ z.imports = function (/*...*/) {
       }
     }
     return cur;  
-  }
-};
-
-// Register a plugin. Plugins can handle module loading, parsing and
-// compiling. Here's an example:
-//
-//    z.plugin('foo.bin', {
-//      handler: function (mod, next) {
-//        var self = this;
-//        z.loader.load(mod.src, function (err, data) {
-//          self.parse(raw);
-//          next();
-//        }, error);
-//      },
-//      parse: function (raw, mod) {
-//        // code
-//        return raw;
-//      },
-//      build: function (mod, next) {
-//        z.build.fs.readFile(mod.src, 'utf-8', function (err, raw) {
-//          z.build.modules[mod.name] = {
-//            data: raw
-//          };
-//          next();
-//        });
-//      }
-//    });
-
-z.plugin = function (name, options) {
-  _plugins[name] = options;
-};
-
-// Get a plugin. If it isn't loaded, use z.loader to get it. If this is the zjs
-// runtime (and z.loader isn't available), this will throw an error.
-z.usePlugin = function (name, next) {
-  if (_plugins.hasOwnProperty(name)) {
-    next(_plugins[name]);
-  } else if (z.loader) {
-    mod = z.loader.parseModulePath(name);
-    z.loader.requestScript(mod.src, function () {
-      if (!_plugins.hasOwnProperty(name)) {
-        throw new Error('No plugin found: ' + name);
-        return;
-      }
-      z.usePlugin(name, next);
-    });
-  } else {
-    throw new Error('No plugin found: ' + name);
   }
 };
 

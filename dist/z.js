@@ -1,10 +1,23 @@
 /*!
+
+
+    __________
+   /\_______  \
+   \/______/  /
+          /  /
+         /  /
+        /  /______    __
+       /\_________\  /\_\
+       \/_________/  \/_/
+
+
+
   zjs 2.0.0
 
   Copyright 2014
   Released under the MIT license
 
-  Date: 2014-07-23T17:55Z
+  Date: 2014-07-28T17:45Z
 */
 
 (function (factory) {
@@ -59,6 +72,15 @@ function each (obj, callback, context) {
   }
   return obj;
 }
+
+function defaults (obj, source) {
+  if (source) {
+    for (var prop in source) {
+      if (obj[prop] === void 0) obj[prop] = source[prop];
+    }
+  }
+  return obj;
+};
 
 // Run through each item in an array, then resolve a Wait
 // once all items have been iterated through.
@@ -231,9 +253,6 @@ var _modules = {};
 // Namespace registry
 var _namespaces = {};
 
-// Plugin registry
-var _plugins = {};
-
 // Default config options.
 var _config = {
   debug: false,
@@ -361,13 +380,29 @@ z.imports = function (/*...*/) {
   }
 };
 
+// Get all registered modules.
+z.getModules = function () {
+  return _modules;
+};
+
+// Get all registered namespaces.
+z.getNamespaces = function () {
+  return _namespaces;
+};
+// z.plugin
+// --------
+
+// Plugin registry
+var _plugins = {};
+
 // Register a plugin. Plugins can handle module loading, parsing and
 // compiling. Here's an example:
 //
 //    z.plugin('foo.bin', {
 //      handler: function (mod, next) {
 //        var self = this;
-//        z.loader.load(mod.src, function (err, data) {
+//        var loader = z.Loader.getInstance();
+//        loader.load(mod.src, function (err, data) {
 //          self.parse(raw);
 //          next();
 //        }, error);
@@ -377,15 +412,16 @@ z.imports = function (/*...*/) {
 //        return raw;
 //      },
 //      build: function (mod, next) {
-//        z.build.fs.readFile(mod.src, 'utf-8', function (err, raw) {
-//          z.build.modules[mod.name] = {
+//        var build = z.Build.getInstance();
+//        build.fs.readFile(mod.src, 'utf-8', function (err, raw) {
+//          build.modules[mod.name] = {
 //            data: raw
 //          };
 //          next();
 //        });
 //      }
 //    });
-
+//
 z.plugin = function (name, options) {
   _plugins[name] = options;
 };
@@ -395,9 +431,10 @@ z.plugin = function (name, options) {
 z.usePlugin = function (name, next) {
   if (_plugins.hasOwnProperty(name)) {
     next(_plugins[name]);
-  } else if (z.loader) {
-    mod = z.loader.parseModulePath(name);
-    z.loader.requestScript(mod.src, function () {
+  } else if (z.Loader) {
+    var loader = z.Loader.getInstance();
+    mod = loader.parseModulePath(name);
+    loader.requestScript(mod.src, function () {
       if (!_plugins.hasOwnProperty(name)) {
         throw new Error('No plugin found: ' + name);
         return;
@@ -409,17 +446,8 @@ z.usePlugin = function (name, next) {
   }
 };
 
-// Get all registered modules.
-z.getModules = function () {
-  return _modules;
-};
-
-// Get all registered namespaces.
-z.getNamespaces = function () {
-  return _namespaces;
-};
-// Plugins
-// -------
+// Default plugins
+// ---------------
 
 // The default loader.
 z.plugin('__module', {
@@ -428,27 +456,30 @@ z.plugin('__module', {
   },
   handler: function (mod, next) {
     var self = this;
-    z.loader.requestAJAX(mod.src, function (err, raw) {
+    var loader = z.Loader.getInstance();
+    loader.requestAJAX(mod.src, function (err, raw) {
       var deps = z.parser.getDeps(raw);
       if (deps.length > 0) {
-        z.loader.load(deps, function () {
+        loader.load(deps, function () {
           var compiled = self.parse(raw, mod);
-          z.loader.enable(compiled, mod, next);
+          loader.enable(compiled, mod, next);
         })
       } else {
         var compiled = self.parse(raw);
-        z.loader.enable(compiled, mod, next);
+        loader.enable(compiled, mod, next);
       }
     });
   },
   build: function (mod, next) {
     var self = this;
-    z.build.fs.readFile(mod.src, 'utf-8', function (err, raw) {
+    var loader = z.Loader.getInstance();
+    var build = z.Build.getInstance();
+    build.fs.readFile(mod.src, 'utf-8', function (err, raw) {
       var deps = z.parser.getDeps(raw);
       if (deps.length > 0) {
-        z.loader.load(deps, function () {
+        loader.load(deps, function () {
           var compiled = self.parse(raw, mod);
-          z.build.modules[mod.name] = {
+          build.modules[mod.name] = {
             deps: deps,
             data: compiled
           };
@@ -456,7 +487,7 @@ z.plugin('__module', {
         });
       } else {
         var compiled = self.parse(raw, mod);
-        z.build.modules[mod.name] = {
+        build.modules[mod.name] = {
           data: compiled
         };
         next();
@@ -468,12 +499,14 @@ z.plugin('__module', {
 // A plugin to load unwrapped scripts.
 z.plugin('shim', {
   handler: function (mod, next) {
-    z.loader.requestScript(mod.src, next);
+    var loader = z.Loader.getInstance();
+    loader.requestScript(mod.src, next);
   },
   build: function (mod, next) {
-    z.build.fs.readFile(mod.src, 'utf-8', function (err, raw) {
-      z.build.extractLicenses(raw);
-      z.build.modules[mod.name] = {
+    var build = z.Build.getInstance();
+    build.fs.readFile(mod.src, 'utf-8', function (err, raw) {
+      build.extractLicenses(raw);
+      build.modules[mod.name] = {
         data: raw
       };
       next();
@@ -490,17 +523,19 @@ z.plugin('txt', {
   },
   handler: function (mod, next) {
     var self = this;
-    z.loader.requestAJAX(mod.src, function (err, data) {
+    var loader = z.Loader.getInstance();
+    loader.requestAJAX(mod.src, function (err, data) {
       if (err) return next(err);
       var compiled = self.parse(data, mod);
-      z.loader.enable(compiled, mod, next);
+      loader.enable(compiled, mod, next);
     });
   },
   build: function (mod, next) {
     var self = this;
-    z.build.fs.readFile(mod.src, 'utf-8', function (err, data) {
+    var build = z.Build.getInstance();
+    build.fs.readFile(mod.src, 'utf-8', function (err, data) {
       var compiled = self.parse(data, mod);
-      z.build.modules[mod.name] = {
+      build.modules[mod.name] = {
         data: compiled
       };
       next();
@@ -526,7 +561,8 @@ var _cleanModulePath = /[\r|\n|'|"|\s]/g;
 // If a module-name has only one segment, like `main`, then `main`
 // is the root.
 function _ensureRootNamespace (name) {
-  name = z.loader.parseModulePath(name).name;
+  var loader = z.Loader.getInstance();
+  name = loader.parseModulePath(name).name;
   var ns = (name.indexOf('.') > 0) 
     ? name.substring(0, name.indexOf('.'))
     : name;
@@ -580,15 +616,29 @@ parser.wrap = function (rawModule) {
 };
 
 z.parser = parser;
-// z.loader
+// z.Loader
 // --------
-// The loader, as its name suggests, handles all importing
+// The Loader, as its name suggests, handles all importing
 // of scripts. 
-var loader = {};
+var Loader = function (options) {
+  options = options || {};
+  this.visited = {};
+  this.options = defaults({
+    // ???
+  }, options);
+};
 
-// A list of visited scripts, used to ensure that things are only
-// requested once.
-loader.visited = {};
+// Used with 'getInstance()'
+var _loaderInstance = null;
+
+// Get a singleton instance of z.Loader. If this
+// is the first time `getInstance` is called, the
+// options arg will be passed to z.Loader's constructor.
+Loader.getInstance = function (options) {
+  if (!_loaderInstance)
+    _loaderInstance = new Loader(options);
+  return _loaderInstance;
+}
 
 // A simple error handler to use if a callback is not
 // provided.
@@ -597,7 +647,6 @@ function _handleErr (err) {
 };
 
 // Check if the passed item is a path
-// @private
 function _isPath (obj) {
   var result = false;
   result = obj.indexOf('/') >= 0;
@@ -607,7 +656,6 @@ function _isPath (obj) {
 };
 
 // Convert a path into an object name
-// @private
 function _pathToName (path, options) {
   options = options || {};
   if (_isPath(path)
@@ -652,7 +700,7 @@ function _mapRequest (path) {
 };
 
 // Make sure the module path is converted into a uri.
-loader.parseModulePath = function (req) {
+Loader.prototype.parseModulePath = function (req) {
   var root = z.config('root');
   var path = {name:'', src:'', plugin: '__module'};
   var parts = req.split(':');
@@ -673,12 +721,13 @@ loader.parseModulePath = function (req) {
   return path;
 };
 
-loader.load = function (path, next) {
+Loader.prototype.load = function (path, next) {
+  var self = this;
   next = next || _handleErr;
 
   if (path instanceof Array) {
     eachWait(path, function (item, next) {
-      loader.load(item, next);
+      self.load(item, next);
     })
     .done(function (err) {
       if (err) {
@@ -774,7 +823,7 @@ function _addScript (mod, text, next) {
 };
 
 // Send an AJAX request.
-loader.requestAJAX = function (src, next) {
+Loader.prototype.requestAJAX = function (src, next) {
   var visited = this.visited;
   if(visited.hasOwnProperty(src)){
     visited[src].done(next);
@@ -804,7 +853,7 @@ loader.requestAJAX = function (src, next) {
 };
 
 // Load a script by placing it in the DOM
-loader.requestScript = function (src, next) {
+Loader.prototype.requestScript = function (src, next) {
   var visited = this.visited;
   if(visited.hasOwnProperty(src)){
     visited[src].done(next);
@@ -824,12 +873,12 @@ loader.requestScript = function (src, next) {
 
 // Take a raw module string and place it into the DOM as a `<script>`.
 // This will only be run after any dependencies have been loaded first.
-loader.enable = function (compiled, mod, next) {
+Loader.prototype.enable = function (compiled, mod, next) {
   next = next || _handleErr;
   _addScript(mod, compiled, next);
 };
 
-z.loader = loader;
+z.Loader = Loader;
 // Start a script by loading a main file. Please note that,
 // due to the way zjs loads scripts, z.config won't work
 // if you place it in your main module. Use `z.start.config`
@@ -842,7 +891,8 @@ z.start = function (mainFile, done) {
   var main = mainFile.substring(lastSegment);
   z.config('root', root);
   z.config('main', main);
-  z.loader.load(main, done);
+  var loader = z.Loader.getInstance();
+  loader.load(main, done);
 };
 
 // Start a script by loading a config file. At the very
@@ -863,10 +913,11 @@ z.start = function (mainFile, done) {
 // By convention, this file is nammed 'config.js', but you can
 // call it whatever you'd like.
 z.startConfig = function (configFile, done) {
+  var loader = z.Loader.getInstance();
   configFile = configFile + '.js';
-  z.loader.requestScript(configFile, function () {
+  loader.requestScript(configFile, function () {
     if (z.config('main'))
-      z.loader.load(z.config('main'), done);
+      loader.load(z.config('main'), done);
   });
 };
 

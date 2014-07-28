@@ -17,7 +17,8 @@ var _cleanModulePath = /[\r|\n|'|"|\s]/g;
 // If a module-name has only one segment, like `main`, then `main`
 // is the root.
 function _ensureRootNamespace (name) {
-  name = z.loader.parseModulePath(name).name;
+  var loader = z.Loader.getInstance();
+  name = loader.parseModulePath(name).name;
   var ns = (name.indexOf('.') > 0) 
     ? name.substring(0, name.indexOf('.'))
     : name;

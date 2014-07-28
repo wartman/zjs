@@ -28,11 +28,12 @@ describe('z.build', function () {
   });
 
   it('compiles modules', function (done) {
-    z.build.newInstance({
+    z.Build.getInstance({
       main: 'tests/fixtures/config.js',
       dest: 'tests/tmp/app.js'
-    });
-    z.build.done(function () {
+    })
+    .start()
+    .done(function () {
       var actual = fs.readFileSync(__dirname + "/tmp/app.js", 'utf-8');
       var module = Function('', actual);
 
