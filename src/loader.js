@@ -81,15 +81,25 @@ function _mapRequest (path) {
   return path;
 };
 
-// Make sure the module path is converted into a uri.
-Loader.prototype.parseModulePath = function (req) {
-  var root = z.config('root');
-  var path = {name:'', src:'', plugin: '__module'};
+// Check a path for a plugin. 
+// @private
+function _checkForPlugin (prop, path) {
+  var req = path[prop];
   var parts = req.split(':');
   if (parts.length > 1) {
     path.plugin = parts[0].trim();
-    req = parts[1].trim();
+    path[prop] = parts[1].trim();
   }
+}
+
+// Make sure the module path is converted into a uri,
+// check for the correct plugin to use, and apply any maps
+// that have been registered.
+Loader.prototype.parseModulePath = function (req) {
+  var root = z.config('root');
+  var path = {req: req, name: '', src: '', plugin: '__module'};
+  _checkForPlugin('req', path);
+  req = path.req;
   if (_isPath(req)) {
     path.name = _pathToName(req, {stripExt:true});
     path.src = req;
@@ -98,11 +108,14 @@ Loader.prototype.parseModulePath = function (req) {
     path.src = _nameToPath(req) + '.js';
   }
   path = _mapRequest(path);
+  // Maps can indicate plugins too, so check again
+  _checkForPlugin('src', path);
   // Add root.
   path.src = root + path.src;
   return path;
 };
 
+// Grab a module or modules, using the correct plugin.
 Loader.prototype.load = function (path, next) {
   var self = this;
   next = next || _handleErr;
@@ -151,11 +164,7 @@ function _newScript (moduleName) {
 // Place a script in the DOM
 function _insertScript(script, next) {
   var head = document.getElementsByTagName("head")[0] || document.documentElement;
-  try {
-    head.insertBefore(script, head.firstChild).parentNode;
-  } catch (e) {
-    console.log('caught:', e);
-  }
+  head.insertBefore(script, head.firstChild).parentNode;
   if (next) {
     // If a callback is provided, use an event listener.
     var done = false;
@@ -211,8 +220,8 @@ Loader.prototype.requestAJAX = function (src, next) {
     visited[src].done(next);
     return;
   }
-  visited[src] = new Wait();
-  visited[src].done(next);
+  var visit = visited[src] = new Wait();
+  visit.done(next);
 
   if(root.XMLHttpRequest){
     var request = new XMLHttpRequest();
@@ -223,9 +232,9 @@ Loader.prototype.requestAJAX = function (src, next) {
   request.onreadystatechange = function(){
     if(4 === this.readyState){
       if(200 === this.status){
-        visited[src].resolve(this.responseText);
+        visit.resolve(this.responseText);
       } else {
-        visited[src].reject('AJAX Error: Could not load [' + src + '], status code: ' + this.status);
+        visit.reject('AJAX Error: Could not load [' + src + '], status code: ' + this.status);
       }
     }
   }
@@ -242,19 +251,18 @@ Loader.prototype.requestScript = function (src, next) {
     return;
   }
 
-  visited[src] = new Wait();
-  visited[src].done(next);
+  var visit = visited[src] = new Wait();
+  visit.done(next);
 
   var script = _newScript();
   script.src = src;
   script.async = true;
   _insertScript(script, function () {
-    visited[src].resolve();
+    visit.resolve();
   });
 };
 
 // Take a raw module string and place it into the DOM as a `<script>`.
-// This will only be run after any dependencies have been loaded first.
 Loader.prototype.enable = function (compiled, mod, next) {
   next = next || _handleErr;
   _addScript(mod, compiled, next);

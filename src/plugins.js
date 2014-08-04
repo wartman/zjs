@@ -60,21 +60,20 @@ z.usePlugin = function (name, next) {
 
 // The default loader.
 z.plugin('__module', {
-  parse: function (raw, mod) {
-    return z.parser.wrap(raw);
-  },
   handler: function (mod, next) {
     var self = this;
     var loader = z.Loader.getInstance();
+    var parser = new z.Parser();
     loader.requestAJAX(mod.src, function (err, raw) {
-      var deps = z.parser.getDeps(raw);
+      parser.setModule(raw);
+      var deps = parser.getDeps();
       if (deps.length > 0) {
         loader.load(deps, function () {
-          var compiled = self.parse(raw, mod);
+          var compiled = parser.getWrappedModule();
           loader.enable(compiled, mod, next);
-        })
+        });
       } else {
-        var compiled = self.parse(raw);
+        var compiled = parser.getWrappedModule();
         loader.enable(compiled, mod, next);
       }
     });
@@ -83,11 +82,13 @@ z.plugin('__module', {
     var self = this;
     var loader = z.Loader.getInstance();
     var build = z.Build.getInstance();
+    var parser = new z.Parser();
     build.fs.readFile(mod.src, 'utf-8', function (err, raw) {
-      var deps = z.parser.getDeps(raw);
+      parser.setModule(raw);
+      var deps = parser.getDeps();
       if (deps.length > 0) {
         loader.load(deps, function () {
-          var compiled = self.parse(raw, mod);
+          var compiled = parser.getWrappedModule();
           build.modules[mod.name] = {
             deps: deps,
             data: compiled
@@ -95,7 +96,7 @@ z.plugin('__module', {
           next();
         });
       } else {
-        var compiled = self.parse(raw, mod);
+        var compiled = parser.getWrappedModule();
         build.modules[mod.name] = {
           data: compiled
         };
@@ -128,7 +129,8 @@ z.plugin('txt', {
   parse: function (raw, mod) {
     raw = "z.module('" + mod.name + "');\n"
           + mod.name + ' = "' + raw.replace(/"/g, '\"') + '";\n';
-    return z.parser.wrap(raw);
+    var parser = new z.Parser(raw);
+    return parser.getWrappedModule();
   },
   handler: function (mod, next) {
     var self = this;

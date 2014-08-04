@@ -1,6 +1,5 @@
 /*!
 
-
     __________
    /\_______  \
    \/______/  /
@@ -11,21 +10,24 @@
        \/_________/  \/_/
 
 
-
   zjs 2.0.0
 
   Copyright 2014
   Released under the MIT license
 
-  Date: 2014-07-28T19:51Z
+  Date: 2014-08-04T16:35Z
 */
 
 (function (factory) {
-  if ( typeof module === "object" && typeof module.exports === "object" ) {
+  if (typeof root !== 'undefined') {
+    // If root is already defined, use it.
+    factory (root);
+  } else if ( typeof module === "object" && typeof module.exports === "object" ) {
     // For CommonJS environments.
     factory(module.exports);
     global.z = module.exports.z;
   } else {
+    // For normal, browser envs.
     factory(window);
   }
 }( function (root, undefined) {

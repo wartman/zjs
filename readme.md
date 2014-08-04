@@ -102,12 +102,11 @@ API
   z.imports('Foo'); // -> Imports from libs/foo.min.js
   ```
 
-  Note that this method will automatically work with any 
-  script that exports a global var, so long as `mod` is 
-  equal to the global you want. Here is an example for jQuery:
+  Maps can include plugins, which can be handy if you need to, for example,
+  import a shimmed script:
   
   ```javascript
-  z.map('$', 'libs/jQuery.min.js')
+  z.map('$', 'shim:libs/jQuery.min.js')
   ```
 
 - z.__mapNamespace__(*ns*, *path*)
@@ -119,6 +118,14 @@ API
   // The following import will now import 'lib/FooBin/Bax.js'
   // rather then 'Foo/Bin/Bax.js'
   z.imports('Foo.Bin.Bax');
+  ```
+
+  Plugins can be mapped to namespaces too. This could be used, for example, to import templates:
+
+  ```javascript
+  z.mapNamespace('templates', 'app.plugins.tpl:app/templates/');
+  // Now you can import templates without needing to include a plugin prefix:
+  z.imports('templates.foo'); // -> Imports from 'app/templates/foo.tpl' using the 'app.plugins.tpl' plugin.
   ```
 
 - z.__start__(*mainFile*, *done*)
@@ -147,7 +154,10 @@ API
     // here, if you need to.
     maps: {
       modules: {
-        'foo' : 'libs/foo/foo.js'
+        'foo' : 'app/foo/foo.js'
+      },
+      namespaces: {
+        'lib' : 'libs/'
       }
     }
   });
@@ -222,7 +232,7 @@ API
   z.map('$', 'shim:bower_components/jquery/dist/jquery.min.js');
   ```
 
-  `zjs` ships with a 'txt' plugin for loading files and a 'shim' plugin to load scripts
+  `zjs` ships with a 'txt' plugin for loading text files and a 'shim' plugin to load scripts
   that export a global var.
 
   This method is not available in `z.runtime.js` or compiled scripts.

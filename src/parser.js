@@ -1,7 +1,10 @@
-// z.parser
+// z.Parser
 // --------
-// The parser handles module dependencies and the like.
-var parser = {};
+// The Parser handles module dependencies and the like.
+var Parser = z.Parser = function (mod) {
+  this._mod = mod;
+  this._deps = [];
+};
 
 // RegExp to find an import.
 var _importsMatch = /z\.imports\(([\s\S\r\n]+?)\)/g;
@@ -22,21 +25,26 @@ function _ensureRootNamespace (name) {
   var ns = (name.indexOf('.') > 0) 
     ? name.substring(0, name.indexOf('.'))
     : name;
-  // z.namespace(ns);
   var namespaces = z.getNamespaces();
   if (!namespaces.hasOwnProperty(ns)) {
     namespaces[ns] = true;
   }
 };
 
+// Set the module to parse.
+Parser.prototype.setModule = function (mod) {
+  this._mod = mod;
+  this._deps = [];
+};
+
 // Parse a module loaded by AJAX, using regular expressions to match
 // any `z.imports` calls in the provided module. Any matches will be
 // returned in an array; if no imports are found, then an empty array
 // will be returned.
-parser.getDeps = function (rawModule) {
+Parser.prototype.getDeps = function () {
   var self = this;
-  var deps = [];
-  var nsList = [];
+  var deps = this._deps;
+  var rawModule = this._mod;
   rawModule.replace(_importsMatch, function (matches, importList) {
     var imports = importList.split(',');
     each(imports, function (item) {
@@ -55,10 +63,11 @@ parser.getDeps = function (rawModule) {
 
 // Wrap a module in a function to keep it from messing with globals. This
 // will also provide it with any required namespaces.
-parser.wrap = function (rawModule) {
+Parser.prototype.getWrappedModule = function () {
   var nsVals = [];
   var nsList = [];
   var compiled = '';
+  var rawModule = this._mod;
   var namespaces = z.getNamespaces();
   each(namespaces, function (val, ns) {
     nsVals.push("z.namespace('" + ns + "')");
@@ -66,9 +75,6 @@ parser.wrap = function (rawModule) {
   });
   nsVals.push('z');
   nsList.push('z');
-
-  compiled = ";(function (" + nsList.join(', ') + ") {/* <- zjs runtime */ " + rawModule + "\n})(" + nsVals.join(', ') + ");\n";
+  compiled = ";(function (" + nsList.join(', ') + ") { " + rawModule + "\n})(" + nsVals.join(', ') + ");\n";
   return compiled;
 };
-
-z.parser = parser;

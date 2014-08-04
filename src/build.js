@@ -138,9 +138,9 @@ Build.prototype.compile = function () {
 
 	// Add the minimal implementation of z unless otherwise requested.
 	if (z.config('compile.full')) {
-		var lib = fs.readFileSync(__dirname + '../dist/z.js', 'utf-8');
+		var lib = fs.readFileSync(__dirname + '/../dist/z.js', 'utf-8');
 	} else {
-		var lib = fs.readFileSync(__dirname + '/api.js', 'utf-8');
+		var lib = fs.readFileSync(__dirname + '/../dist/z.runtime.js', 'utf-8');
 	}
 
 	// Put it together.

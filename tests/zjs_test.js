@@ -88,7 +88,7 @@ describe('z', function () {
 
   });
 
-  describe('#parser', function () {
+  describe('#Parser', function () {
     
     describe('#getDeps', function () {
 
@@ -101,7 +101,8 @@ describe('z', function () {
             'foo.bax'
           );
         };
-        var deps = z.parser.getDeps(mock.toString());
+        var parser = new z.Parser(mock.toString());
+        var deps = parser.getDeps();
         expect(deps).to.deep.equal([
           'foo.bar',
           'foo.bin',
@@ -181,6 +182,15 @@ describe('z', function () {
         });
       });
 
+      it('loads using a mapped shim', function (done) {
+        var loader = z.Loader.getInstance();
+        z.map('globalMapped', 'shim:fixtures/globalMapped.js');
+        loader.load('globalMapped', function () {
+          expect(window.globalMapped).to.equal('globalMapped');
+          done();
+        });
+      });
+
       it('catches syntax errors', function (done) {
         var mochaHandler = window.onerror;
         var loader = z.Loader.getInstance();
@@ -256,6 +266,14 @@ describe('z', function () {
 			expect(loader.parseModulePath('ItemTwo').src).to.equal('MyLib/ItemTwo.js');
 		});
 
+    it('maps plugins', function () {
+      var loader = z.Loader.getInstance();
+      z.map('mappedPlugin', 'fakePlugin:foo.bin.bar');
+      var path = loader.parseModulePath('mappedPlugin');
+      expect(path.plugin).to.equal('fakePlugin');
+      expect(path.src).to.equal('foo/bin/bar.js');
+    });
+
 		it('maps namespaces', function () {
       var loader = z.Loader.getInstance();
 			z.config('root', '');
@@ -263,6 +281,14 @@ describe('z', function () {
 			expect(loader.parseModulePath('Foo.Bar.Bin').src).to.equal('libs/FooBar/Bin.js');
 			expect(loader.parseModulePath('Foo.Bar.Bax.Bin').src).to.equal('libs/FooBar/Bax/Bin.js');
 		});
+
+    it('maps namespaced plugins', function () {
+      var loader = z.Loader.getInstance();
+      z.mapNamespace('foo.plugins', 'fakePlugin:libs/foo');
+      var path = loader.parseModulePath('foo.plugins.jk');
+      expect(path.plugin).to.equal('fakePlugin');
+      expect(path.src).to.equal('libs/foo/jk.js');
+    });
 
 	});
 
@@ -289,7 +315,7 @@ describe('z', function () {
         expect(z.config('test')).to.equal('test');
         expect(z.config('root')).to.equal('fixtures/start-config/');
         expect(z.config('main')).to.equal('mainfoo');
-        expect(modules.main.foo).to.equal('Configured');
+        expect(modules.mainfoo.foo).to.equal('Configured');
         expect(modules.foo.bin.bar.mapped).to.equal('mapped');
         expect(modules.startconfigfoo.foo).to.equal('startconfigfoo');
         done();
