@@ -1,6 +1,5 @@
-z('fixtures.stress.three')
-  .exports(function(){
-    return {
-      Three: "three"
-    };
-  });
+z.module(
+  'fixtures.stress.three'
+).define(function () {
+  fixtures.stress.three = 'three';
+});

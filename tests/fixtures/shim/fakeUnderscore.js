@@ -1,1 +1,0 @@
-(function () { this._ = 'underscore'; }).call(this);

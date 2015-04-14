@@ -1,8 +1,5 @@
-z('fixtures.stress.one')
-  .imports('fixtures.stress.item.foo')
-  .exports(function(){
-    return {
-      One: "one",
-      Foo: fixtures.stress.item.foo
-    };
-  });
+z.module(
+  'fixtures.stress.one'
+).define(function () {
+  fixtures.stress.one = 'one';
+});
