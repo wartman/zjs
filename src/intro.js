@@ -1,0 +1,17 @@
+/*!
+ * zjs @VERSION
+ *
+ * Copyright 2014
+ * Released under the MIT license
+ *
+ * Date: @DATE
+ */
+
+(function (factory) {
+  if ( typeof module === "object" && typeof module.exports === "object" ) {
+    // For CommonJS environments.
+    factory(module.exports);
+  } else {
+    factory(window);
+  }
+}(function (root, undefined) {

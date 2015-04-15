@@ -11,19 +11,15 @@
     "url": "https://wartman@bitbucket.org/wartman/zjs.git"
   },
   "license": "MIT",
-  "main": "z.js",
   "author": {
     "name": "Peter Wartman",
     "email": "pwartman@wartfolio.com"
   },
   "devDependencies": {
-    "chai": "^1.9.1",
-    "grunt": "~0.4.2",
-    "grunt-contrib-connect": "~0.7.1",
-    "grunt-contrib-nodeunit": "~0.3.3",
-    "grunt-mocha-phantomjs": "^0.4.3",
-    "grunt-simple-mocha": "^0.4.0",
-    "mocha": "^1.18.2"
+    "expect.js": "^0.3.1",
+    "gulp": "^3.8.11",
+    "gulp-concat": "^2.5.2",
+    "mocha": "^2.2.4"
   },
   "bin": {
     "zjs": "./bin/zjs"

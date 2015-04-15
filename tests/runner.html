@@ -10,19 +10,14 @@
   <body>
     <div id="mocha"></div>
     <script src="../node_modules/mocha/mocha.js"></script>
-    <script src="../node_modules/chai/chai.js"></script>
+    <script src="../node_modules/expect.js/index.js"></script>
     <script>
-      expect = chai.expect;
       mocha.setup('bdd');
     </script>
-    <script src="../src/z.js"></script>
+    <script src="../lib/z.js"></script>
     <script src="z-test.js"></script>
     <script>
-      if (window.mochaPhantomJS) {
-        mochaPhantomJS.run();
-      } else {
-        mocha.run();
-      }
+      mocha.run();
     </script>
   </body>
 </html>

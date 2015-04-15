@@ -47,6 +47,21 @@ describe('z', function () {
       });
     });
 
+    it('loads modules defined using the `module` shortcut (no `z.`)', function (done) {
+      z.loadModules(['fixtures.shortcut'], function (err) {
+        if (err) return done(err);
+        expect(fixtures.shortcut.foo).to.equal('foo');
+        done();
+      });
+    });
+
+    it('returns an error if a module does not exist', function (done) {
+      z.loadModules(['fixtures.wrongName'], function (err) {
+        if (!err) done(new Error('expected an error, none returned'));
+        done();
+      });
+    });
+
   });
 
 });
