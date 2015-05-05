@@ -25,20 +25,6 @@ describe('z', function () {
       });
     });
 
-    describe('#package', function () {
-
-      it('provides a package namespace that the module can add to', function () {
-        z.module(
-          'tests.module.packaged.item'
-        ).package(
-          'item'
-        ).define(function () {
-          expect(item).to.be.an('object');
-        });
-      })
-
-    })
-
   });
 
   describe('#loadModules', function () {
