@@ -22,7 +22,21 @@ describe('z', function () {
       ).define(function () {
         expect(tests.module.importable.target.foo).to.equal('foo');
         done();
+      });
+    });
+
+    describe('#package', function () {
+
+      it('provides a package namespace that the module can add to', function () {
+        z.module(
+          'tests.module.packaged.item'
+        ).package(
+          'item'
+        ).define(function () {
+          expect(item).to.be.an('object');
+        });
       })
+
     })
 
   });
@@ -55,12 +69,13 @@ describe('z', function () {
       });
     });
 
-    it('returns an error if a module does not exist', function (done) {
-      z.loadModules(['fixtures.wrongName'], function (err) {
-        if (!err) done(new Error('expected an error, none returned'));
+    it('loads modules even if module name is different', function (done) {
+      z.loadModules(['fixtures.packaged.thing'], function (err) {
+        if (err) return done(err);
+        expect(packaged.thing).to.equal('packaged');
         done();
       });
-    });
+    })
 
   });
 

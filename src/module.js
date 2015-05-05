@@ -31,7 +31,7 @@ var Module = function (z, namespace, options) {
 
   // Ensure the namespace exists.
   // @todo: make configurable?
-  ensureNamespaceExists(this._namespace, {});
+  ensureNamespaceExists(this._namespace);
 };
 
 Module.STATES = {
@@ -95,7 +95,6 @@ Module.prototype.enable = function () {
     this._dispatchListeners(this._onReadyListeners);
   } else {
     this._z.loadModules(this._dependencies, function (err) {
-      console.log(err);
       if (err) {
         this._state = Module.STATES.DISABLED;
         this._dispatchListeners(this._onFailedListeners);

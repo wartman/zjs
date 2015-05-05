@@ -47,12 +47,13 @@ Z.prototype.getModule = function (namespace) {
 Z.prototype.module = function (namespace) {
   var module = new Module(this, namespace);
   this._modules[namespace] = module;
+  // Handle modules with a different name
+  this._lastModule = namespace;
   return module;
 };
 
 // Load all requested modules, then run the callback.
 Z.prototype.loadModules = function (deps, next, context) {
-  console.log('loading', deps);
   var rootPath = this.config.root;
   var progress = deps.length;
   var _this = this;
@@ -64,7 +65,6 @@ Z.prototype.loadModules = function (deps, next, context) {
       return
     }
     progress -= 1;
-    console.log('progress:', progress);
     if (progress <= 0) next.call(context, null);
   };
   var onFailed = function (err) {
@@ -74,15 +74,27 @@ Z.prototype.loadModules = function (deps, next, context) {
     var depPath = dep.split('.');
     depPath.unshift(rootPath);
     var fullPath = depPath.join('/');
-    console.log(fullPath);
     var mod = this._modules[dep];
     if (mod) {
       mod.onReady(onReady);
     } else {
       this._loader.load(fullPath, function (err) {
-        if (err) throw err;
+        if (err) {
+          onReady(err);
+          return;
+        }
         mod = _this._modules[dep];
         if (!mod) {
+          // Handle modules with an alias.
+          var lastMod = _this._lastModule 
+            ? _this._modules[_this._lastModule]
+            : false;
+          if (lastMod) {
+            _this._modules[dep] = lastMod;
+            delete _this._lastModule;
+            lastMod.onReady(onReady);
+            return;
+          }
           onReady(new Error('No module loaded for path ' + fullPath));
           return;
         }
